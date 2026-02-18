@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rodiablo Mobile</title>
+<style>
+body{margin:0;background:black;overflow:hidden;}
+canvas{display:block;background:#111;}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+const TILE_W = 64;
+const TILE_H = 32;
+
+let player = {x:5,y:5};
+
+function isoToScreen(x,y){
+  return {
+    x:(x-y)*(TILE_W/2)+canvas.width/2,
+    y:(x+y)*(TILE_H/2)+100
+  };
+}
+
+function drawTile(x,y){
+  const pos = isoToScreen(x,y);
+  ctx.beginPath();
+  ctx.moveTo(pos.x,pos.y);
+  ctx.lineTo(pos.x+TILE_W/2,pos.y+TILE_H/2);
+  ctx.lineTo(pos.x,pos.y+TILE_H);
+  ctx.lineTo(pos.x-TILE_W/2,pos.y+TILE_H/2);
+  ctx.closePath();
+  ctx.fillStyle="#222";
+  ctx.fill();
+}
+
+function drawPlayer(){
+  const pos = isoToScreen(player.x,player.y);
+
+  // 몸통
+  ctx.fillStyle="#8b0000";
+  ctx.fillRect(pos.x-8,pos.y-20,16,20);
+
+  // 머리
+  ctx.fillStyle="#ffe0bd";
+  ctx.fillRect(pos.x-5,pos.y-28,10,8);
+
+  // 칼
+  ctx.strokeStyle="silver";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(pos.x,pos.y-10);
+  ctx.lineTo(pos.x+20,pos.y-30);
+  ctx.stroke();
+}
+
+canvas.addEventListener("touchstart",(e)=>{
+  const rect=canvas.getBoundingClientRect();
+  const tx=e.touches[0].clientX-rect.left;
+  const ty=e.touches[0].clientY-rect.top;
+
+  for(let y=0;y<10;y++){
+    for(let x=0;x<10;x++){
+      const pos=isoToScreen(x,y);
+      if(Math.abs(tx-pos.x)<32 && Math.abs(ty-pos.y)<16){
+        player.x=x;
+        player.y=y;
+      }
+    }
+  }
+});
+
+function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for(let y=0;y<10;y++){
+    for(let x=0;x<10;x++){
+      drawTile(x,y);
+    }
+  }
+
+  drawPlayer();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
