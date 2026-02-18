@@ -4,48 +4,77 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Blood of the Ronin - Advanced</title>
+<title>Blood of the Ronin - Diablo Style</title>
 <style>
-body { margin:0; background:black; overflow:hidden; }
+body { margin:0; background:black; overflow:hidden; font-family:serif; }
 canvas { display:block; }
-#ui {
-  position:absolute;
-  top:10px;
-  left:10px;
-  color:white;
-  font-family:Arial;
+
+#ui-bar {
+  position:fixed;
+  bottom:0;
+  width:100%;
+  height:90px;
+  background:linear-gradient(#2b0000,#000);
+  border-top:3px solid #550000;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px;
+  box-sizing:border-box;
+  color:#ddd;
+}
+
+.orb {
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  border:3px solid #550000;
+  background:radial-gradient(circle at 30% 30%, #ff0000, #550000);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+}
+
+#center-ui {
+  text-align:center;
+  font-size:14px;
+  color:#ccc;
 }
 </style>
 </head>
 <body>
-<div id="ui">
-HP: <span id="hp">100</span>
-</div>
+
 <canvas id="game"></canvas>
+
+<div id="ui-bar">
+  <div class="orb" id="hpOrb">100</div>
+  <div id="center-ui">
+    <div>Blood of the Ronin</div>
+    <div>Tap to Move / Auto Slash</div>
+  </div>
+  <div class="orb" style="background:radial-gradient(circle at 30% 30%, #00aaff, #003355);">SK</div>
+</div>
+
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+canvas.height = window.innerHeight - 90;
 
-let player = {x:canvas.width/2, y:canvas.height/2, hp:100};
+let player = {x:canvas.width/2, y:canvas.height/2, hp:100, level:1, xp:0};
 let enemies = [];
-let boss = null;
 let attacking = false;
 
 function spawnEnemy(){
   enemies.push({
     x:Math.random()*canvas.width,
     y:Math.random()*canvas.height,
-    hp:30
+    hp:20
   });
 }
 
-function spawnBoss(){
-  boss = {x:canvas.width/2, y:100, hp:300};
-}
-
-for(let i=0;i<5;i++) spawnEnemy();
+for(let i=0;i<6;i++) spawnEnemy();
 
 canvas.addEventListener("touchstart", handleInput);
 canvas.addEventListener("mousedown", handleInput);
@@ -56,7 +85,7 @@ function handleInput(e){
   player.x = x;
   player.y = y;
   attacking = true;
-  setTimeout(()=>attacking=false,200);
+  setTimeout(()=>attacking=false,250);
 }
 
 function update(){
@@ -65,75 +94,78 @@ function update(){
     let dy = player.y - enemy.y;
     let dist = Math.sqrt(dx*dx+dy*dy);
     if(dist>0){
-      enemy.x += dx/dist;
-      enemy.y += dy/dist;
+      enemy.x += dx/dist*0.7;
+      enemy.y += dy/dist*0.7;
     }
 
     if(dist < 20){
-      player.hp -= 0.2;
+      player.hp -= 0.3;
     }
 
-    if(attacking && dist < 50){
-      enemy.hp -= 5;
+    if(attacking && dist < 45){
+      enemy.hp -= 8;
     }
   });
 
-  enemies = enemies.filter(e=>e.hp>0);
+  enemies = enemies.filter(e=>{
+    if(e.hp<=0){
+      player.xp += 10;
+      if(player.xp >= player.level*50){
+        player.level++;
+        player.xp = 0;
+        player.hp = 100;
+      }
+      return false;
+    }
+    return true;
+  });
 
-  if(enemies.length==0 && !boss){
-    spawnBoss();
+  if(enemies.length < 5){
+    spawnEnemy();
   }
 
-  if(boss){
-    let dx = player.x - boss.x;
-    let dy = player.y - boss.y;
-    let dist = Math.sqrt(dx*dx+dy*dy);
-    if(dist>0){
-      boss.x += dx/dist*0.5;
-      boss.y += dy/dist*0.5;
-    }
-
-    if(dist < 30){
-      player.hp -= 0.5;
-    }
-
-    if(attacking && dist < 60){
-      boss.hp -= 3;
-    }
-  }
-
-  document.getElementById("hp").innerText = Math.max(0,Math.floor(player.hp));
+  document.getElementById("hpOrb").innerText = Math.max(0,Math.floor(player.hp));
 }
 
 function draw(){
-  ctx.fillStyle="black";
+  ctx.fillStyle="#111";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(player.x,player.y,150,0,Math.PI*2);
-  ctx.clip();
+  // dungeon floor grid
+  ctx.strokeStyle="#222";
+  for(let x=0;x<canvas.width;x+=40){
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+  }
+  for(let y=0;y<canvas.height;y+=40){
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(canvas.width,y);
+    ctx.stroke();
+  }
 
-  ctx.fillStyle="red";
+  // enemies
+  ctx.fillStyle="#770000";
   enemies.forEach(e=>{
     ctx.beginPath();
-    ctx.arc(e.x,e.y,10,0,Math.PI*2);
+    ctx.arc(e.x,e.y,12,0,Math.PI*2);
     ctx.fill();
   });
 
-  if(boss){
-    ctx.fillStyle="purple";
-    ctx.beginPath();
-    ctx.arc(boss.x,boss.y,25,0,Math.PI*2);
-    ctx.fill();
-  }
-
-  ctx.fillStyle = attacking ? "yellow" : "white";
+  // player
+  ctx.fillStyle = attacking ? "#ffffaa" : "#dddddd";
   ctx.beginPath();
-  ctx.arc(player.x,player.y,12,0,Math.PI*2);
+  ctx.arc(player.x,player.y,14,0,Math.PI*2);
   ctx.fill();
 
-  ctx.restore();
+  // shadow vignette
+  let gradient = ctx.createRadialGradient(player.x,player.y,50,player.x,player.y,200);
+  gradient.addColorStop(0,"rgba(0,0,0,0)");
+  gradient.addColorStop(1,"rgba(0,0,0,0.85)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
 function gameLoop(){
