@@ -1,0 +1,215 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ronin - Fixed Visual Build</title>
+<style>
+body { margin:0; background:black; overflow:hidden; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let player = {x:canvas.width/2,y:canvas.height/2,dir:0};
+let enemies=[];
+let corpses=[];
+let particles=[];
+let attacking=false;
+let attackFrame=0;
+
+function spawnEnemy(){
+ enemies.push({
+  x:Math.random()*canvas.width,
+  y:Math.random()*canvas.height,
+  hp:40
+ });
+}
+for(let i=0;i<6;i++) spawnEnemy();
+
+canvas.addEventListener("mousedown",input);
+canvas.addEventListener("touchstart",input);
+
+function input(e){
+ let x=e.touches?e.touches[0].clientX:e.clientX;
+ let y=e.touches?e.touches[0].clientY:e.clientY;
+
+ let dx=x-player.x;
+ let dy=y-player.y;
+ player.dir=Math.atan2(dy,dx);
+
+ player.x=x;
+ player.y=y;
+
+ attacking=true;
+ attackFrame=0;
+ setTimeout(()=>attacking=false,300);
+}
+
+function spawnBlood(x,y){
+ for(let i=0;i<10;i++){
+  particles.push({
+   x,y,
+   vx:(Math.random()-0.5)*6,
+   vy:(Math.random()-0.5)*6,
+   life:40
+  });
+ }
+}
+
+function dismember(enemy){
+ corpses.push({
+   x:enemy.x,
+   y:enemy.y,
+   topOffset:0,
+   bottomOffset:0,
+   life:120
+ });
+}
+
+function update(){
+ if(attacking) attackFrame++;
+
+ enemies.forEach(enemy=>{
+  let dx=player.x-enemy.x;
+  let dy=player.y-enemy.y;
+  let dist=Math.sqrt(dx*dx+dy*dy);
+
+  if(dist>0){
+   enemy.x+=dx/dist*0.6;
+   enemy.y+=dy/dist*0.6;
+  }
+
+  if(attacking && dist<60 && attackFrame===2){
+   enemy.hp-=40;
+   spawnBlood(enemy.x,enemy.y);
+   if(enemy.hp<=0){
+    dismember(enemy);
+   }
+  }
+ });
+
+ enemies=enemies.filter(e=>e.hp>0);
+ if(enemies.length<6) spawnEnemy();
+
+ particles.forEach(p=>{
+  p.x+=p.vx;
+  p.y+=p.vy;
+  p.life--;
+ });
+ particles=particles.filter(p=>p.life>0);
+
+ corpses.forEach(c=>{
+  c.topOffset -= 0.4;
+  c.bottomOffset += 0.4;
+  c.life--;
+ });
+ corpses=corpses.filter(c=>c.life>0);
+}
+
+function drawKatana(){
+ ctx.save();
+ ctx.translate(player.x,player.y);
+ let frame = attackFrame % 3;
+ let swing = [-0.8,0,0.8][frame];
+ ctx.rotate(player.dir + swing);
+
+ // blade
+ ctx.fillStyle="#cccccc";
+ ctx.fillRect(0,-2,50,4);
+
+ // edge shine
+ ctx.fillStyle="#ffffff";
+ ctx.fillRect(10,-1,20,2);
+
+ // handle
+ ctx.fillStyle="#552200";
+ ctx.fillRect(-10,-3,10,6);
+
+ ctx.restore();
+}
+
+function drawPlayer(){
+ // legs
+ ctx.fillStyle="#330000";
+ ctx.fillRect(player.x-6,player.y,12,12);
+
+ // torso
+ ctx.fillStyle="#550000";
+ ctx.fillRect(player.x-10,player.y-12,20,14);
+
+ // armor highlight
+ ctx.fillStyle="#880000";
+ ctx.fillRect(player.x-6,player.y-10,12,6);
+
+ // head
+ ctx.fillStyle="#aa0000";
+ ctx.fillRect(player.x-6,player.y-22,12,10);
+
+ // horns
+ ctx.fillStyle="#ffffcc";
+ ctx.fillRect(player.x-8,player.y-24,4,6);
+ ctx.fillRect(player.x+4,player.y-24,4,6);
+
+ // eyes
+ ctx.fillStyle=attacking?"yellow":"white";
+ ctx.fillRect(player.x-3,player.y-18,2,2);
+ ctx.fillRect(player.x+1,player.y-18,2,2);
+
+ if(attacking){
+  drawKatana();
+ }
+}
+
+function draw(){
+ ctx.fillStyle="#111";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ enemies.forEach(e=>{
+  ctx.fillStyle="#003300";
+  ctx.fillRect(e.x-12,e.y-12,24,24);
+ });
+
+ corpses.forEach(c=>{
+  ctx.fillStyle="#004400";
+  ctx.fillRect(c.x-12,c.y-12+c.topOffset,24,12);
+  ctx.fillRect(c.x-12,c.y+c.bottomOffset,24,12);
+ });
+
+ drawPlayer();
+
+ ctx.fillStyle="#aa0000";
+ particles.forEach(p=>{
+  ctx.fillRect(p.x,p.y,3,3);
+ });
+
+ // Torch Lighting
+ let flicker = 120 + Math.sin(Date.now()*0.01)*15;
+ let gradient = ctx.createRadialGradient(
+   player.x,player.y,40,
+   player.x,player.y,flicker
+ );
+ gradient.addColorStop(0,"rgba(255,140,0,0.25)");
+ gradient.addColorStop(0.5,"rgba(0,0,0,0.4)");
+ gradient.addColorStop(1,"rgba(0,0,0,0.95)");
+ ctx.fillStyle=gradient;
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
