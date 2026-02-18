@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Blood of the Ronin - Abyss Axe</title>
+<title>Blood of the Ronin - Katana 3 Frame</title>
 <style>
 body { margin:0; background:black; overflow:hidden; }
 canvas { display:block; }
@@ -13,7 +13,7 @@ canvas { display:block; }
   bottom:0;
   width:100%;
   height:80px;
-  background:linear-gradient(#140000,#000);
+  background:linear-gradient(#1a0000,#000);
   border-top:3px solid #550000;
   color:white;
   display:flex;
@@ -26,7 +26,7 @@ canvas { display:block; }
 <body>
 
 <canvas id="game"></canvas>
-<div id="ui">🪓 Oni Executioner - Abyss Dungeon</div>
+<div id="ui">⚔️ Oni Samurai - 3 Frame Katana</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -34,56 +34,18 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight - 80;
 
-const TILE = 40;
-const COLS = Math.floor(canvas.width / TILE);
-const ROWS = Math.floor(canvas.height / TILE);
-
-let dungeon = [];
-for(let y=0;y<ROWS;y++){
-  dungeon[y]=[];
-  for(let x=0;x<COLS;x++){
-    dungeon[y][x] = (Math.random() < 0.18) ? 1 : 0; // walls
-  }
-}
-
-let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function startMusic(){
-  let osc1 = audioCtx.createOscillator();
-  let osc2 = audioCtx.createOscillator();
-  let gain = audioCtx.createGain();
-  osc1.type="sawtooth";
-  osc2.type="triangle";
-  osc1.frequency.value=55;
-  osc2.frequency.value=73;
-  gain.gain.value=0.03;
-  osc1.connect(gain);
-  osc2.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc1.start();
-  osc2.start();
-}
-startMusic();
-
-function playHit(){
-  let osc = audioCtx.createOscillator();
-  let gain = audioCtx.createGain();
-  osc.type="square";
-  osc.frequency.value=120;
-  gain.gain.value=0.15;
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime+0.1);
-}
-
-let player = {x:canvas.width/2,y:canvas.height/2,dir:0};
-let enemies=[];
-let particles=[];
-let attacking=false;
-let axeFrame=0;
+let player = {x:canvas.width/2, y:canvas.height/2, dir:0};
+let enemies = [];
+let particles = [];
+let attacking = false;
+let attackFrame = 0;
 
 function spawnEnemy(){
-  enemies.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,hp:40});
+  enemies.push({
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    hp:30
+  });
 }
 for(let i=0;i<6;i++) spawnEnemy();
 
@@ -91,90 +53,108 @@ canvas.addEventListener("touchstart", handleInput);
 canvas.addEventListener("mousedown", handleInput);
 
 function handleInput(e){
-  audioCtx.resume();
-  let x = e.touches?e.touches[0].clientX:e.clientX;
-  let y = e.touches?e.touches[0].clientY:e.clientY;
-  let dx=x-player.x, dy=y-player.y;
-  player.dir=Math.atan2(dy,dx);
-  if(!isWall(x,y)){
-    player.x=x;
-    player.y=y;
-  }
-  attacking=true;
-  axeFrame=0;
+  let x = e.touches ? e.touches[0].clientX : e.clientX;
+  let y = e.touches ? e.touches[0].clientY : e.clientY;
+
+  let dx = x - player.x;
+  let dy = y - player.y;
+  player.dir = Math.atan2(dy,dx);
+
+  player.x = x;
+  player.y = y;
+
+  attacking = true;
+  attackFrame = 0;
   setTimeout(()=>attacking=false,300);
 }
 
-function isWall(px,py){
-  let gx=Math.floor(px/TILE);
-  let gy=Math.floor(py/TILE);
-  if(gx<0||gy<0||gx>=COLS||gy>=ROWS) return true;
-  return dungeon[gy][gx]===1;
-}
-
 function spawnBlood(x,y){
-  for(let i=0;i<12;i++){
-    particles.push({x,y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:40});
-  }
-}
-
-function spawnGib(x,y){
-  for(let i=0;i<6;i++){
-    particles.push({x,y,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:60,chunk:true});
+  for(let i=0;i<8;i++){
+    particles.push({
+      x,y,
+      vx:(Math.random()-0.5)*4,
+      vy:(Math.random()-0.5)*4,
+      life:30
+    });
   }
 }
 
 function update(){
-  if(attacking) axeFrame = (axeFrame+1)%3;
+  if(attacking){
+    attackFrame++;
+  }
 
   enemies.forEach(enemy=>{
-    let dx=player.x-enemy.x;
-    let dy=player.y-enemy.y;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-    if(dist>0 && !isWall(enemy.x+dx/dist*0.5, enemy.y+dy/dist*0.5)){
-      enemy.x+=dx/dist*0.5;
-      enemy.y+=dy/dist*0.5;
+    let dx = player.x - enemy.x;
+    let dy = player.y - enemy.y;
+    let dist = Math.sqrt(dx*dx+dy*dy);
+
+    if(dist>0){
+      enemy.x += dx/dist*0.6;
+      enemy.y += dy/dist*0.6;
     }
-    if(attacking && dist<70){
-      enemy.hp-=20;
+
+    if(attacking && dist < 60 && attackFrame === 2){
+      enemy.hp -= 15;
       spawnBlood(enemy.x,enemy.y);
-      playHit();
-      if(enemy.hp<=0) spawnGib(enemy.x,enemy.y);
     }
   });
 
-  enemies=enemies.filter(e=>e.hp>0);
-  if(enemies.length<6) spawnEnemy();
+  enemies = enemies.filter(e=>e.hp>0);
+  if(enemies.length < 6) spawnEnemy();
 
-  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life--;});
-  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+  });
+  particles = particles.filter(p=>p.life>0);
 }
 
-function drawDungeon(){
-  for(let y=0;y<ROWS;y++){
-    for(let x=0;x<COLS;x++){
-      if(dungeon[y][x]===1){
-        ctx.fillStyle="#222";
-        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
-      }
-    }
-  }
-}
-
-function drawAxe(x,y,angle,frame){
+function drawKatana(x,y,angle,frame){
   ctx.save();
   ctx.translate(x,y);
-  ctx.rotate(angle + frame*0.5);
-  ctx.fillStyle="#bbb";
-  ctx.fillRect(-5,-25,10,50);
-  ctx.fillRect(-20,-5,40,10);
+
+  let swingOffset = 0;
+  if(frame === 0) swingOffset = -0.8;
+  if(frame === 1) swingOffset = 0;
+  if(frame === 2) swingOffset = 0.8;
+
+  ctx.rotate(angle + swingOffset);
+
+  // blade
+  ctx.fillStyle="#cccccc";
+  ctx.fillRect(0,-2,45,4);
+
+  // handle
+  ctx.fillStyle="#552200";
+  ctx.fillRect(-8,-3,8,6);
+
   ctx.restore();
 }
 
 function drawPlayer(){
+  // body
   ctx.fillStyle="#770000";
   ctx.fillRect(player.x-10,player.y-10,20,20);
-  if(attacking) drawAxe(player.x,player.y,player.dir,axeFrame);
+
+  // head
+  ctx.fillStyle="#cc0000";
+  ctx.fillRect(player.x-6,player.y-18,12,10);
+
+  // horns
+  ctx.fillStyle="#ffffcc";
+  ctx.fillRect(player.x-8,player.y-20,4,6);
+  ctx.fillRect(player.x+4,player.y-20,4,6);
+
+  // eyes
+  ctx.fillStyle= attacking ? "#ffff00" : "#ffffff";
+  ctx.fillRect(player.x-3,player.y-15,2,2);
+  ctx.fillRect(player.x+1,player.y-15,2,2);
+
+  if(attacking){
+    drawKatana(player.x,player.y,player.dir,attackFrame%3);
+  }
 }
 
 function drawEnemies(){
@@ -184,34 +164,32 @@ function drawEnemies(){
   });
 }
 
-function drawParticles(){
-  particles.forEach(p=>{
-    ctx.fillStyle = p.chunk ? "#550000" : "#aa0000";
-    ctx.fillRect(p.x,p.y,4,4);
-  });
-}
-
 function draw(){
   ctx.fillStyle="#111";
   ctx.fillRect(0,0,canvas.width,canvas.height);
-  drawDungeon();
+
   drawEnemies();
   drawPlayer();
-  drawParticles();
 
-  let gradient=ctx.createRadialGradient(player.x,player.y,80,player.x,player.y,260);
+  ctx.fillStyle="#aa0000";
+  particles.forEach(p=>{
+    ctx.fillRect(p.x,p.y,3,3);
+  });
+
+  let gradient = ctx.createRadialGradient(player.x,player.y,60,player.x,player.y,220);
   gradient.addColorStop(0,"rgba(0,0,0,0)");
   gradient.addColorStop(1,"rgba(0,0,0,0.9)");
-  ctx.fillStyle=gradient;
+  ctx.fillStyle = gradient;
   ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
-function loop(){
+function gameLoop(){
   update();
   draw();
-  requestAnimationFrame(loop);
+  requestAnimationFrame(gameLoop);
 }
-loop();
+
+gameLoop();
 </script>
 </body>
 </html>
