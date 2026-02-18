@@ -4,57 +4,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Blood of the Ronin - Diablo Style</title>
+<title>Blood of the Ronin - Oni Samurai</title>
 <style>
-body { margin:0; background:black; overflow:hidden; font-family:serif; }
+body { margin:0; background:black; overflow:hidden; }
 canvas { display:block; }
-
-#ui-bar {
+#ui {
   position:fixed;
   bottom:0;
   width:100%;
   height:90px;
   background:linear-gradient(#2b0000,#000);
   border-top:3px solid #550000;
+  color:white;
   display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:10px;
-  box-sizing:border-box;
-  color:#ddd;
-}
-
-.orb {
-  width:70px;
-  height:70px;
-  border-radius:50%;
-  border:3px solid #550000;
-  background:radial-gradient(circle at 30% 30%, #ff0000, #550000);
-  display:flex;
-  align-items:center;
   justify-content:center;
-  font-weight:bold;
-}
-
-#center-ui {
-  text-align:center;
-  font-size:14px;
-  color:#ccc;
+  align-items:center;
+  font-family:serif;
 }
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
-
-<div id="ui-bar">
-  <div class="orb" id="hpOrb">100</div>
-  <div id="center-ui">
-    <div>Blood of the Ronin</div>
-    <div>Tap to Move / Auto Slash</div>
-  </div>
-  <div class="orb" style="background:radial-gradient(circle at 30% 30%, #00aaff, #003355);">SK</div>
-</div>
+<div id="ui">🔴 Oni Samurai - Tap to Move / Auto Slash</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -62,7 +34,7 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight - 90;
 
-let player = {x:canvas.width/2, y:canvas.height/2, hp:100, level:1, xp:0};
+let player = {x:canvas.width/2, y:canvas.height/2, hp:100};
 let enemies = [];
 let attacking = false;
 
@@ -70,7 +42,7 @@ function spawnEnemy(){
   enemies.push({
     x:Math.random()*canvas.width,
     y:Math.random()*canvas.height,
-    hp:20
+    hp:30
   });
 }
 
@@ -88,6 +60,44 @@ function handleInput(e){
   setTimeout(()=>attacking=false,250);
 }
 
+function drawOni(x,y){
+  // shadow
+  ctx.fillStyle="rgba(0,0,0,0.5)";
+  ctx.beginPath();
+  ctx.ellipse(x,y+18,14,6,0,0,Math.PI*2);
+  ctx.fill();
+
+  // body
+  ctx.fillStyle="#770000";
+  ctx.fillRect(x-10,y-10,20,20);
+
+  // armor details
+  ctx.fillStyle="#aa0000";
+  ctx.fillRect(x-8,y-8,16,8);
+
+  // head
+  ctx.fillStyle="#cc0000";
+  ctx.fillRect(x-6,y-18,12,10);
+
+  // horns
+  ctx.fillStyle="#ffffcc";
+  ctx.fillRect(x-8,y-20,4,6);
+  ctx.fillRect(x+4,y-20,4,6);
+
+  // eyes
+  ctx.fillStyle= attacking ? "#ffff00" : "#ffffff";
+  ctx.fillRect(x-3,y-15,2,2);
+  ctx.fillRect(x+1,y-15,2,2);
+
+  // sword slash effect
+  if(attacking){
+    ctx.strokeStyle="#ff4444";
+    ctx.beginPath();
+    ctx.arc(x,y,28,0,Math.PI*1.5);
+    ctx.stroke();
+  }
+}
+
 function update(){
   enemies.forEach(enemy=>{
     let dx = player.x - enemy.x;
@@ -103,35 +113,19 @@ function update(){
     }
 
     if(attacking && dist < 45){
-      enemy.hp -= 8;
+      enemy.hp -= 10;
     }
   });
 
-  enemies = enemies.filter(e=>{
-    if(e.hp<=0){
-      player.xp += 10;
-      if(player.xp >= player.level*50){
-        player.level++;
-        player.xp = 0;
-        player.hp = 100;
-      }
-      return false;
-    }
-    return true;
-  });
-
-  if(enemies.length < 5){
-    spawnEnemy();
-  }
-
-  document.getElementById("hpOrb").innerText = Math.max(0,Math.floor(player.hp));
+  enemies = enemies.filter(e=>e.hp>0);
+  if(enemies.length < 6) spawnEnemy();
 }
 
 function draw(){
   ctx.fillStyle="#111";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // dungeon floor grid
+  // dungeon grid
   ctx.strokeStyle="#222";
   for(let x=0;x<canvas.width;x+=40){
     ctx.beginPath();
@@ -147,21 +141,17 @@ function draw(){
   }
 
   // enemies
-  ctx.fillStyle="#770000";
+  ctx.fillStyle="#003300";
   enemies.forEach(e=>{
     ctx.beginPath();
     ctx.arc(e.x,e.y,12,0,Math.PI*2);
     ctx.fill();
   });
 
-  // player
-  ctx.fillStyle = attacking ? "#ffffaa" : "#dddddd";
-  ctx.beginPath();
-  ctx.arc(player.x,player.y,14,0,Math.PI*2);
-  ctx.fill();
+  drawOni(player.x, player.y);
 
-  // shadow vignette
-  let gradient = ctx.createRadialGradient(player.x,player.y,50,player.x,player.y,200);
+  // darkness vignette
+  let gradient = ctx.createRadialGradient(player.x,player.y,60,player.x,player.y,220);
   gradient.addColorStop(0,"rgba(0,0,0,0)");
   gradient.addColorStop(1,"rgba(0,0,0,0.85)");
   ctx.fillStyle = gradient;
