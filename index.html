@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oni Samurai</title>
+<style>
+body{margin:0;background:black;overflow:hidden;}
+canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
+#ui{
+ position:fixed;bottom:0;width:100%;height:120px;
+ background:#111;border-top:3px solid #550000;
+ display:flex;align-items:center;justify-content:space-between;
+ padding:0 25px;box-sizing:border-box;
+}
+#movePad{position:relative;width:90px;height:90px;border-radius:50%;background:#222;}
+#stick{position:absolute;width:40px;height:40px;border-radius:50%;background:#666;left:25px;top:25px;}
+#attackBtn{
+ width:90px;height:90px;border-radius:50%;
+ background:#990000;border:3px solid #ff4444;
+ display:flex;align-items:center;justify-content:center;
+ font-size:26px;color:white;
+}
+#attackBtn.active{background:red;transform:scale(.85);}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+ <div id="movePad"><div id="stick"></div></div>
+ <div id="attackBtn">⚔</div>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const uiHeight=120;
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight-uiHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+/* ===== 사운드 ===== */
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+function swingSound(){
+ let o=audioCtx.createOscillator();
+ let g=audioCtx.createGain();
+ o.type="sawtooth";
+ o.frequency.setValueAtTime(700,audioCtx.currentTime);
+ o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+0.12);
+ g.gain.value=0.15;
+ o.connect(g); g.connect(audioCtx.destination);
+ o.start(); o.stop(audioCtx.currentTime+0.12);
+}
+function hitSound(){
+ let o=audioCtx.createOscillator();
+ let g=audioCtx.createGain();
+ o.type="square";
+ o.frequency.value=100;
+ g.gain.value=0.25;
+ o.connect(g); g.connect(audioCtx.destination);
+ o.start(); o.stop(audioCtx.currentTime+0.08);
+}
+
+/* ===== 기본 데이터 ===== */
+let player={
+ x:0,y:0,
+ dir:"down",
+ speed:2,
+ radius:14,
+ hp:100,maxHp:100,
+ invul:0
+};
+
+let enemies=[];
+let particles=[];
+let bloodPools=[];
+let shake=0;
+
+for(let i=0;i<6;i++){
+ enemies.push({
+  x:(Math.random()-0.5)*600,
+  y:(Math.random()-0.5)*600,
+  hp:40,
+  radius:14,
+  stun:0,
+  attackFrame:0
+ });
+}
+
+/* ===== 입력 ===== */
+let joyDX=0,joyDY=0;
+let attacking=false;
+let attackFrame=0;
+
+const pad=document.getElementById("movePad");
+const stick=document.getElementById("stick");
+const attackBtn=document.getElementById("attackBtn");
+let joyActive=false;
+
+pad.addEventListener("touchstart",()=>joyActive=true);
+pad.addEventListener("touchmove",e=>{
+ if(!joyActive)return;
+ let r=pad.getBoundingClientRect();
+ let x=e.touches[0].clientX-r.left-45;
+ let y=e.touches[0].clientY-r.top-45;
+ let d=Math.hypot(x,y);
+ let max=30;
+ if(d>max){x*=max/d;y*=max/d;}
+ stick.style.left=(x+25)+"px";
+ stick.style.top=(y+25)+"px";
+ joyDX=x/max; joyDY=y/max;
+
+ if(Math.abs(x)>Math.abs(y))
+  player.dir=x>0?"right":"left";
+ else
+  player.dir=y>0?"down":"up";
+});
+pad.addEventListener("touchend",()=>{
+ joyActive=false;joyDX=joyDY=0;
+ stick.style.left="25px";stick.style.top="25px";
+});
+
+attackBtn.addEventListener("touchstart",()=>{
+ attacking=true;
+ attackFrame=0;
+ swingSound();
+ attackBtn.classList.add("active");
+});
+attackBtn.addEventListener("touchend",()=>{
+ attackBtn.classList.remove("active");
+});
+
+/* ===== 원형 충돌 ===== */
+function circleCollide(a,b){
+ return Math.hypot(a.x-b.x,a.y-b.y) < a.radius + b.radius;
+}
+
+/* ===== 업데이트 ===== */
+function update(){
+
+ player.x+=joyDX*player.speed*4;
+ player.y+=joyDY*player.speed*4;
+
+ if(player.invul>0) player.invul--;
+
+ enemies.forEach(e=>{
+
+  let dx=player.x-e.x;
+  let dy=player.y-e.y;
+  let dist=Math.hypot(dx,dy);
+
+  if(e.stun>0){ e.stun--; return; }
+
+  // 플레이어와 충돌시 밀어냄
+  if(circleCollide(player,e)){
+   let overlap = player.radius + e.radius - dist;
+   let nx=dx/dist;
+   let ny=dy/dist;
+   e.x-=nx*overlap*0.5;
+   e.y-=ny*overlap*0.5;
+  }
+
+  // 공격 트리거
+  if(dist<45 && e.attackFrame===0){
+   e.attackFrame=25;
+  }
+
+  if(e.attackFrame>0){
+   e.attackFrame--;
+   if(e.attackFrame===5 && player.invul===0){
+    player.hp-=10;
+    player.invul=30;
+    shake=10;
+   }
+   return;
+  }
+
+  if(dist>1){
+   e.x+=dx/dist*0.8;
+   e.y+=dy/dist*0.8;
+  }
+
+ });
+
+ if(attacking){
+  attackFrame++;
+  if(attackFrame===3)checkHit();
+  if(attackFrame>8)attacking=false;
+ }
+
+ particles.forEach(p=>{
+  p.x+=p.vx;
+  p.y+=p.vy;
+  p.life--;
+ });
+ particles=particles.filter(p=>p.life>0);
+
+ if(shake>0)shake--;
+}
+
+/* ===== 공격 판정 ===== */
+function checkHit(){
+ let attackRange=60;
+
+ enemies.forEach(e=>{
+  let dist=Math.hypot(e.x-player.x,e.y-player.y);
+
+  if(dist < attackRange + e.radius){
+
+   e.hp-=20;
+   e.stun=15;
+
+   let dx=e.x-player.x;
+   let dy=e.y-player.y;
+   let len=Math.hypot(dx,dy);
+   let nx=dx/len;
+   let ny=dy/len;
+
+   e.x+=nx*18;
+   e.y+=ny*18;
+
+   hitSound();
+   shake=12;
+
+   for(let i=0;i<20;i++){
+    particles.push({
+     x:e.x,y:e.y,
+     vx:nx*4+(Math.random()-0.5)*4,
+     vy:ny*4+(Math.random()-0.5)*4,
+     life:30
+    });
+   }
+
+   if(e.hp<=0){
+    bloodPools.push({x:e.x,y:e.y,size:14});
+   }
+  }
+ });
+
+ enemies=enemies.filter(e=>e.hp>0);
+}
+
+/* ===== 렌더 ===== */
+function draw(){
+
+ ctx.fillStyle="#111";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ let camX=player.x-canvas.width/2;
+ let camY=player.y-canvas.height/2;
+ let sx=shake?(Math.random()-0.5)*12:0;
+ let sy=shake?(Math.random()-0.5)*12:0;
+
+ ctx.save();
+ ctx.translate(-camX+sx,-camY+sy);
+
+ let size=40;
+ for(let x=-1000;x<1000;x+=size){
+  for(let y=-1000;y<1000;y+=size){
+   ctx.fillStyle=((x+y)/size)%2==0?"#1a1a1a":"#222";
+   ctx.fillRect(x,y,size,size);
+  }
+ }
+
+ bloodPools.forEach(b=>{
+  ctx.fillStyle="#550000";
+  ctx.beginPath();
+  ctx.arc(b.x,b.y,b.size,0,Math.PI*2);
+  ctx.fill();
+ });
+
+ particles.forEach(p=>{
+  ctx.fillStyle="red";
+  ctx.fillRect(p.x,p.y,3,3);
+ });
+
+ enemies.forEach(e=>drawEnemy(e));
+
+ ctx.restore();
+
+ drawPlayer(canvas.width/2,canvas.height/2);
+ drawUI();
+}
+
+/* ===== 플레이어 ===== */
+function drawPlayer(x,y){
+
+ ctx.fillStyle="#880000";
+ ctx.fillRect(x-10,y-12,20,22);
+
+ ctx.fillStyle="#aa0000";
+ ctx.fillRect(x-7,y-20,14,8);
+
+ ctx.fillStyle="#ffffcc";
+ ctx.fillRect(x-8,y-26,4,8);
+ ctx.fillRect(x+4,y-26,4,8);
+
+ ctx.fillStyle="#fff";
+ ctx.fillRect(x-3,y-14,2,2);
+ ctx.fillRect(x+1,y-14,2,2);
+
+ drawSword(x,y);
+}
+
+/* ===== 칼 (완전 정상화) ===== */
+function drawSword(x,y){
+
+ ctx.save();
+ ctx.translate(x,y);
+
+ let offset=18;
+
+ if(player.dir=="right"){ ctx.translate(offset,0); ctx.rotate(Math.PI/2); }
+ else if(player.dir=="left"){ ctx.translate(-offset,0); ctx.rotate(-Math.PI/2); }
+ else if(player.dir=="up"){ ctx.translate(0,-offset); ctx.rotate(Math.PI); }
+ else if(player.dir=="down"){ ctx.translate(0,offset); ctx.rotate(0); }
+
+ if(attacking && attackFrame<5){
+  if(player.dir=="right") ctx.rotate(0.8);
+  if(player.dir=="left") ctx.rotate(-0.8);
+  if(player.dir=="up") ctx.rotate(0.8);
+  if(player.dir=="down") ctx.rotate(-0.8);
+ }
+
+ ctx.fillStyle="#552200";
+ ctx.fillRect(-2,6,4,8);
+
+ ctx.fillStyle="#bbbbbb";
+ ctx.fillRect(-8,6,16,3);
+
+ ctx.fillStyle="#dddddd";
+ ctx.fillRect(-2,-20,4,26);
+
+ ctx.beginPath();
+ ctx.moveTo(-2,-20);
+ ctx.lineTo(0,-32);
+ ctx.lineTo(2,-20);
+ ctx.fill();
+
+ ctx.restore();
+}
+
+/* ===== 몬스터 ===== */
+function drawEnemy(e){
+
+ ctx.fillStyle="#006600";
+ ctx.fillRect(e.x-10,e.y-12,20,22);
+
+ ctx.fillStyle="#00aa00";
+ ctx.fillRect(e.x-7,e.y-20,14,8);
+
+ ctx.fillStyle="red";
+ ctx.fillRect(e.x-4,e.y-14,3,3);
+ ctx.fillRect(e.x+1,e.y-14,3,3);
+
+ if(e.attackFrame>0){
+  let progress=25-e.attackFrame;
+  ctx.save();
+  ctx.translate(e.x,e.y);
+  if(progress<10) ctx.rotate(-0.6);
+  if(progress>=10 && progress<=15) ctx.rotate(1.4);
+  ctx.fillStyle="#00ff00";
+  ctx.fillRect(0,-2,30,4);
+  ctx.restore();
+ }
+}
+
+/* ===== UI ===== */
+function drawUI(){
+ let w=200,h=20;
+ ctx.fillStyle="#550000";
+ ctx.fillRect(20,20,w,h);
+ ctx.fillStyle="red";
+ ctx.fillRect(20,20,w*(player.hp/player.maxHp),h);
+ ctx.strokeStyle="white";
+ ctx.strokeRect(20,20,w,h);
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
