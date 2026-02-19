@@ -311,7 +311,6 @@ function drawSword(x,y){
 
  let sideOffset=18;
 
- // 위치 이동
  if(player.dir=="right") ctx.translate(sideOffset,0);
  else if(player.dir=="left") ctx.translate(-sideOffset,0);
  else if(player.dir=="up") ctx.translate(0,-sideOffset);
@@ -319,41 +318,33 @@ function drawSword(x,y){
 
  let t = attackFrame/8;
 
- // ======================
- // 👉 좌우 공격 수정
- // ======================
+ if(attacking){
 
- if(attacking && player.dir=="right"){
-  ctx.translate(6,0);        // 바깥으로 밀기
-  ctx.rotate(1.4*t);         // 바깥쪽으로 회전
+  if(player.dir=="right"){
+   ctx.translate(6,0);
+   ctx.rotate(1.4*t);
+  }
+
+  else if(player.dir=="left"){
+   ctx.translate(-6,0);
+   ctx.rotate(-1.4*t);
+  }
+
+  else if(player.dir=="up"){
+   ctx.rotate(-1.4*t);
+  }
+
+  else if(player.dir=="down"){
+
+   if(t < 0.25){
+    ctx.rotate(-Math.PI/2);
+   } else {
+    ctx.rotate(-Math.PI/2 + 2.2*(t-0.25));
+   }
+  }
  }
 
- if(attacking && player.dir=="left"){
-  ctx.translate(-6,0);
-  ctx.rotate(-1.4*t);
- }
-
- if(attacking && player.dir=="up"){
-  ctx.rotate(-1.4*t);
- }
-
- // ======================
- // 👉 하단 공격 개선
- // ======================
-
- if(player.dir=="down" && attacking){
-
- let t = attackFrame/8;
-
- if(t < 0.25){
-  // 🔥 완전 가로로 눕힘 (왼쪽으로)
-  ctx.rotate(-Math.PI/2);
- } else {
-  // 내려찍기 모션
-  ctx.rotate(-Math.PI/2 + 2.2*(t-0.25));
- }
-
- // 기본 칼 렌더
+ // ===== 기본 칼 렌더 =====
  ctx.fillStyle="#552200";
  ctx.fillRect(-2,6,4,8);
 
@@ -368,26 +359,6 @@ function drawSword(x,y){
  ctx.lineTo(0,-32);
  ctx.lineTo(2,-20);
  ctx.fill();
-}
- 
- } else {
-
-  // 기본 렌더
-  ctx.fillStyle="#552200";
-  ctx.fillRect(-2,6,4,8);
-
-  ctx.fillStyle="#bbbbbb";
-  ctx.fillRect(-8,6,16,3);
-
-  ctx.fillStyle="#dddddd";
-  ctx.fillRect(-2,-20,4,26);
-
-  ctx.beginPath();
-  ctx.moveTo(-2,-20);
-  ctx.lineTo(0,-32);
-  ctx.lineTo(2,-20);
-  ctx.fill();
- }
 
  ctx.restore();
 }
