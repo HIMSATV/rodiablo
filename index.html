@@ -311,35 +311,61 @@ function drawSword(x,y){
 
  let sideOffset=18;
 
- // 대기 = 항상 세로
+ // 방향 위치 이동 (기존 유지)
  if(player.dir=="right") ctx.translate(sideOffset,0);
  else if(player.dir=="left") ctx.translate(-sideOffset,0);
  else if(player.dir=="up") ctx.translate(0,-sideOffset);
  else if(player.dir=="down") ctx.translate(0,sideOffset);
 
- // 공격 시에만 회전
+ // 🔥 하단 공격만 회전 제거
  if(attacking){
   let t=attackFrame/8;
+
   if(player.dir=="right") ctx.rotate(-1.2*t);
   if(player.dir=="left") ctx.rotate(1.2*t);
   if(player.dir=="up") ctx.rotate(-1.2*t);
-  if(player.dir=="down") ctx.rotate(1.2*t);
+
+  // down은 회전 안함
  }
 
- ctx.fillStyle="#552200";
- ctx.fillRect(-2,6,4,8);
+ // ===== 하단 공격 전용 역수 렌더 =====
+ if(player.dir=="down" && attacking){
 
- ctx.fillStyle="#bbbbbb";
- ctx.fillRect(-8,6,16,3);
+  // 손잡이 (위쪽)
+  ctx.fillStyle="#552200";
+  ctx.fillRect(-2,-14,4,8);
 
- ctx.fillStyle="#dddddd";
- ctx.fillRect(-2,-20,4,26);
+  ctx.fillStyle="#bbbbbb";
+  ctx.fillRect(-8,-14,16,3);
 
- ctx.beginPath();
- ctx.moveTo(-2,-20);
- ctx.lineTo(0,-32);
- ctx.lineTo(2,-20);
- ctx.fill();
+  // 칼날 아래 방향
+  ctx.fillStyle="#dddddd";
+  ctx.fillRect(-2,-6,4,26);
+
+  ctx.beginPath();
+  ctx.moveTo(-2,20);
+  ctx.lineTo(0,32);
+  ctx.lineTo(2,20);
+  ctx.fill();
+
+ } else {
+
+  // ===== 기존 렌더 그대로 =====
+  ctx.fillStyle="#552200";
+  ctx.fillRect(-2,6,4,8);
+
+  ctx.fillStyle="#bbbbbb";
+  ctx.fillRect(-8,6,16,3);
+
+  ctx.fillStyle="#dddddd";
+  ctx.fillRect(-2,-20,4,26);
+
+  ctx.beginPath();
+  ctx.moveTo(-2,-20);
+  ctx.lineTo(0,-32);
+  ctx.lineTo(2,-20);
+  ctx.fill();
+ }
 
  ctx.restore();
 }
