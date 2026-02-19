@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Oni ARPG Combat Fix</title>
+<style>
+body { margin:0; overflow:hidden; background:#111; touch-action:none;}
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+
+const TILE=64;
+const MAP=25;
+const ZOOM=2.2;
+
+let inputX=0,inputY=0;
+let monsters=[];
+let particles=[];
+
+function iso(x,y){
+  return {x:(x-y)*TILE/2,y:(x+y)*TILE/4}
+}
+
+function dist(a,b){
+  return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
+// ===== PLAYER =====
+class Player{
+  constructor(){
+    this.x=0; this.y=0;
+    this.speed=0.04;
+    this.dir=0;
+    this.attackTime=0;
+  }
+
+  update(){
+    if(inputX||inputY){
+      this.x+=inputX*this.speed;
+      this.y+=inputY*this.speed;
+    }
+    if(this.attackTime>0) this.attackTime--;
+  }
+
+  attack(){
+    if(this.attackTime>0) return;
+
+    let closest=null;
+    let minDist=999;
+
+    monsters.forEach(m=>{
+      if(m.dead) return;
+      let d=Math.hypot(m.x-this.x,m.y-this.y);
+      if(d<minDist){
+        minDist=d;
+        closest=m;
+      }
+    });
+
+    if(!closest || minDist>2) return;
+
+    this.dir=Math.atan2(closest.y-this.y,closest.x-this.x);
+    this.attackTime=20;
+
+    closest.hp-=50;
+    for(let i=0;i<25;i++)
+      particles.push(new Blood(closest.x,closest.y));
+
+    if(closest.hp<=0){
+      closest.dead=true;
+      for(let i=0;i<40;i++)
+        particles.push(new Blood(closest.x,closest.y));
+    }
+  }
+
+  draw(cam){
+    let p=iso(this.x,this.y);
+    let sx=canvas.width/2+(p.x-cam.x)*ZOOM;
+    let sy=canvas.height/2+(p.y-cam.y)*ZOOM;
+
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.scale(ZOOM*1.8,ZOOM*1.8);
+
+    ctx.fillStyle="#6b0000";
+    ctx.fillRect(-6,-12,12,14);
+
+    ctx.fillStyle="#400000";
+    ctx.fillRect(-5,-18,10,7);
+
+    ctx.fillStyle="#ddd";
+    ctx.beginPath();
+    ctx.moveTo(-4,-18); ctx.lineTo(-8,-25); ctx.lineTo(-2,-20); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(4,-18); ctx.lineTo(8,-25); ctx.lineTo(2,-20); ctx.fill();
+
+    ctx.shadowColor="yellow";
+    ctx.shadowBlur=8;
+    ctx.fillStyle="yellow";
+    ctx.fillRect(-3,-15,2,2);
+    ctx.fillRect(1,-15,2,2);
+    ctx.shadowBlur=0;
+
+    if(this.attackTime>0){
+      ctx.rotate(this.dir);
+      ctx.fillStyle="#ccc";
+      ctx.fillRect(0,-1,16,3);
+    }
+
+    ctx.restore();
+  }
+}
+
+// ===== MONSTER =====
+class Monster{
+  constructor(x,y,type){
+    this.x=x; this.y=y;
+    this.type=type;
+    this.hp=60;
+    this.dead=false;
+  }
+
+  update(player){
+    if(this.dead) return;
+
+    let dx=player.x-this.x;
+    let dy=player.y-this.y;
+    let d=Math.hypot(dx,dy);
+
+    if(d<5){
+      this.x+=dx/d*0.02;
+      this.y+=dy/d*0.02;
+    }
+
+    // 겹침 방지
+    monsters.forEach(m=>{
+      if(m===this||m.dead) return;
+      let dd=Math.hypot(this.x-m.x,this.y-m.y);
+      if(dd<0.8){
+        this.x+=(this.x-m.x)/dd*0.02;
+        this.y+=(this.y-m.y)/dd*0.02;
+      }
+    });
+  }
+
+  draw(cam){
+    if(this.dead) return;
+
+    let p=iso(this.x,this.y);
+    let sx=canvas.width/2+(p.x-cam.x)*ZOOM;
+    let sy=canvas.height/2+(p.y-cam.y)*ZOOM;
+
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.scale(ZOOM*1.5,ZOOM*1.5);
+
+    if(this.type==="skeleton"){
+      ctx.fillStyle="#ddd";
+      ctx.fillRect(-4,-10,8,12);
+      ctx.fillStyle="black";
+      ctx.fillRect(-2,-14,4,4);
+      ctx.fillStyle="red";
+      ctx.fillRect(-2,-13,1,1);
+      ctx.fillRect(1,-13,1,1);
+    }else{
+      ctx.fillStyle="#1e8449";
+      ctx.fillRect(-5,-10,10,12);
+      ctx.fillStyle="black";
+      ctx.fillRect(-3,-14,6,4);
+      ctx.fillStyle="yellow";
+      ctx.fillRect(-2,-13,1,1);
+      ctx.fillRect(1,-13,1,1);
+    }
+
+    ctx.restore();
+  }
+}
+
+// ===== BLOOD =====
+class Blood{
+  constructor(x,y){
+    this.x=x; this.y=y;
+    this.life=30;
+    this.vx=(Math.random()-0.5)*0.2;
+    this.vy=(Math.random()-0.5)*0.2;
+  }
+  update(){
+    this.x+=this.vx;
+    this.y+=this.vy;
+    this.life--;
+  }
+  draw(cam){
+    let p=iso(this.x,this.y);
+    let sx=canvas.width/2+(p.x-cam.x)*ZOOM;
+    let sy=canvas.height/2+(p.y-cam.y)*ZOOM;
+    ctx.fillStyle="darkred";
+    ctx.fillRect(sx,sy,3,3);
+  }
+}
+
+// ===== JOYSTICK =====
+const joystick={
+  x:canvas.width*0.2,
+  y:canvas.height*0.8,
+  r:60
+};
+
+const attackBtn={
+  x:canvas.width*0.85,
+  y:canvas.height*0.8,
+  r:50
+};
+
+canvas.addEventListener("touchmove",e=>{
+  let t=e.touches[0];
+  let dx=t.clientX-joystick.x;
+  let dy=t.clientY-joystick.y;
+  let d=Math.hypot(dx,dy);
+  if(d<joystick.r){
+    inputX=dx/joystick.r;
+    inputY=dy/joystick.r;
+  }
+});
+
+canvas.addEventListener("touchend",()=>{
+  inputX=0; inputY=0;
+});
+
+canvas.addEventListener("touchstart",e=>{
+  for(let t of e.touches){
+    let dx=t.clientX-attackBtn.x;
+    let dy=t.clientY-attackBtn.y;
+    if(Math.hypot(dx,dy)<attackBtn.r){
+      player.attack();
+    }
+  }
+});
+
+// ===== INIT =====
+let player=new Player();
+for(let i=0;i<8;i++)
+  monsters.push(new Monster(
+    Math.random()*6-3,
+    Math.random()*6-3,
+    Math.random()<0.5?"skeleton":"goblin"
+  ));
+
+let cam={x:0,y:0};
+
+function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  player.update();
+  monsters.forEach(m=>m.update(player));
+  particles.forEach(p=>p.update());
+  particles=particles.filter(p=>p.life>0);
+  monsters=monsters.filter(m=>!m.dead);
+
+  cam.x+=((iso(player.x,player.y).x)-cam.x)*0.1;
+  cam.y+=((iso(player.x,player.y).y)-cam.y)*0.1;
+
+  for(let x=-MAP;x<MAP;x++){
+    for(let y=-MAP;y<MAP;y++){
+      let p=iso(x,y);
+      let sx=canvas.width/2+(p.x-cam.x)*ZOOM;
+      let sy=canvas.height/2+(p.y-cam.y)*ZOOM;
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.lineTo(sx+TILE/2*ZOOM,sy+TILE/4*ZOOM);
+      ctx.lineTo(sx,sy+TILE/2*ZOOM);
+      ctx.lineTo(sx-TILE/2*ZOOM,sy+TILE/4*ZOOM);
+      ctx.closePath();
+      ctx.fillStyle="#3a3a3a";
+      ctx.fill();
+    }
+  }
+
+  monsters.forEach(m=>m.draw(cam));
+  particles.forEach(p=>p.draw(cam));
+  player.draw(cam);
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
