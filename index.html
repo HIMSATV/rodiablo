@@ -314,37 +314,48 @@ function drawSword(x,y){
 
   let offsetX = 0;
   let offsetY = 0;
+  let angle = 0;
 
   // ===== RIGHT =====
   if(player.dir === "right"){
-    offsetX = sideOffset + (attacking ? 20*t : 0);
+    offsetX = sideOffset;
+    if(attacking){
+      angle = 1.4 * t;
+    }
   }
 
   // ===== LEFT =====
   else if(player.dir === "left"){
-    offsetX = -sideOffset - (attacking ? 20*t : 0);
+    offsetX = -sideOffset;
+    if(attacking){
+      angle = -1.4 * t;
+    }
   }
 
   // ===== UP =====
   else if(player.dir === "up"){
-    offsetY = -sideOffset - (attacking ? 20*t : 0);
-  }
-
-  // ===== DOWN (회전 없음) =====
-  else if(player.dir === "down"){
-
-    offsetY = sideOffset - 6;
+    offsetY = -sideOffset;
 
     if(attacking){
-      // 가로 상태에서 아래로 슬라이드
-      offsetY += 20 * t;
+      angle = -1.4 * t;
     }
+  }
 
-    // 항상 가로 상태 유지
-    ctx.rotate(-Math.PI/2);
+  // ===== DOWN (상단과 동일 구조) =====
+  else if(player.dir === "down"){
+    offsetY = sideOffset;
+
+    // 기본 자세: 아래 향함
+    angle = Math.PI;
+
+    if(attacking){
+      // 상단의 반대 방향 회전
+      angle += 1.4 * t;
+    }
   }
 
   ctx.translate(offsetX, offsetY);
+  ctx.rotate(angle);
 
   // ===== 칼 =====
   ctx.fillStyle="#552200";
