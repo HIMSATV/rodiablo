@@ -201,44 +201,56 @@ function update(){
 
 /* ===== 공격 ===== */
 function checkHit(){
- let range=60;
 
- enemies.forEach(e=>{
-  let dist=Math.hypot(e.x-player.x,e.y-player.y);
+  let range = 60;
 
-  if(dist < range + e.radius){
+  enemies.forEach(e => {
 
-   e.hp-=20;
-   e.stun=15;
+    let dx = e.x - player.x;
+    let dy = e.y - player.y;
+    let dist = Math.hypot(dx, dy);
 
-   let dx=e.x-player.x;
-   let dy=e.y-player.y;
-   let len=Math.hypot(dx,dy);
-   let nx=dx/len;
-   let ny=dy/len;
+    // 🔥 기존 거리 체크 유지
+    if(dist > range + e.radius) return;
 
-   e.x+=nx*18;
-   e.y+=ny*18;
+    // 🔥 방향 제한 추가
+    if(player.dir === "up" && dy >= 0) return;
+    if(player.dir === "down" && dy <= 0) return;
+    if(player.dir === "right" && dx <= 0) return;
+    if(player.dir === "left" && dx >= 0) return;
 
-   hitSound();
-   shake=12;
+    // ===== 여기 도달하면 공격 성공 =====
 
-   for(let i=0;i<20;i++){
-    particles.push({
-     x:e.x,y:e.y,
-     vx:nx*4+(Math.random()-0.5)*4,
-     vy:ny*4+(Math.random()-0.5)*4,
-     life:30
-    });
-   }
+    e.hp -= 20;
+    e.stun = 15;
 
-   if(e.hp<=0){
-    bloodPools.push({x:e.x,y:e.y,size:14});
-   }
-  }
- });
+    let len = dist || 1;
+    let nx = dx / len;
+    let ny = dy / len;
 
- enemies=enemies.filter(e=>e.hp>0);
+    e.x += nx * 18;
+    e.y += ny * 18;
+
+    hitSound();
+    shake = 12;
+
+    for(let i=0;i<20;i++){
+      particles.push({
+        x:e.x,
+        y:e.y,
+        vx:nx*4 + (Math.random()-0.5)*4,
+        vy:ny*4 + (Math.random()-0.5)*4,
+        life:30
+      });
+    }
+
+    if(e.hp <= 0){
+      bloodPools.push({x:e.x, y:e.y, size:14});
+    }
+
+  });
+
+  enemies = enemies.filter(e => e.hp > 0);
 }
 
 /* ===== 렌더 ===== */
