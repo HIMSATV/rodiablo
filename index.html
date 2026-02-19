@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ronin Isometric</title>
+<style>
+body{margin:0;background:#111;overflow:hidden;}
+canvas{display:block;}
+#attackBtn{
+ position:fixed;
+ right:60px;
+ bottom:120px;
+ width:90px;height:90px;
+ border-radius:50%;
+ background:radial-gradient(circle,#aa0000,#440000);
+ border:3px solid #ff4444;
+ display:flex;align-items:center;justify-content:center;
+ color:white;font-size:20px;
+}
+#joystickBase{
+ position:fixed;
+ bottom:120px;
+ left:50%;
+ transform:translateX(-180px);
+ width:120px;height:120px;
+ border-radius:50%;
+ background:rgba(255,255,255,0.08);
+}
+#joystick{
+ position:absolute;
+ width:60px;height:60px;
+ border-radius:50%;
+ background:rgba(255,255,255,0.25);
+ top:30px;left:30px;
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="joystickBase"><div id="joystick"></div></div>
+<div id="attackBtn">⚔</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+function iso(x,y){
+ return {
+  x:(x-y),
+  y:(x+y)/2
+ };
+}
+
+let player={
+ x:0,y:0,
+ speed:1.6,
+ dir:0,
+ radius:16
+};
+
+let enemies=[];
+let particles=[];
+let attacking=false;
+let attackCooldown=0;
+
+for(let i=0;i<6;i++){
+ enemies.push({
+  x:Math.random()*400-200,
+  y:Math.random()*400-200,
+  hp:50,
+  radius:14
+ });
+}
+
+function findClosest(){
+ let min=99999,t=null;
+ enemies.forEach(e=>{
+  let dx=e.x-player.x;
+  let dy=e.y-player.y;
+  let d=Math.hypot(dx,dy);
+  if(d<min){min=d;t=e;}
+ });
+ return t;
+}
+
+function attack(){
+ if(attackCooldown>0) return;
+ let t=findClosest();
+ if(!t) return;
+
+ let dx=t.x-player.x;
+ let dy=t.y-player.y;
+ let dist=Math.hypot(dx,dy);
+ if(dist>90) return;
+
+ player.dir=Math.atan2(dy,dx);
+ attacking=true;
+ attackCooldown=40;
+
+ enemies.forEach(e=>{
+  let dx=e.x-player.x;
+  let dy=e.y-player.y;
+  let d=Math.hypot(dx,dy);
+  let angle=Math.atan2(dy,dx);
+  let diff=Math.abs(angle-player.dir);
+  if(d<80 && diff<0.8){
+    e.hp-=25;
+    spawnBlood(e.x,e.y);
+  }
+ });
+
+ setTimeout(()=>attacking=false,180);
+}
+
+document.getElementById("attackBtn").addEventListener("touchstart",attack);
+document.getElementById("attackBtn").addEventListener("mousedown",attack);
+
+function spawnBlood(x,y){
+ for(let i=0;i<10;i++){
+  particles.push({
+   x,y,
+   vx:(Math.random()-0.5)*3,
+   vy:(Math.random()-0.5)*3,
+   life:30
+  });
+ }
+}
+
+let joyActive=false,joyDX=0,joyDY=0;
+const base=document.getElementById("joystickBase");
+const stick=document.getElementById("joystick");
+
+base.addEventListener("touchstart",()=>joyActive=true);
+base.addEventListener("touchmove",e=>{
+ if(!joyActive)return;
+ let r=base.getBoundingClientRect();
+ let x=e.touches[0].clientX-r.left;
+ let y=e.touches[0].clientY-r.top;
+ joyDX=x-60; joyDY=y-60;
+ let d=Math.hypot(joyDX,joyDY);
+ if(d>50){joyDX=joyDX/d*50;joyDY=joyDY/d*50;}
+ stick.style.left=(joyDX+30)+"px";
+ stick.style.top=(joyDY+30)+"px";
+});
+base.addEventListener("touchend",()=>{
+ joyActive=false;joyDX=joyDY=0;
+ stick.style.left="30px";stick.style.top="30px";
+});
+
+function resolveCollision(a,b){
+ let dx=a.x-b.x;
+ let dy=a.y-b.y;
+ let dist=Math.hypot(dx,dy);
+ let min=a.radius+b.radius;
+ if(dist<min && dist>0){
+  let push=(min-dist)/2;
+  a.x+=dx/dist*push;
+  a.y+=dy/dist*push;
+  b.x-=dx/dist*push;
+  b.y-=dy/dist*push;
+ }
+}
+
+function update(){
+ if(joyActive){
+  player.x+=joyDX/50*player.speed;
+  player.y+=joyDY/50*player.speed;
+  if(Math.hypot(joyDX,joyDY)>5)
+   player.dir=Math.atan2(joyDY,joyDX);
+ }
+
+ enemies.forEach(e=>{
+  let dx=player.x-e.x;
+  let dy=player.y-e.y;
+  let d=Math.hypot(dx,dy);
+  if(d>0){
+   e.x+=dx/d*0.4;
+   e.y+=dy/d*0.4;
+  }
+  resolveCollision(player,e);
+ });
+
+ enemies=enemies.filter(e=>e.hp>0);
+ particles.forEach(p=>{
+  p.x+=p.vx;p.y+=p.vy;p.life--;
+ });
+ particles=particles.filter(p=>p.life>0);
+
+ if(attackCooldown>0)attackCooldown--;
+}
+
+function drawPlayer(){
+ let p=iso(player.x,player.y);
+ ctx.save();
+ ctx.translate(canvas.width/2+p.x,canvas.height/2+p.y);
+ ctx.rotate(player.dir);
+
+ // 갑주
+ ctx.fillStyle="#8b0000";
+ ctx.beginPath();
+ ctx.arc(0,0,18,0,Math.PI*2);
+ ctx.fill();
+
+ // 뿔 복구
+ ctx.fillStyle="#ddd";
+ ctx.fillRect(-12,-22,6,14);
+ ctx.fillRect(6,-22,6,14);
+
+ // 눈 발광
+ ctx.fillStyle="yellow";
+ ctx.fillRect(-5,-4,3,3);
+ ctx.fillRect(2,-4,3,3);
+
+ if(attacking){
+  ctx.strokeStyle="white";
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.arc(0,0,60,-0.7,0.7);
+  ctx.stroke();
+ }
+
+ ctx.restore();
+}
+
+function drawEnemy(e){
+ let p=iso(e.x,e.y);
+ ctx.save();
+ ctx.translate(canvas.width/2+p.x,canvas.height/2+p.y);
+
+ ctx.fillStyle="#0a5f0a";
+ ctx.beginPath();
+ ctx.arc(0,0,15,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle="#00ff00";
+ ctx.fillRect(-4,-5,3,3);
+ ctx.fillRect(2,-5,3,3);
+
+ ctx.restore();
+}
+
+function draw(){
+ ctx.fillStyle="#1a1a1a";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ enemies.forEach(drawEnemy);
+ drawPlayer();
+
+ ctx.fillStyle="#aa0000";
+ particles.forEach(p=>{
+  let pp=iso(p.x,p.y);
+  ctx.fillRect(canvas.width/2+pp.x,canvas.height/2+pp.y,3,3);
+ });
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
