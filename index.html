@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oni Samurai</title>
+<style>
+body{margin:0;background:black;overflow:hidden;}
+canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
+#ui{
+ position:fixed;bottom:0;width:100%;height:120px;
+ background:#111;border-top:3px solid #550000;
+ display:flex;align-items:center;justify-content:space-between;
+ padding:0 25px;box-sizing:border-box;
+}
+#movePad{position:relative;width:90px;height:90px;border-radius:50%;background:#222;}
+#stick{position:absolute;width:40px;height:40px;border-radius:50%;background:#666;left:25px;top:25px;}
+#attackBtn{
+ width:90px;height:90px;border-radius:50%;
+ background:#990000;border:3px solid #ff4444;
+ display:flex;align-items:center;justify-content:center;
+ font-size:26px;color:white;
+}
+#attackBtn.active{background:red;transform:scale(.85);}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+ <div id="movePad"><div id="stick"></div></div>
+ <div id="attackBtn">⚔</div>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const uiHeight=120;
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight-uiHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+/* ===== 사운드 ===== */
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+function swingSound(){
+ let o=audioCtx.createOscillator();
+ let g=audioCtx.createGain();
+ o.type="sawtooth";
+ o.frequency.setValueAtTime(700,audioCtx.currentTime);
+ o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+0.12);
+ g.gain.value=0.15;
+ o.connect(g); g.connect(audioCtx.destination);
+ o.start(); o.stop(audioCtx.currentTime+0.12);
+}
+function hitSound(){
+ let o=audioCtx.createOscillator();
+ let g=audioCtx.createGain();
+ o.type="square";
+ o.frequency.value=100;
+ g.gain.value=0.25;
+ o.connect(g); g.connect(audioCtx.destination);
+ o.start(); o.stop(audioCtx.currentTime+0.08);
+}
+
+/* ===== 객체 ===== */
+let player={
+ x:0,y:0,
+ dir:"down",
+ speed:2,
+ radius:14,
+ hp:100
+};
+
+let enemies=[];
+let particles=[];
+let shake=0;
+
+for(let i=0;i<6;i++){
+ enemies.push({
+  x:(Math.random()-0.5)*600,
+  y:(Math.random()-0.5)*600,
+  hp:40,
+  radius:14
+ });
+}
+
+/* ===== 입력 ===== */
+let joyDX=0,joyDY=0;
+let attacking=false;
+let attackFrame=0;
+
+const pad=document.getElementById("movePad");
+const stick=document.getElementById("stick");
+const attackBtn=document.getElementById("attackBtn");
+let joyActive=false;
+
+pad.addEventListener("touchstart",()=>joyActive=true);
+pad.addEventListener("touchmove",e=>{
+ if(!joyActive)return;
+ let r=pad.getBoundingClientRect();
+ let x=e.touches[0].clientX-r.left-45;
+ let y=e.touches[0].clientY-r.top-45;
+ let d=Math.hypot(x,y);
+ let max=30;
+ if(d>max){x*=max/d;y*=max/d;}
+ stick.style.left=(x+25)+"px";
+ stick.style.top=(y+25)+"px";
+ joyDX=x/max; joyDY=y/max;
+
+ if(Math.abs(x)>Math.abs(y))
+  player.dir=x>0?"right":"left";
+ else
+  player.dir=y>0?"down":"up";
+});
+pad.addEventListener("touchend",()=>{
+ joyActive=false;joyDX=joyDY=0;
+ stick.style.left="25px";stick.style.top="25px";
+});
+
+attackBtn.addEventListener("touchstart",()=>{
+ attacking=true;
+ attackFrame=0;
+ swingSound();
+ attackBtn.classList.add("active");
+});
+attackBtn.addEventListener("touchend",()=>{
+ attackBtn.classList.remove("active");
+});
+
+/* ===== 업데이트 ===== */
+function update(){
+
+ player.x+=joyDX*player.speed;
+ player.y+=joyDY*player.speed;
+
+ if(attacking){
+  attackFrame++;
+  if(attackFrame>8) attacking=false;
+
+  if(attackFrame===4){
+   enemies.forEach(e=>{
+    let dx=e.x-player.x;
+    let dy=e.y-player.y;
+    if(Math.hypot(dx,dy)<60){
+     e.hp-=20;
+     hitSound();
+     shake=8;
+     for(let i=0;i<8;i++){
+      particles.push({
+       x:e.x,y:e.y,
+       vx:dx*0.1+(Math.random()-0.5)*4,
+       vy:dy*0.1+(Math.random()-0.5)*4,
+       life:30
+      });
+     }
+    }
+   });
+  }
+ }
+
+ enemies=enemies.filter(e=>{
+  if(e.hp<=0){
+   for(let i=0;i<20;i++){
+    particles.push({
+     x:e.x,y:e.y,
+     vx:(Math.random()-0.5)*6,
+     vy:(Math.random()-0.5)*6,
+     life:40
+    });
+   }
+   return false;
+  }
+  return true;
+ });
+
+ particles.forEach(p=>{
+  p.x+=p.vx;
+  p.y+=p.vy;
+  p.life--;
+ });
+ particles=particles.filter(p=>p.life>0);
+
+ if(shake>0) shake--;
+}
+
+/* ===== 그리기 ===== */
+function draw(){
+
+ ctx.save();
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ let camX=canvas.width/2-player.x+(Math.random()-0.5)*shake;
+ let camY=canvas.height/2-player.y+(Math.random()-0.5)*shake;
+ ctx.translate(camX,camY);
+
+ drawGrid();
+
+ enemies.forEach(drawEnemy);
+ drawPlayer();
+ particles.forEach(drawParticle);
+
+ ctx.restore();
+
+ requestAnimationFrame(loop);
+}
+
+function drawGrid(){
+ for(let x=-2000;x<2000;x+=40){
+  for(let y=-2000;y<2000;y+=40){
+   ctx.fillStyle=((x+y)/40)%2?"#111":"#181818";
+   ctx.fillRect(x,y,40,40);
+  }
+ }
+}
+
+function drawPlayer(){
+ ctx.fillStyle="red";
+ ctx.fillRect(player.x-12,player.y-14,24,28);
+ drawSword(player.x,player.y);
+}
+
+function drawSword(x,y){
+ ctx.save();
+ ctx.translate(x,y);
+
+ let offset=18;
+ if(player.dir=="right") ctx.translate(offset,0);
+ if(player.dir=="left") ctx.translate(-offset,0);
+ if(player.dir=="up") ctx.translate(0,-offset);
+ if(player.dir=="down") ctx.translate(0,offset);
+
+ if(attacking){
+  let t=attackFrame/8;
+  if(player.dir=="right") ctx.rotate(-1.2*t);
+  if(player.dir=="left") ctx.rotate(1.2*t);
+  if(player.dir=="up") ctx.rotate(-1.2*t);
+  if(player.dir=="down"){
+   ctx.rotate(Math.PI);
+   ctx.rotate(1.2*t);
+  }
+ }
+
+ ctx.fillStyle="#552200";
+ ctx.fillRect(-2,6,4,8);
+
+ ctx.fillStyle="#bbb";
+ ctx.fillRect(-8,6,16,3);
+
+ ctx.fillStyle="#ddd";
+ ctx.fillRect(-2,-20,4,26);
+
+ ctx.beginPath();
+ ctx.moveTo(-2,-20);
+ ctx.lineTo(0,-32);
+ ctx.lineTo(2,-20);
+ ctx.fill();
+
+ ctx.restore();
+}
+
+function drawEnemy(e){
+ ctx.fillStyle="darkred";
+ ctx.fillRect(e.x-12,e.y-14,24,28);
+ ctx.fillStyle="red";
+ ctx.fillRect(e.x-3,e.y-4,6,6);
+}
+
+function drawParticle(p){
+ ctx.fillStyle="red";
+ ctx.fillRect(p.x,p.y,3,3);
+}
+
+function loop(){
+ update();
+ draw();
+}
+
+loop();
+</script>
+</body>
+</html>
