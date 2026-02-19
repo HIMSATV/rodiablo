@@ -341,15 +341,21 @@ function drawSword(x,y){
    ctx.rotate(-1.4*t);
   }
 
-  else if(player.dir=="down"){
+ else if(player.dir=="down"){
 
- // 🔥 칼을 몸 바깥쪽으로 먼저 밀기
- ctx.translate(12, -4);  // ← 이게 핵심
+ // 🔥 칼을 몸 중앙 쪽으로 살짝 위치
+ ctx.translate(0, -4);
 
- // 회전 시작을 몸 안쪽 각도에서 시작
- let startAngle = -Math.PI/2 - 1.2;
+ // 시작: 약간 위쪽 (몸 안쪽)
+ let startAngle = -Math.PI/2 - 0.6;
 
- ctx.rotate(startAngle + 3.0*t);
+ // 끝: 완전히 아래로
+ let endAngle = Math.PI/2;
+
+ // 부드러운 보간
+ let angle = startAngle + (endAngle - startAngle) * t;
+
+ ctx.rotate(angle);
 }
  }
 
