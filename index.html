@@ -303,30 +303,54 @@ function drawSword(x,y){
  ctx.save();
  ctx.translate(x,y);
 
- let offset=18;
+ let offset = 18;
 
- if(player.dir=="right"){ ctx.translate(offset,0); ctx.rotate(Math.PI/2); }
- if(player.dir=="left"){ ctx.translate(-offset,0); ctx.rotate(-Math.PI/2); }
- if(player.dir=="up"){ ctx.translate(0,-offset); ctx.rotate(Math.PI); }
- if(player.dir=="down"){ ctx.translate(0,offset); ctx.rotate(0); }
-
- if(attacking && attackFrame<5){
-  ctx.rotate(0.8);
+ // ===== 방향별 위치 + 회전 =====
+ if(player.dir=="right"){
+  ctx.translate(offset,0);
+  ctx.rotate(Math.PI/2);
+ }
+ else if(player.dir=="left"){
+  ctx.translate(-offset,0);
+  ctx.rotate(-Math.PI/2);
+ }
+ else if(player.dir=="up"){
+  ctx.translate(0,-offset);
+  ctx.rotate(Math.PI);
+ }
+ else if(player.dir=="down"){
+  ctx.translate(0,offset);
+  ctx.rotate(0);
  }
 
+ // ===== 공격 시 자연스러운 추가 회전 =====
+ if(attacking && attackFrame<5){
+
+  if(player.dir=="right") ctx.rotate(0.9);
+  if(player.dir=="left") ctx.rotate(-0.9);
+  if(player.dir=="up") ctx.rotate(0.9);
+  if(player.dir=="down") ctx.rotate(-0.9);
+ }
+
+ // ===== 칼 디자인 =====
+
+ // 손잡이
  ctx.fillStyle="#552200";
  ctx.fillRect(-2,6,4,8);
 
+ // 가드
  ctx.fillStyle="#bbbbbb";
  ctx.fillRect(-8,6,16,3);
 
+ // 칼날
  ctx.fillStyle="#dddddd";
- ctx.fillRect(-2,-18,4,24);
+ ctx.fillRect(-2,-20,4,26);
 
+ // 뾰족 끝
  ctx.beginPath();
- ctx.moveTo(-2,-18);
- ctx.lineTo(0,-28);
- ctx.lineTo(2,-18);
+ ctx.moveTo(-2,-20);
+ ctx.lineTo(0,-32);
+ ctx.lineTo(2,-20);
  ctx.fill();
 
  ctx.restore();
