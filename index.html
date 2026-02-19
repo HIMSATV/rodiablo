@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rodiablo</title>
+<style>
+body{margin:0;background:#000;overflow:hidden;}
+canvas{display:block;background:#080808;}
+#hp{
+position:absolute;
+top:10px;left:10px;
+color:#ff4444;
+font-family:monospace;
+}
+</style>
+</head>
+<body>
+<div id="hp"></div>
+<canvas id="game"></canvas>
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const hpUI=document.getElementById("hp");
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+const TILE_W=64;
+const TILE_H=32;
+
+const palette={
+ floor:"#1c1c1c",
+ floor2:"#111",
+ player:"#7a0000",
+ skin:"#d2a679",
+ goblin:"#2e6b2e",
+ skeleton:"#dcdcdc",
+ blood:"#600000"
+};
+
+let player={x:5,y:5,hp:10,attacking:false};
+let particles=[];
+
+let monsters=[
+ {type:"skeleton",x:3,y:3,hp:3,cool:0},
+ {type:"goblin",x:7,y:6,hp:4,cool:0}
+];
+
+function isoToScreen(x,y){
+ return{
+  x:(x-y)*(TILE_W/2)+canvas.width/2,
+  y:(x+y)*(TILE_H/2)+120
+ };
+}
+
+function drawTile(x,y){
+ const pos=isoToScreen(x,y);
+ ctx.beginPath();
+ ctx.moveTo(pos.x,pos.y);
+ ctx.lineTo(pos.x+TILE_W/2,pos.y+TILE_H/2);
+ ctx.lineTo(pos.x,pos.y+TILE_H);
+ ctx.lineTo(pos.x-TILE_W/2,pos.y+TILE_H/2);
+ ctx.closePath();
+ ctx.fillStyle=(x+y)%2?palette.floor:palette.floor2;
+ ctx.fill();
+}
+
+function drawPlayer(){
+ const pos=isoToScreen(player.x,player.y);
+
+ ctx.fillStyle="rgba(0,0,0,0.7)";
+ ctx.beginPath();
+ ctx.ellipse(pos.x,pos.y+14,12,6,0,0,Math.PI*2);
+ ctx.fill();
+
+ ctx.fillStyle=palette.player;
+ ctx.fillRect(pos.x-8,pos.y-20,16,20);
+
+ ctx.fillStyle=palette.skin;
+ ctx.fillRect(pos.x-5,pos.y-28,10,8);
+
+ if(player.attacking){
+  ctx.strokeStyle="#ccc";
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(pos.x,pos.y-15);
+  ctx.lineTo(pos.x+25,pos.y-35);
+  ctx.stroke();
+ }
+}
+
+function drawMonster(m){
+ const pos=isoToScreen(m.x,m.y);
+
+ ctx.fillStyle="rgba(0,0,0,0.6)";
+ ctx.beginPath();
+ ctx.ellipse(pos.x,pos.y+12,10,5,0,0,Math.PI*2);
+ ctx.fill();
+
+ if(m.type==="goblin"){
+   ctx.fillStyle=palette.goblin;
+   ctx.fillRect(pos.x-10,pos.y-18,20,18);
+   ctx.fillRect(pos.x-6,pos.y-26,12,8);
+ }
+
+ if(m.type==="skeleton"){
+   ctx.fillStyle=palette.skeleton;
+   ctx.fillRect(pos.x-8,pos.y-18,16,18);
+   ctx.fillRect(pos.x-5,pos.y-26,10,8);
+   ctx.fillStyle="#000";
+   ctx.fillRect(pos.x-3,pos.y-22,2,2);
+   ctx.fillRect(pos.x+1,pos.y-22,2,2);
+ }
+}
+
+function spawnBlood(x,y){
+ for(let i=0;i<8;i++){
+  particles.push({
+   x:x,
+   y:y,
+   vx:(Math.random()-0.5)*2,
+   vy:(Math.random()-0.5)*2,
+   life:30
+  });
+ }
+}
+
+function updateParticles(){
+ particles.forEach((p,i)=>{
+  p.x+=p.vx;
+  p.y+=p.vy;
+  p.life--;
+  if(p.life<=0) particles.splice(i,1);
+ });
+}
+
+function drawParticles(){
+ particles.forEach(p=>{
+  const pos=isoToScreen(p.x,p.y);
+  ctx.fillStyle=palette.blood;
+  ctx.fillRect(pos.x,pos.y,3,3);
+ });
+}
+
+function updateMonsters(){
+ monsters.forEach((m,i)=>{
+  const dx=player.x-m.x;
+  const dy=player.y-m.y;
+
+  if(m.type==="skeleton"){
+    if(Math.abs(dx)+Math.abs(dy)<4 && m.cool<=0){
+      m.x+=Math.sign(dx)*2;
+      m.y+=Math.sign(dy)*2;
+      m.cool=40;
+    }
+  }
+
+  if(m.type==="goblin"){
+    if(Math.abs(dx)+Math.abs(dy)<3 && m.cool<=0){
+      m.y-=2;
+      setTimeout(()=>{m.y+=2},200);
+      m.cool=50;
+    }
+  }
+
+  if(Math.abs(dx)<=1 && Math.abs(dy)<=1){
+    player.hp--;
+    spawnBlood(player.x,player.y);
+  }
+
+  m.cool--;
+  if(player.attacking && Math.abs(dx)<=1 && Math.abs(dy)<=1){
+    m.hp--;
+    spawnBlood(m.x,m.y);
+  }
+
+  if(m.hp<=0){
+    spawnBlood(m.x,m.y);
+    monsters.splice(i,1);
+  }
+ });
+}
+
+canvas.addEventListener("touchstart",(e)=>{
+ const rect=canvas.getBoundingClientRect();
+ const tx=e.touches[0].clientX-rect.left;
+ const ty=e.touches[0].clientY-rect.top;
+
+ player.attacking=true;
+ setTimeout(()=>player.attacking=false,200);
+
+ for(let y=0;y<10;y++){
+  for(let x=0;x<10;x++){
+   const pos=isoToScreen(x,y);
+   if(Math.abs(tx-pos.x)<32 && Math.abs(ty-pos.y)<16){
+    player.x=x;
+    player.y=y;
+   }
+  }
+ }
+});
+
+function loop(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ for(let y=0;y<10;y++){
+  for(let x=0;x<10;x++){
+   drawTile(x,y);
+  }
+ }
+
+ updateMonsters();
+ updateParticles();
+
+ monsters.forEach(drawMonster);
+ drawPlayer();
+ drawParticles();
+
+ hpUI.innerText="HP: "+player.hp;
+
+ if(player.hp<=0){
+  hpUI.innerText="YOU DIED";
+ }
+
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
