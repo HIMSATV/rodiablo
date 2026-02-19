@@ -343,30 +343,33 @@ function drawSword(x,y){
 
  if(player.dir=="down" && attacking){
 
-  if(t < 0.3){
-   // 첫 프레임: 칼을 눕혀서 시작
-   ctx.rotate(Math.PI/2);
-  } else {
-   // 내려찍기
-   ctx.rotate(Math.PI/2 - 1.8*(t-0.3));
-  }
+ let t = attackFrame/8;
 
-  // 일반 세로 칼 렌더 사용
-  ctx.fillStyle="#552200";
-  ctx.fillRect(-2,6,4,8);
+ if(t < 0.25){
+  // 🔥 완전 가로로 눕힘 (왼쪽으로)
+  ctx.rotate(-Math.PI/2);
+ } else {
+  // 내려찍기 모션
+  ctx.rotate(-Math.PI/2 + 2.2*(t-0.25));
+ }
 
-  ctx.fillStyle="#bbbbbb";
-  ctx.fillRect(-8,6,16,3);
+ // 기본 칼 렌더
+ ctx.fillStyle="#552200";
+ ctx.fillRect(-2,6,4,8);
 
-  ctx.fillStyle="#dddddd";
-  ctx.fillRect(-2,-20,4,26);
+ ctx.fillStyle="#bbbbbb";
+ ctx.fillRect(-8,6,16,3);
 
-  ctx.beginPath();
-  ctx.moveTo(-2,-20);
-  ctx.lineTo(0,-32);
-  ctx.lineTo(2,-20);
-  ctx.fill();
+ ctx.fillStyle="#dddddd";
+ ctx.fillRect(-2,-20,4,26);
 
+ ctx.beginPath();
+ ctx.moveTo(-2,-20);
+ ctx.lineTo(0,-32);
+ ctx.lineTo(2,-20);
+ ctx.fill();
+}
+ 
  } else {
 
   // 기본 렌더
