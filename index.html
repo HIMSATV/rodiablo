@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Oni Samurai Combat</title>
+<style>
+body { margin:0; overflow:hidden; background:#1a1a1a; }
+canvas { display:block; touch-action:none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const TILE = 64;
+const MAP_SIZE = 20;
+const ZOOM = 2.5;
+
+let attacking = false;
+let pointer = {x:canvas.width/2, y:canvas.height/2};
+
+canvas.addEventListener("mousemove", e=>{
+  pointer.x = e.clientX;
+  pointer.y = e.clientY;
+});
+
+canvas.addEventListener("mousedown", ()=> attacking = true);
+
+canvas.addEventListener("touchstart", e=>{
+  attacking = true;
+});
+
+class Joystick {
+  constructor(){
+    this.baseX = 120;
+    this.baseY = canvas.height - 120;
+    this.radius = 60;
+    this.active = false;
+    this.dx = 0;
+    this.dy = 0;
+  }
+
+  update(e){
+    let touch = e.touches[0];
+    let x = touch.clientX;
+    let y = touch.clientY;
+
+    let dist = Math.hypot(x-this.baseX,y-this.baseY);
+    if(dist < this.radius*1.5){
+      this.active = true;
+      this.dx = (x-this.baseX)/this.radius;
+      this.dy = (y-this.baseY)/this.radius;
+    }
+  }
+
+  reset(){
+    this.active=false;
+    this.dx=0;
+    this.dy=0;
+  }
+
+  draw(){
+    ctx.globalAlpha=0.4;
+    ctx.beginPath();
+    ctx.arc(this.baseX,this.baseY,this.radius,0,Math.PI*2);
+    ctx.fillStyle="#555";
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(this.baseX+this.dx*this.radius,
+            this.baseY+this.dy*this.radius,
+            25,0,Math.PI*2);
+    ctx.fillStyle="#aaa";
+    ctx.fill();
+    ctx.globalAlpha=1;
+  }
+}
+
+const joystick = new Joystick();
+
+canvas.addEventListener("touchmove", e=>{
+  joystick.update(e);
+});
+canvas.addEventListener("touchend", ()=>{
+  joystick.reset();
+  attacking=false;
+});
+
+class Particle{
+  constructor(x,y){
+    this.x=x;
+    this.y=y;
+    this.vx=(Math.random()-0.5)*0.2;
+    this.vy=(Math.random()-0.5)*0.2;
+    this.life=40;
+  }
+  update(){
+    this.x+=this.vx;
+    this.y+=this.vy;
+    this.life--;
+  }
+  draw(camX,camY){
+    const isoX=(this.x-this.y)*TILE/2;
+    const isoY=(this.x+this.y)*TILE/4;
+    const sx=canvas.width/2+(isoX-camX)*ZOOM;
+    const sy=canvas.height/2+(isoY-camY)*ZOOM;
+    ctx.fillStyle="red";
+    ctx.fillRect(sx,sy,3,3);
+  }
+}
+
+class Player{
+  constructor(){
+    this.x=0;
+    this.y=0;
+    this.speed=0.05; // 🚶 느린 걷기
+    this.dir=0;
+    this.hp=100;
+    this.attackFrame=0;
+  }
+
+  update(){
+    if(joystick.active){
+      this.x+=joystick.dx*this.speed;
+      this.y+=joystick.dy*this.speed;
+    }
+
+    let px=pointer.x-canvas.width/2;
+    let py=pointer.y-canvas.height/2;
+    this.dir=Math.atan2(py,px);
+
+    if(attacking){
+      this.attackFrame++;
+      if(this.attackFrame===5){
+        hitCheck();
+      }
+      if(this.attackFrame>15){
+        this.attackFrame=0;
+        attacking=false;
+      }
+    }
+  }
+
+  draw(camX,camY){
+    const isoX=(this.x-this.y)*TILE/2;
+    const isoY=(this.x+this.y)*TILE/4;
+    const sx=canvas.width/2+(isoX-camX)*ZOOM;
+    const sy=canvas.height/2+(isoY-camY)*ZOOM;
+
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.scale(ZOOM*1.6,ZOOM*1.6);
+
+    ctx.fillStyle="#7a0000";
+    ctx.fillRect(-5,-10,10,12);
+
+    ctx.fillStyle="yellow";
+    ctx.fillRect(-2,-13,2,2);
+    ctx.fillRect(1,-13,2,2);
+
+    ctx.restore();
+
+    // HP 바
+    ctx.fillStyle="red";
+    ctx.fillRect(20,20,this.hp*2,20);
+  }
+}
+
+class Goblin{
+  constructor(x,y){
+    this.x=x;
+    this.y=y;
+    this.hp=30;
+    this.speed=0.02;
+  }
+  update(player){
+    let dx=player.x-this.x;
+    let dy=player.y-this.y;
+    let dist=Math.hypot(dx,dy);
+    if(dist<5){
+      this.x+=dx/dist*this.speed;
+      this.y+=dy/dist*this.speed;
+    }
+  }
+  draw(camX,camY){
+    const isoX=(this.x-this.y)*TILE/2;
+    const isoY=(this.x+this.y)*TILE/4;
+    const sx=canvas.width/2+(isoX-camX)*ZOOM;
+    const sy=canvas.height/2+(isoY-camY)*ZOOM;
+
+    ctx.save();
+    ctx.translate(sx,sy);
+    ctx.scale(ZOOM*1.4,ZOOM*1.4);
+
+    ctx.fillStyle="#2ecc71";
+    ctx.fillRect(-4,-8,8,10);
+
+    ctx.restore();
+
+    // 몬스터 HP바
+    ctx.fillStyle="red";
+    ctx.fillRect(sx-20,sy-40,this.hp,5);
+  }
+}
+
+let particles=[];
+const player=new Player();
+let goblins=[new Goblin(2,2),new Goblin(-3,1)];
+
+function hitCheck(){
+  goblins.forEach(g=>{
+    let dx=g.x-player.x;
+    let dy=g.y-player.y;
+    let dist=Math.hypot(dx,dy);
+    let angle=Math.atan2(dy,dx);
+    let diff=Math.abs(angle-player.dir);
+    if(dist<1.5 && diff<0.8){
+      g.hp-=10;
+      for(let i=0;i<10;i++){
+        particles.push(new Particle(g.x,g.y));
+      }
+    }
+  });
+  goblins=goblins.filter(g=>g.hp>0);
+}
+
+let camX=0, camY=0;
+
+function drawMap(){
+  for(let x=-MAP_SIZE;x<MAP_SIZE;x++){
+    for(let y=-MAP_SIZE;y<MAP_SIZE;y++){
+      const isoX=(x-y)*TILE/2;
+      const isoY=(x+y)*TILE/4;
+      const sx=canvas.width/2+(isoX-camX)*ZOOM;
+      const sy=canvas.height/2+(isoY-camY)*ZOOM;
+
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.lineTo(sx+TILE/2*ZOOM,sy+TILE/4*ZOOM);
+      ctx.lineTo(sx,sy+TILE/2*ZOOM);
+      ctx.lineTo(sx-TILE/2*ZOOM,sy+TILE/4*ZOOM);
+      ctx.closePath();
+
+      ctx.fillStyle=(x+y)%2==0?"#3a3a3a":"#444";
+      ctx.fill();
+    }
+  }
+}
+
+function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  player.update();
+  goblins.forEach(g=>g.update(player));
+  particles.forEach(p=>p.update());
+  particles=particles.filter(p=>p.life>0);
+
+  camX+=( (player.x-player.y)*TILE/2 - camX)*0.1;
+  camY+=( (player.x+player.y)*TILE/4 - camY)*0.1;
+
+  drawMap();
+  goblins.forEach(g=>g.draw(camX,camY));
+  particles.forEach(p=>p.draw(camX,camY));
+  player.draw(camX,camY);
+  joystick.draw();
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
