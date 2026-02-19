@@ -314,14 +314,16 @@ function drawSword(x,y){
  if(player.dir=="right") ctx.translate(sideOffset,0);
  else if(player.dir=="left") ctx.translate(-sideOffset,0);
  else if(player.dir=="up") ctx.translate(0,-sideOffset);
- else if(player.dir=="down") ctx.translate(0,sideOffset);
 
- // 🔥 아래 방향 기본 자세도 가로로 눕힘
+ // 🔥 down은 몸쪽으로 살짝 올림
+ else if(player.dir=="down") ctx.translate(0,sideOffset-6);
+
+ let t = attackFrame/8;
+
+ // ===== 기본 ↓ 대기자세 (몸통 위치 + 가로)
  if(player.dir=="down" && !attacking){
   ctx.rotate(-Math.PI/2);
  }
-
- let t = attackFrame/8;
 
  if(attacking){
 
@@ -340,10 +342,16 @@ function drawSword(x,y){
   }
 
   else if(player.dir=="down"){
-   ctx.rotate(-Math.PI/2 + 2.2*t);
+
+   // 🔥 몸 안쪽에서 시작 → 바깥쪽으로 크게 휘두름
+   // 시작 각도 더 안쪽
+   let startAngle = -Math.PI/2 - 0.8;
+
+   ctx.rotate(startAngle + 2.4*t);
   }
  }
 
+ // ===== 칼 렌더 =====
  ctx.fillStyle="#552200";
  ctx.fillRect(-2,6,4,8);
 
