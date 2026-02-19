@@ -343,12 +343,14 @@ function drawSword(x,y){
 
   else if(player.dir=="down"){
 
-   // 🔥 몸 안쪽에서 시작 → 바깥쪽으로 크게 휘두름
-   // 시작 각도 더 안쪽
-   let startAngle = -Math.PI/2 - 0.8;
+ // 🔥 칼을 몸 바깥쪽으로 먼저 밀기
+ ctx.translate(12, -4);  // ← 이게 핵심
 
-   ctx.rotate(startAngle + 2.4*t);
-  }
+ // 회전 시작을 몸 안쪽 각도에서 시작
+ let startAngle = -Math.PI/2 - 1.2;
+
+ ctx.rotate(startAngle + 3.0*t);
+}
  }
 
  // ===== 칼 렌더 =====
