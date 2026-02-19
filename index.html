@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+
+<!-- ✅ 확대 완전 차단 -->
+<meta name="viewport"
+ content="width=device-width,
+ initial-scale=1.0,
+ maximum-scale=1.0,
+ user-scalable=no,
+ viewport-fit=cover">
+
+<title>Pixel Axe - iOS Locked</title>
+
+<style>
+html,body{
+ margin:0;
+ padding:0;
+ overflow:hidden;
+ touch-action:none;
+ background:#000;
+}
+
+/* 텍스트 선택 차단 */
+*{
+ -webkit-user-select:none;
+ user-select:none;
+ -webkit-touch-callout:none;
+}
+
+canvas{
+ display:block;
+ image-rendering: pixelated;
+}
+
+#hpBar{
+ position:fixed;
+ top:10px;
+ left:50%;
+ transform:translateX(-50%);
+ width:200px;height:16px;
+ background:#400;
+ border:2px solid #a00;
+}
+#hpFill{
+ height:100%;
+ width:100%;
+ background:#f00;
+}
+
+#uiBar{
+ position:fixed;
+ bottom:0;
+ width:100%;
+ height:140px;
+ background:#200;
+ border-top:3px solid #500;
+}
+
+#joystickBase{
+ position:absolute;
+ left:40px;
+ bottom:20px;
+ width:120px;height:120px;
+ border-radius:50%;
+ background:rgba(255,255,255,0.08);
+}
+
+#joystick{
+ position:absolute;
+ width:60px;height:60px;
+ border-radius:50%;
+ background:rgba(255,255,255,0.25);
+ left:30px;top:30px;
+}
+
+#attackBtn{
+ position:absolute;
+ right:40px;
+ bottom:35px;
+ width:90px;height:90px;
+ border-radius:50%;
+ background:#900;
+ border:3px solid #f44;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ color:white;
+ font-size:22px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<div id="hpBar"><div id="hpFill"></div></div>
+
+<div id="uiBar">
+ <div id="joystickBase"><div id="joystick"></div></div>
+ <div id="attackBtn">⚔</div>
+</div>
+
+<script>
+
+/* ✅ iOS 제스처 완전 차단 */
+document.addEventListener('gesturestart', e=>e.preventDefault());
+document.addEventListener('gesturechange', e=>e.preventDefault());
+document.addEventListener('gestureend', e=>e.preventDefault());
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function (event) {
+ let now = Date.now();
+ if (now - lastTouchEnd <= 300) {
+   event.preventDefault();
+ }
+ lastTouchEnd = now;
+}, {passive:false});
+
+/* ===== 도트 해상도 ===== */
+const scale=4;
+const baseW=240;
+const baseH=320;
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+canvas.width=baseW;
+canvas.height=baseH;
+canvas.style.width=baseW*scale+"px";
+canvas.style.height=baseH*scale+"px";
+ctx.imageSmoothingEnabled=false;
+
+/* ===== 플레이어 ===== */
+let player={
+ x:120,y:150,
+ dir:0,
+ speed:1.5,
+ hp:100,maxHp:100
+};
+
+let enemies=[];
+let attacking=false;
+let attackCooldown=0;
+
+/* 적 생성 */
+function spawnEnemy(){
+ enemies.push({
+  x:Math.random()*baseW,
+  y:Math.random()*baseH,
+  hp:40
+ });
+}
+for(let i=0;i<5;i++) spawnEnemy();
+
+/* 자동 타겟 */
+function findClosest(){
+ let min=9999,target=null;
+ enemies.forEach(e=>{
+  let d=Math.hypot(e.x-player.x,e.y-player.y);
+  if(d<min){min=d;target=e;}
+ });
+ return target;
+}
+
+/* 공격 */
+const attackBtn=document.getElementById("attackBtn");
+
+attackBtn.addEventListener("touchstart",function(e){
+ e.preventDefault();
+ attack();
+},{passive:false});
+
+attackBtn.addEventListener("mousedown",attack);
+
+function attack(){
+ if(attackCooldown>0)return;
+ let target=findClosest();
+ if(!target)return;
+
+ player.dir=Math.atan2(target.y-player.y,target.x-player.x);
+ attacking=true;
+ attackCooldown=20;
+
+ enemies.forEach(e=>{
+  let d=Math.hypot(e.x-player.x,e.y-player.y);
+  if(d<40) e.hp-=20;
+ });
+
+ setTimeout(()=>attacking=false,150);
+}
+
+/* 조이스틱 */
+let joyActive=false,joyDX=0,joyDY=0;
+const base=document.getElementById("joystickBase");
+const stick=document.getElementById("joystick");
+
+base.addEventListener("touchstart",e=>{
+ e.preventDefault();
+ joyActive=true;
+},{passive:false});
+
+base.addEventListener("touchmove",e=>{
+ e.preventDefault();
+ if(!joyActive)return;
+ let r=base.getBoundingClientRect();
+ let x=e.touches[0].clientX-r.left;
+ let y=e.touches[0].clientY-r.top;
+ joyDX=(x-60)/50;
+ joyDY=(y-60)/50;
+},{passive:false});
+
+base.addEventListener("touchend",()=>{
+ joyActive=false;
+ joyDX=joyDY=0;
+});
+
+/* 업데이트 */
+function update(){
+ if(joyActive){
+  player.x+=joyDX*player.speed;
+  player.y+=joyDY*player.speed;
+ }
+
+ enemies.forEach(e=>{
+  let dx=player.x-e.x;
+  let dy=player.y-e.y;
+  let d=Math.hypot(dx,dy);
+  if(d>0){
+   e.x+=dx/d*0.5;
+   e.y+=dy/d*0.5;
+  }
+ });
+
+ enemies=enemies.filter(e=>e.hp>0);
+ if(enemies.length<5) spawnEnemy();
+
+ if(attackCooldown>0)attackCooldown--;
+
+ document.getElementById("hpFill").style.width=
+  (player.hp/player.maxHp*100)+"%";
+}
+
+/* 도트 플레이어 */
+function drawPlayer(x,y){
+ ctx.fillStyle="#8b0000";
+ ctx.fillRect(x-4,y-6,8,8);
+
+ ctx.fillStyle="#500";
+ ctx.fillRect(x-4,y+2,3,4);
+ ctx.fillRect(x+1,y+2,3,4);
+
+ ctx.fillStyle="#a00";
+ ctx.fillRect(x-3,y-10,6,4);
+
+ ctx.fillStyle="#fff";
+ ctx.fillRect(x-3,y-12,2,2);
+ ctx.fillRect(x+1,y-12,2,2);
+
+ ctx.fillStyle="yellow";
+ ctx.fillRect(x-2,y-9,1,1);
+ ctx.fillRect(x+1,y-9,1,1);
+
+ ctx.save();
+ ctx.translate(x,y);
+ ctx.rotate(player.dir);
+ if(attacking) ctx.rotate(Math.sin(Date.now()/30)*0.5);
+
+ ctx.fillStyle="#5a3a1a";
+ ctx.fillRect(0,-1,16,2);
+
+ ctx.fillStyle="#ccc";
+ ctx.fillRect(14,-4,6,8);
+ ctx.restore();
+}
+
+/* 도트 몬스터 */
+function drawEnemy(e){
+ ctx.fillStyle="#0a0";
+ ctx.fillRect(e.x-5,e.y-5,10,10);
+
+ ctx.fillStyle="#0f0";
+ ctx.fillRect(e.x-3,e.y-3,6,6);
+
+ ctx.fillStyle="red";
+ ctx.fillRect(e.x-2,e.y-1,2,2);
+ ctx.fillRect(e.x+1,e.y-1,2,2);
+}
+
+/* 그리기 */
+function draw(){
+ ctx.fillStyle="#111";
+ ctx.fillRect(0,0,baseW,baseH);
+
+ enemies.forEach(drawEnemy);
+ drawPlayer(player.x,player.y);
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+
+</script>
+</body>
+</html>
