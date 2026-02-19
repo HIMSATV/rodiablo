@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+ content="width=device-width,
+ initial-scale=1.0,
+ maximum-scale=1.0,
+ user-scalable=no">
+<title>Oni Slayer</title>
+
+<style>
+body{margin:0;background:black;overflow:hidden;}
+canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
+#ui{
+ position:fixed;bottom:0;width:100%;height:120px;
+ background:#111;border-top:3px solid #550000;
+ display:flex;align-items:center;
+ justify-content:space-between;
+ padding:0 25px;box-sizing:border-box;
+}
+#movePad{position:relative;width:90px;height:90px;
+ border-radius:50%;background:#222;}
+#stick{position:absolute;width:40px;height:40px;
+ border-radius:50%;background:#666;
+ left:25px;top:25px;}
+#hpContainer{flex:1;margin:0 20px;height:18px;
+ background:#330000;border:2px solid #990000;}
+#hpBar{height:100%;width:100%;background:red;}
+#attackBtn{
+ width:90px;height:90px;border-radius:50%;
+ background:#990000;border:3px solid #ff4444;
+ display:flex;align-items:center;justify-content:center;
+ font-size:26px;color:white;
+}
+#attackBtn.active{background:red;transform:scale(.85);}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="ui">
+ <div id="movePad"><div id="stick"></div></div>
+ <div id="hpContainer"><div id="hpBar"></div></div>
+ <div id="attackBtn">⚔</div>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const uiHeight=120;
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight-uiHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+/* ===== 플레이어 ===== */
+let player={
+ x:canvas.width/2,
+ y:canvas.height/2,
+ dir:"right",
+ radius:14,
+ speed:2
+};
+
+let joyDX=0,joyDY=0;
+let attacking=false;
+let attackFrame=0;
+
+/* ===== 조이스틱 ===== */
+const pad=document.getElementById("movePad");
+const stick=document.getElementById("stick");
+let joyActive=false;
+
+pad.addEventListener("touchstart",()=>joyActive=true);
+
+pad.addEventListener("touchmove",e=>{
+ if(!joyActive)return;
+ let rect=pad.getBoundingClientRect();
+ let x=e.touches[0].clientX-rect.left-45;
+ let y=e.touches[0].clientY-rect.top-45;
+ let dist=Math.hypot(x,y);
+ let max=30;
+ if(dist>max){x*=max/dist;y*=max/dist;}
+ stick.style.left=(x+45-20)+"px";
+ stick.style.top=(y+45-20)+"px";
+ joyDX=x/max; joyDY=y/max;
+
+ // 방향 결정
+ if(Math.abs(x)>Math.abs(y)){
+  player.dir = x>0 ? "right":"left";
+ }else{
+  player.dir = y>0 ? "down":"up";
+ }
+});
+
+pad.addEventListener("touchend",()=>{
+ joyActive=false; joyDX=joyDY=0;
+ stick.style.left="25px"; stick.style.top="25px";
+});
+
+/* ===== 공격 ===== */
+const attackBtn=document.getElementById("attackBtn");
+attackBtn.addEventListener("touchstart",()=>{
+ attacking=true;
+ attackFrame=0;
+ attackBtn.classList.add("active");
+});
+attackBtn.addEventListener("touchend",()=>{
+ attackBtn.classList.remove("active");
+});
+
+/* ===== 업데이트 ===== */
+function update(){
+
+ player.x+=joyDX*player.speed*3;
+ player.y+=joyDY*player.speed*3;
+
+ if(attacking){
+  attackFrame++;
+  if(attackFrame>12){
+   attacking=false;
+  }
+ }
+}
+
+/* ===== 렌더 ===== */
+function draw(){
+ ctx.fillStyle="#111";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+ drawOni(player.x,player.y);
+}
+
+/* ===== 오니 + 4방향 2프레임 공격 ===== */
+function drawOni(x,y){
+
+ // 몸
+ ctx.fillStyle="#880000";
+ ctx.fillRect(x-10,y-12,20,22);
+
+ // 머리
+ ctx.fillStyle="#aa0000";
+ ctx.fillRect(x-7,y-20,14,8);
+
+ // 뿔
+ ctx.fillStyle="#ffffcc";
+ ctx.fillRect(x-8,y-26,4,8);
+ ctx.fillRect(x+4,y-26,4,8);
+
+ // 눈
+ ctx.fillStyle="#fff";
+ ctx.fillRect(x-3,y-14,2,2);
+ ctx.fillRect(x+1,y-14,2,2);
+
+ drawSword(x,y);
+}
+
+/* ===== 칼 ===== */
+function drawSword(x,y){
+
+ let frame = attackFrame<6?0:1;
+
+ ctx.save();
+
+ if(!attacking){
+  // 대기 상태: 몸 옆에 들고 있음
+  if(player.dir=="right"){
+   ctx.translate(x+14,y);
+   ctx.rotate(0);
+  }
+  if(player.dir=="left"){
+   ctx.translate(x-14,y);
+   ctx.rotate(Math.PI);
+  }
+  if(player.dir=="up"){
+   ctx.translate(x,y-14);
+   ctx.rotate(-Math.PI/2);
+  }
+  if(player.dir=="down"){
+   ctx.translate(x,y+14);
+   ctx.rotate(Math.PI/2);
+  }
+ }
+ else{
+  // 공격 모션
+  if(player.dir=="right"){
+   ctx.translate(x+14,y);
+   ctx.rotate(frame==0?-0.5:0.5);
+  }
+  if(player.dir=="left"){
+   ctx.translate(x-14,y);
+   ctx.rotate(frame==0?Math.PI+0.5:Math.PI-0.5);
+  }
+  if(player.dir=="up"){
+   ctx.translate(x,y-14);
+   ctx.rotate(frame==0?-1.8:-1.2);
+  }
+  if(player.dir=="down"){
+   ctx.translate(x,y+14);
+   ctx.rotate(frame==0?1.2:1.8);
+  }
+ }
+
+ // 손잡이
+ ctx.fillStyle="#552200";
+ ctx.fillRect(-2,0,4,10);
+
+ // 십자가 가로
+ ctx.fillStyle="#bbbbbb";
+ ctx.fillRect(-8,0,16,3);
+
+ // 칼날 (짧게)
+ ctx.fillStyle="#dddddd";
+ ctx.fillRect(-2,-18,4,18);
+
+ // 끝
+ ctx.beginPath();
+ ctx.moveTo(-2,-18);
+ ctx.lineTo(0,-24);
+ ctx.lineTo(2,-18);
+ ctx.closePath();
+ ctx.fill();
+
+ ctx.restore();
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
