@@ -316,6 +316,11 @@ function drawSword(x,y){
  else if(player.dir=="up") ctx.translate(0,-sideOffset);
  else if(player.dir=="down") ctx.translate(0,sideOffset);
 
+ // 🔥 아래 방향 기본 자세도 가로로 눕힘
+ if(player.dir=="down" && !attacking){
+  ctx.rotate(-Math.PI/2);
+ }
+
  let t = attackFrame/8;
 
  if(attacking){
@@ -335,16 +340,10 @@ function drawSword(x,y){
   }
 
   else if(player.dir=="down"){
-
-   if(t < 0.25){
-    ctx.rotate(-Math.PI/2);
-   } else {
-    ctx.rotate(-Math.PI/2 + 2.2*(t-0.25));
-   }
+   ctx.rotate(-Math.PI/2 + 2.2*t);
   }
  }
 
- // ===== 기본 칼 렌더 =====
  ctx.fillStyle="#552200";
  ctx.fillRect(-2,6,4,8);
 
