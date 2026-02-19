@@ -310,7 +310,6 @@ function drawSword(x,y){
  ctx.translate(x,y);
 
  let sideOffset=18;
-
  let t = attackFrame/8;
 
  // ===== RIGHT =====
@@ -342,7 +341,7 @@ function drawSword(x,y){
   }
  }
 
- // ===== DOWN (완전 재정리 버전) =====
+ // ===== DOWN (완전 수정 버전) =====
  else if(player.dir=="down"){
 
   // 몸쪽으로 약간 올림
@@ -350,22 +349,27 @@ function drawSword(x,y){
 
   if(attacking){
 
-   // 🔥 몸 안쪽 위에서 시작 → 화면 아래로 베기
-   let startAngle = -2.2;
-   let endAngle   = 1.2;
+    // 🔥 손잡이 기준으로 회전
+    ctx.translate(0,10);
 
-   let angle = startAngle + (endAngle - startAngle) * t;
+    // 가로 상태에서 시작
+    let startAngle = -Math.PI/2;
 
-   ctx.rotate(angle);
+    // 아래로 내려찍기 (180도 스윙)
+    let angle = startAngle + (Math.PI * t);
+
+    ctx.rotate(angle);
+
+    ctx.translate(0,-10);
 
   } else {
 
-   // 대기 = 가로
-   ctx.rotate(-Math.PI/2);
+    // 대기 = 가로
+    ctx.rotate(-Math.PI/2);
   }
  }
 
- // ===== 칼 그림 =====
+ // ===== 칼 그리기 =====
  ctx.fillStyle="#552200";
  ctx.fillRect(-2,6,4,8);
 
@@ -383,7 +387,6 @@ function drawSword(x,y){
 
  ctx.restore();
 }
-alert("TEST");
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
 
