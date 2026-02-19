@@ -311,55 +311,61 @@ function drawSword(x,y){
 
  let sideOffset=18;
 
- if(player.dir=="right") ctx.translate(sideOffset,0);
- else if(player.dir=="left") ctx.translate(-sideOffset,0);
- else if(player.dir=="up") ctx.translate(0,-sideOffset);
-
- // 🔥 down은 몸쪽으로 살짝 올림
- else if(player.dir=="down") ctx.translate(0,sideOffset-6);
-
  let t = attackFrame/8;
 
- // ===== 기본 ↓ 대기자세 (몸통 위치 + 가로)
- if(player.dir=="down" && !attacking){
-  ctx.rotate(-Math.PI/2);
- }
+ // ===== RIGHT =====
+ if(player.dir=="right"){
+  ctx.translate(sideOffset,0);
 
- if(attacking){
-
-  if(player.dir=="right"){
+  if(attacking){
    ctx.translate(6,0);
    ctx.rotate(1.4*t);
   }
+ }
 
-  else if(player.dir=="left"){
+ // ===== LEFT =====
+ else if(player.dir=="left"){
+  ctx.translate(-sideOffset,0);
+
+  if(attacking){
    ctx.translate(-6,0);
    ctx.rotate(-1.4*t);
   }
-
-  else if(player.dir=="up"){
-   ctx.rotate(-1.4*t);
-  }
-
- else if(player.dir=="down"){
-
- // 🔥 칼을 몸 중앙 쪽으로 살짝 위치
- ctx.translate(0, -4);
-
- // 시작: 약간 위쪽 (몸 안쪽)
- let startAngle = -Math.PI/2 - 0.6;
-
- // 끝: 완전히 아래로
- let endAngle = Math.PI/2;
-
- // 부드러운 보간
- let angle = startAngle + (endAngle - startAngle) * t;
-
- ctx.rotate(angle);
-}
  }
 
- // ===== 칼 렌더 =====
+ // ===== UP =====
+ else if(player.dir=="up"){
+  ctx.translate(0,-sideOffset);
+
+  if(attacking){
+   ctx.rotate(-1.4*t);
+  }
+ }
+
+ // ===== DOWN (완전 재정리 버전) =====
+ else if(player.dir=="down"){
+
+  // 몸쪽으로 약간 올림
+  ctx.translate(0,sideOffset-6);
+
+  if(attacking){
+
+   // 🔥 몸 안쪽 위에서 시작 → 화면 아래로 베기
+   let startAngle = -2.2;
+   let endAngle   = 1.2;
+
+   let angle = startAngle + (endAngle - startAngle) * t;
+
+   ctx.rotate(angle);
+
+  } else {
+
+   // 대기 = 가로
+   ctx.rotate(-Math.PI/2);
+  }
+ }
+
+ // ===== 칼 그림 =====
  ctx.fillStyle="#552200";
  ctx.fillRect(-2,6,4,8);
 
