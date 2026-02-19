@@ -304,61 +304,71 @@ function drawPlayer(x,y){
 }
 
 /* ===== 🔥 최종 고정 칼 모션 ===== */
-function drawSword(x, y){
+function drawSword(x, y) {
 
   ctx.save();
   ctx.translate(x, y);
 
-  const sideOffset = 18;
-  const t = attackFrame / 8;
+  var sideOffset = 18;
+  var t = attackFrame / 8;
 
-  let offsetX = 0;
-  let offsetY = 0;
-  let angle = 0;
+  var offsetX = 0;
+  var offsetY = 0;
+  var angle = 0;
 
   // ▶ RIGHT (베기)
-  if(player.dir === "right"){
+  if (player.dir === "right") {
+
     offsetX = sideOffset;
-    angle = attacking ? 1.6 * t : 0;
+    angle = attacking ? 1.5 * t : 0;
+
   }
 
   // ◀ LEFT (베기)
-  else if(player.dir === "left"){
+  else if (player.dir === "left") {
+
     offsetX = -sideOffset;
-    angle = attacking ? -1.6 * t : 0;
+    angle = attacking ? -1.5 * t : 0;
+
   }
 
   // ▲ UP (찌르기)
-  else if(player.dir === "up"){
-    offsetY = -sideOffset - (attacking ? 25 * t : 0);
-    angle = 0;
+  else if (player.dir === "up") {
+
+    offsetY = -sideOffset;
+    if (attacking) {
+      offsetY -= 25 * t;
+    }
+
   }
 
-  // ▼ DOWN (상단 위치 기준 그대로, 180도만 회전)
-  else if(player.dir === "down"){
-    offsetY = -sideOffset - (attacking ? 25 * t : 0);
+  // ▼ DOWN (눈 바로 아래에서 시작)
+  else if (player.dir === "down") {
+
+    offsetY = -6;   // 🔥 눈 바로 아래 위치로 시작점 이동
     angle = Math.PI;
+
+    if (attacking) {
+      offsetY += 25 * t;
+    }
   }
 
   ctx.translate(offsetX, offsetY);
   ctx.rotate(angle);
 
-  // 손잡이
-  ctx.fillStyle="#552200";
-  ctx.fillRect(-2,6,4,8);
+  ctx.fillStyle = "#552200";
+  ctx.fillRect(-2, 6, 4, 8);
 
-  // 가드
-  ctx.fillStyle="#bbbbbb";
-  ctx.fillRect(-8,6,16,3);
+  ctx.fillStyle = "#bbbbbb";
+  ctx.fillRect(-8, 6, 16, 3);
 
-  // 칼날
-  ctx.fillStyle="#dddddd";
-  ctx.fillRect(-2,-20,4,26);
+  ctx.fillStyle = "#dddddd";
+  ctx.fillRect(-2, -20, 4, 26);
 
   ctx.beginPath();
-  ctx.moveTo(-2,-20);
-  ctx.lineTo(0,-32);
-  ctx.lineTo(2,-20);
+  ctx.moveTo(-2, -20);
+  ctx.lineTo(0, -32);
+  ctx.lineTo(2, -20);
   ctx.fill();
 
   ctx.restore();
