@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ronin Gothic Build</title>
+<style>
+body { margin:0; background:black; overflow:hidden; }
+canvas { display:block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let player = {x:canvas.width/2,y:canvas.height/2,dir:0,hp:100};
+let enemies=[];
+let particles=[];
+let attacking=false;
+let attackFrame=0;
+
+function spawnEnemy(){
+ let type=Math.random()>0.5?"goblin":"skeleton";
+ enemies.push({
+   x:Math.random()*canvas.width,
+   y:Math.random()*canvas.height,
+   type:type,
+   hp:type==="goblin"?60:40,
+   state:"idle",
+   cooldown:0,
+   vy:0
+ });
+}
+for(let i=0;i<6;i++) spawnEnemy();
+
+canvas.addEventListener("mousedown",input);
+canvas.addEventListener("touchstart",input);
+
+function input(e){
+ let x=e.touches?e.touches[0].clientX:e.clientX;
+ let y=e.touches?e.touches[0].clientY:e.clientY;
+ let dx=x-player.x;
+ let dy=y-player.y;
+ player.dir=Math.atan2(dy,dx);
+ player.x=x;
+ player.y=y;
+ attacking=true;
+ attackFrame=0;
+ setTimeout(()=>attacking=false,250);
+}
+
+function spawnBlood(x,y){
+ for(let i=0;i<6;i++){
+  particles.push({
+    x,y,
+    vx:(Math.random()-0.5)*4,
+    vy:(Math.random()-0.5)*4,
+    life:30
+  });
+ }
+}
+
+function update(){
+
+ if(attacking) attackFrame++;
+
+ enemies.forEach(e=>{
+
+  let dx=player.x-e.x;
+  let dy=player.y-e.y;
+  let dist=Math.sqrt(dx*dx+dy*dy);
+
+  if(e.cooldown>0) e.cooldown--;
+
+  if(e.type==="skeleton"){
+     if(dist<180 && e.cooldown===0){
+        e.state="dash";
+        e.cooldown=120;
+     }
+     if(e.state==="dash"){
+        e.x+=dx/dist*4;
+        e.y+=dy/dist*4;
+        if(dist<20){
+           player.hp-=5;
+           e.state="idle";
+        }
+     } else {
+        e.x+=dx/dist*0.6;
+        e.y+=dy/dist*0.6;
+     }
+  }
+
+  if(e.type==="goblin"){
+     if(dist<160 && e.cooldown===0){
+        e.state="jump";
+        e.vy=-6;
+        e.cooldown=140;
+     }
+     if(e.state==="jump"){
+        e.vy+=0.4;
+        e.y+=e.vy;
+        if(e.y>=player.y){
+          e.state="idle";
+          if(dist<40) player.hp-=8;
+        }
+     } else {
+        e.x+=dx/dist*0.5;
+        e.y+=dy/dist*0.5;
+     }
+  }
+
+  if(attacking && dist<60 && attackFrame===2){
+     e.hp-=50;
+     spawnBlood(e.x,e.y);
+  }
+
+ });
+
+ enemies=enemies.filter(e=>e.hp>0);
+ if(enemies.length<6) spawnEnemy();
+
+ particles.forEach(p=>{
+   p.x+=p.vx;
+   p.y+=p.vy;
+   p.life--;
+ });
+ particles=particles.filter(p=>p.life>0);
+}
+
+function drawPlayer(){
+ ctx.fillStyle="#552222";
+ ctx.fillRect(player.x-6,player.y-6,12,12);
+ ctx.fillStyle="white";
+ ctx.fillRect(player.x-3,player.y-3,2,2);
+ ctx.fillRect(player.x+1,player.y-3,2,2);
+ if(attacking){
+   ctx.save();
+   ctx.translate(player.x,player.y);
+   ctx.rotate(player.dir+[-0.8,0,0.8][attackFrame%3]);
+   ctx.fillStyle="#cccccc";
+   ctx.fillRect(0,-2,45,4);
+   ctx.restore();
+ }
+}
+
+function drawGoblin(e){
+ ctx.fillStyle="#0f3b0f";
+ ctx.fillRect(e.x-8,e.y-8,16,16);
+ ctx.fillStyle="#1faa1f";
+ ctx.fillRect(e.x-5,e.y-12,10,6);
+ ctx.fillStyle="red";
+ ctx.fillRect(e.x-3,e.y-4,2,2);
+ ctx.fillRect(e.x+1,e.y-4,2,2);
+}
+
+function drawSkeleton(e){
+ ctx.fillStyle="#bbbbbb";
+ ctx.fillRect(e.x-6,e.y-8,12,16);
+ ctx.fillStyle="#ffffff";
+ ctx.fillRect(e.x-4,e.y-14,8,6);
+ ctx.fillStyle="#000";
+ ctx.fillRect(e.x-2,e.y-12,2,2);
+ ctx.fillRect(e.x+1,e.y-12,2,2);
+}
+
+function draw(){
+
+ ctx.fillStyle="#141010";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ enemies.forEach(e=>{
+   if(e.type==="goblin") drawGoblin(e);
+   else drawSkeleton(e);
+ });
+
+ drawPlayer();
+
+ ctx.fillStyle="#aa0000";
+ particles.forEach(p=>{
+   ctx.fillRect(p.x,p.y,2,2);
+ });
+
+ // Gothic darkness overlay
+ let g=ctx.createRadialGradient(player.x,player.y,60,player.x,player.y,260);
+ g.addColorStop(0,"rgba(0,0,0,0)");
+ g.addColorStop(1,"rgba(0,0,0,0.95)");
+ ctx.fillStyle=g;
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ // HP text
+ ctx.fillStyle="white";
+ ctx.fillText("HP: "+player.hp,20,30);
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+
+</script>
+</body>
+</html>
