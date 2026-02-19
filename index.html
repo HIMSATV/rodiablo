@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Blood of the Ronin - Mobile Upgrade</title>
+<style>
+body { margin:0; background:black; overflow:hidden; }
+canvas { display:block; }
+
+#uiBar{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  height:140px;
+  background:linear-gradient(#1a0000,#000);
+  border-top:3px solid #550000;
+}
+
+/* 조이스틱 */
+#joystickBase{
+  position:absolute;
+  left:40px;
+  bottom:20px;
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.08);
+}
+#joystick{
+  position:absolute;
+  width:60px;
+  height:60px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.25);
+  left:30px;
+  top:30px;
+}
+
+/* 공격 버튼 */
+#attackBtn{
+  position:absolute;
+  right:40px;
+  bottom:35px;
+  width:90px;
+  height:90px;
+  border-radius:50%;
+  background:radial-gradient(circle,#aa0000,#440000);
+  border:3px solid #ff4444;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color:white;
+  font-size:22px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="uiBar">
+  <div id="joystickBase">
+    <div id="joystick"></div>
+  </div>
+  <div id="attackBtn">⚔</div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight - 140;
+
+/* ===== 사운드 ===== */
+let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playHitSound(){
+  let osc = audioCtx.createOscillator();
+  let gain = audioCtx.createGain();
+  osc.type="square";
+  osc.frequency.value=180;
+  gain.gain.value=0.1;
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime+0.08);
+}
+
+/* ===== 게임 객체 ===== */
+let player = {
+  x:canvas.width/2,
+  y:canvas.height/2,
+  dir:0,
+  speed:2
+};
+
+let enemies=[];
+let particles=[];
+let attacking=false;
+let slashAngle=0;
+let attackCooldown=0;
+
+function spawnEnemy(){
+  enemies.push({
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    hp:30
+  });
+}
+for(let i=0;i<6;i++) spawnEnemy();
+
+/* ===== 조이스틱 ===== */
+let joyActive=false, joyDX=0, joyDY=0;
+const base=document.getElementById("joystickBase");
+const stick=document.getElementById("joystick");
+
+base.addEventListener("touchstart",()=>joyActive=true);
+base.addEventListener("touchmove",e=>{
+  if(!joyActive)return;
+  let r=base.getBoundingClientRect();
+  let x=e.touches[0].clientX-r.left;
+  let y=e.touches[0].clientY-r.top;
+  joyDX=x-60; joyDY=y-60;
+
+  let dist=Math.sqrt(joyDX*joyDX+joyDY*joyDY);
+  if(dist>50){
+    joyDX=joyDX/dist*50;
+    joyDY=joyDY/dist*50;
+  }
+
+  stick.style.left=(joyDX+30)+"px";
+  stick.style.top=(joyDY+30)+"px";
+});
+base.addEventListener("touchend",()=>{
+  joyActive=false;
+  joyDX=joyDY=0;
+  stick.style.left="30px";
+  stick.style.top="30px";
+});
+
+/* ===== 공격 버튼 ===== */
+document.getElementById("attackBtn").addEventListener("touchstart",attack);
+document.getElementById("attackBtn").addEventListener("mousedown",attack);
+
+function attack(){
+  if(attackCooldown>0) return;
+
+  attacking=true;
+  slashAngle=player.dir;
+  attackCooldown=25;
+
+  enemies.forEach(enemy=>{
+    let dx=enemy.x-player.x;
+    let dy=enemy.y-player.y;
+    let dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<60){
+      enemy.hp-=15;
+      spawnBlood(enemy.x,enemy.y);
+      playHitSound();
+    }
+  });
+
+  setTimeout(()=>attacking=false,180);
+}
+
+function spawnBlood(x,y){
+  for(let i=0;i<8;i++){
+    particles.push({
+      x,y,
+      vx:(Math.random()-0.5)*4,
+      vy:(Math.random()-0.5)*4,
+      life:30
+    });
+  }
+}
+
+/* ===== 업데이트 ===== */
+function update(){
+
+  /* 이동 */
+  if(joyActive){
+    player.x += joyDX/50 * player.speed;
+    player.y += joyDY/50 * player.speed;
+
+    if(Math.abs(joyDX)>5 || Math.abs(joyDY)>5){
+      player.dir=Math.atan2(joyDY,joyDX);
+    }
+  }
+
+  /* 적 이동 */
+  enemies.forEach(enemy=>{
+    let dx=player.x-enemy.x;
+    let dy=player.y-enemy.y;
+    let dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>0){
+      enemy.x+=dx/dist*0.6;
+      enemy.y+=dy/dist*0.6;
+    }
+  });
+
+  enemies=enemies.filter(e=>e.hp>0);
+  if(enemies.length<6) spawnEnemy();
+
+  particles.forEach(p=>{
+    p.x+=p.vx;
+    p.y+=p.vy;
+    p.life--;
+  });
+  particles=particles.filter(p=>p.life>0);
+
+  if(attackCooldown>0) attackCooldown--;
+}
+
+/* ===== 드로우 ===== */
+function drawKatana(x,y,angle){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(angle);
+  ctx.fillStyle="#cccccc";
+  ctx.fillRect(0,-2,40,4);
+  ctx.fillStyle="#552200";
+  ctx.fillRect(-8,-3,8,6);
+  ctx.restore();
+}
+
+function drawOni(x,y){
+  ctx.fillStyle="#770000";
+  ctx.fillRect(x-10,y-10,20,20);
+
+  ctx.fillStyle="#cc0000";
+  ctx.fillRect(x-6,y-18,12,10);
+
+  ctx.fillStyle="#ffffcc";
+  ctx.fillRect(x-8,y-20,4,6);
+  ctx.fillRect(x+4,y-20,4,6);
+
+  ctx.fillStyle= attacking ? "#ffff00" : "#ffffff";
+  ctx.fillRect(x-3,y-15,2,2);
+  ctx.fillRect(x+1,y-15,2,2);
+
+  if(attacking){
+    drawKatana(x,y,slashAngle);
+  }
+}
+
+function drawGoblin(x,y){
+  ctx.fillStyle="#004400";
+  ctx.fillRect(x-10,y-10,20,20);
+
+  ctx.fillStyle="#00aa00";
+  ctx.fillRect(x-6,y-16,12,8);
+
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(x-4,y-14,2,2);
+  ctx.fillRect(x+2,y-14,2,2);
+}
+
+function draw(){
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  enemies.forEach(e=>drawGoblin(e.x,e.y));
+  drawOni(player.x,player.y);
+
+  ctx.fillStyle="#aa0000";
+  particles.forEach(p=>{
+    ctx.fillRect(p.x,p.y,3,3);
+  });
+
+  let gradient=ctx.createRadialGradient(player.x,player.y,60,player.x,player.y,220);
+  gradient.addColorStop(0,"rgba(0,0,0,0)");
+  gradient.addColorStop(1,"rgba(0,0,0,0.85)");
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function gameLoop(){
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+gameLoop();
+</script>
+</body>
+</html>
