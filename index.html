@@ -304,10 +304,10 @@ function drawPlayer(x,y){
 }
 
 /* ===== 🔥 최종 고정 칼 모션 ===== */
-function drawSword(x,y){
+function drawSword(x, y){
 
   ctx.save();
-  ctx.translate(x,y);
+  ctx.translate(x, y);
 
   const sideOffset = 18;
   const t = attackFrame / 8;
@@ -316,54 +316,49 @@ function drawSword(x,y){
   let offsetY = 0;
   let angle = 0;
 
-  // ===== RIGHT =====
+  // =========================
+  // ▶ RIGHT (베기)
+  // =========================
   if(player.dir === "right"){
     offsetX = sideOffset;
-    if(attacking){
-      angle = 1.4 * t;
-    }
+    angle = attacking ? 1.6 * t : 0;
   }
 
-  // ===== LEFT =====
+  // =========================
+  // ◀ LEFT (베기)
+  // =========================
   else if(player.dir === "left"){
     offsetX = -sideOffset;
-    if(attacking){
-      angle = -1.4 * t;
-    }
+    angle = attacking ? -1.6 * t : 0;
   }
 
-  // ===== UP =====
+  // =========================
+  // ▲ UP (찌르기)
+  // =========================
   else if(player.dir === "up"){
-    offsetY = -sideOffset;
-
-    if(attacking){
-      angle = -1.4 * t;
-    }
+    offsetY = -sideOffset - (attacking ? 25 * t : 0);
   }
 
-  // ===== DOWN (상단과 동일 구조) =====
+  // =========================
+  // ▼ DOWN (찌르기)
+  // =========================
   else if(player.dir === "down"){
-    offsetY = sideOffset;
-
-    // 기본 자세: 아래 향함
-    angle = Math.PI;
-
-    if(attacking){
-      // 상단의 반대 방향 회전
-      angle += 1.4 * t;
-    }
+    offsetY = sideOffset + (attacking ? 25 * t : 0);
+    angle = Math.PI; // 칼 아래 향하게
   }
 
   ctx.translate(offsetX, offsetY);
   ctx.rotate(angle);
 
-  // ===== 칼 =====
+  // ===== 손잡이 =====
   ctx.fillStyle="#552200";
   ctx.fillRect(-2,6,4,8);
 
+  // ===== 가드 =====
   ctx.fillStyle="#bbbbbb";
   ctx.fillRect(-8,6,16,3);
 
+  // ===== 칼날 =====
   ctx.fillStyle="#dddddd";
   ctx.fillRect(-2,-20,4,26);
 
