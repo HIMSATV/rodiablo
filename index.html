@@ -344,29 +344,19 @@ function drawSword(x,y){
  // ===== DOWN (완전 수정 버전) =====
  else if(player.dir=="down"){
 
-  // 몸쪽으로 약간 올림
-  ctx.translate(0,sideOffset-6);
+  ctx.translate(0, sideOffset-6);
+
+  // 기본 가로 상태
+  ctx.rotate(-Math.PI/2);
 
   if(attacking){
 
-    // 🔥 손잡이 기준으로 회전
-    ctx.translate(0,10);
+    let t = attackFrame/8;
 
-    // 가로 상태에서 시작
-    let startAngle = -Math.PI/2;
-
-    // 아래로 내려찍기 (180도 스윙)
-    let angle = startAngle + (Math.PI * t);
-
-    ctx.rotate(angle);
-
-    ctx.translate(0,-10);
-
-  } else {
-
-    // 대기 = 가로
-    ctx.rotate(-Math.PI/2);
+    // 가로 → 아래로 90도만 회전
+    ctx.rotate(Math.PI/2 * t);
   }
+}
  }
 
  // ===== 칼 그리기 =====
