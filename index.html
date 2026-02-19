@@ -306,76 +306,73 @@ function drawPlayer(x,y){
 /* ===== 🔥 최종 고정 칼 모션 ===== */
 function drawSword(x,y){
 
- ctx.save();
- ctx.translate(x,y);
+  ctx.save();
+  ctx.translate(x,y);
 
- let sideOffset=18;
- let t = attackFrame/8;
+  let sideOffset = 18;
+  let t = attackFrame / 8;
 
- // ===== RIGHT =====
- if(player.dir=="right"){
-  ctx.translate(sideOffset,0);
+  // ===== RIGHT =====
+  if(player.dir=="right"){
+    ctx.translate(sideOffset,0);
 
-  if(attacking){
-   ctx.translate(6,0);
-   ctx.rotate(1.4*t);
+    if(attacking){
+      ctx.translate(6,0);
+      ctx.rotate(1.4 * t);
+    }
   }
- }
 
- // ===== LEFT =====
- else if(player.dir=="left"){
-  ctx.translate(-sideOffset,0);
+  // ===== LEFT =====
+  else if(player.dir=="left"){
+    ctx.translate(-sideOffset,0);
 
-  if(attacking){
-   ctx.translate(-6,0);
-   ctx.rotate(-1.4*t);
+    if(attacking){
+      ctx.translate(-6,0);
+      ctx.rotate(-1.4 * t);
+    }
   }
- }
 
- // ===== UP =====
- else if(player.dir=="up"){
-  ctx.translate(0,-sideOffset);
+  // ===== UP =====
+  else if(player.dir=="up"){
+    ctx.translate(0,-sideOffset);
 
-  if(attacking){
-   ctx.rotate(-1.4*t);
+    if(attacking){
+      ctx.rotate(-1.4 * t);
+    }
   }
- }
 
- // ===== DOWN (완전 수정 버전) =====
- else if(player.dir=="down"){
+  // ===== DOWN =====
+  else if(player.dir=="down"){
 
-  ctx.translate(0, sideOffset-6);
+    // 몸쪽으로 약간 올림
+    ctx.translate(0, sideOffset - 6);
 
-  // 기본 가로 상태
-  ctx.rotate(-Math.PI/2);
+    // 기본 가로 상태
+    ctx.rotate(-Math.PI/2);
 
-  if(attacking){
-
-    let t = attackFrame/8;
-
-    // 가로 → 아래로 90도만 회전
-    ctx.rotate(Math.PI/2 * t);
+    if(attacking){
+      // 가로 → 아래로 90도 회전
+      ctx.rotate((Math.PI/2) * t);
+    }
   }
-}
- }
 
- // ===== 칼 그리기 =====
- ctx.fillStyle="#552200";
- ctx.fillRect(-2,6,4,8);
+  // ===== 칼 그리기 =====
+  ctx.fillStyle="#552200";
+  ctx.fillRect(-2,6,4,8);
 
- ctx.fillStyle="#bbbbbb";
- ctx.fillRect(-8,6,16,3);
+  ctx.fillStyle="#bbbbbb";
+  ctx.fillRect(-8,6,16,3);
 
- ctx.fillStyle="#dddddd";
- ctx.fillRect(-2,-20,4,26);
+  ctx.fillStyle="#dddddd";
+  ctx.fillRect(-2,-20,4,26);
 
- ctx.beginPath();
- ctx.moveTo(-2,-20);
- ctx.lineTo(0,-32);
- ctx.lineTo(2,-20);
- ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-2,-20);
+  ctx.lineTo(0,-32);
+  ctx.lineTo(2,-20);
+  ctx.fill();
 
- ctx.restore();
+  ctx.restore();
 }
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
