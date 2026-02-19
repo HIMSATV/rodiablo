@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oni Samurai</title>
+<style>
+body{margin:0;background:black;overflow:hidden;}
+canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
+#ui{
+ position:fixed;bottom:0;width:100%;height:120px;
+ background:#111;border-top:3px solid #550000;
+ display:flex;align-items:center;justify-content:space-between;
+ padding:0 25px;box-sizing:border-box;
+}
+#movePad{position:relative;width:90px;height:90px;border-radius:50%;background:#222;}
+#stick{position:absolute;width:40px;height:40px;border-radius:50%;background:#666;left:25px;top:25px;}
+#attackBtn{
+ width:90px;height:90px;border-radius:50%;
+ background:#990000;border:3px solid #ff4444;
+ display:flex;align-items:center;justify-content:center;
+ font-size:26px;color:white;
+}
+#attackBtn.active{background:red;transform:scale(.85);}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+ <div id="movePad"><div id="stick"></div></div>
+ <div id="attackBtn">⚔</div>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const uiHeight=120;
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight-uiHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+/* ===== 사무라이 ===== */
+let player={
+ x:0,y:0,
+ dir:"down",
+ speed:2,
+ radius:14
+};
+
+let attacking=false;
+let attackFrame=0;
+
+/* ===== 루프 ===== */
+function update(){
+ if(attacking){
+  attackFrame++;
+  if(attackFrame>10){
+   attacking=false;
+   attackFrame=0;
+  }
+ }
+}
+
+function draw(){
+ ctx.fillStyle="#111";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ drawPlayer(canvas.width/2,canvas.height/2);
+}
+
+/* ===== 플레이어 ===== */
+function drawPlayer(x,y){
+
+ ctx.fillStyle="#880000";
+ ctx.fillRect(x-10,y-12,20,22);
+
+ ctx.fillStyle="#aa0000";
+ ctx.fillRect(x-7,y-20,14,8);
+
+ ctx.fillStyle="#ffffcc";
+ ctx.fillRect(x-8,y-26,4,8);
+ ctx.fillRect(x+4,y-26,4,8);
+
+ ctx.fillStyle="#fff";
+ ctx.fillRect(x-3,y-14,2,2);
+ ctx.fillRect(x+1,y-14,2,2);
+
+ drawSword(x,y);
+}
+
+/* ===== 🔥 완전 수정된 칼 ===== */
+function drawSword(x,y){
+
+ ctx.save();
+ ctx.translate(x,y);
+
+ let sideOffset=18;
+
+ // ===== 대기 기본 상태 =====
+ // 항상 몸 옆에 세워진 세로 칼
+
+ if(player.dir=="right"){
+  ctx.translate(sideOffset,0);
+ }
+ else if(player.dir=="left"){
+  ctx.translate(-sideOffset,0);
+ }
+ else if(player.dir=="up"){
+  ctx.translate(0,-sideOffset);
+ }
+ else if(player.dir=="down"){
+  ctx.translate(0,sideOffset);
+ }
+
+ // 기본은 무조건 세로
+ // (회전 없음)
+
+ // ===== 공격 시 회전 =====
+ if(attacking){
+
+  let progress=attackFrame/10;
+
+  if(player.dir=="right"){
+   ctx.rotate(-1.5*progress);
+  }
+  else if(player.dir=="left"){
+   ctx.rotate(1.5*progress);
+  }
+  else if(player.dir=="up"){
+   ctx.rotate(-1.5*progress);
+  }
+  else if(player.dir=="down"){
+   ctx.rotate(1.5*progress);
+  }
+ }
+
+ // ===== 칼 디자인 =====
+ ctx.fillStyle="#552200";
+ ctx.fillRect(-2,6,4,8);
+
+ ctx.fillStyle="#bbbbbb";
+ ctx.fillRect(-8,6,16,3);
+
+ ctx.fillStyle="#dddddd";
+ ctx.fillRect(-2,-20,4,26);
+
+ ctx.beginPath();
+ ctx.moveTo(-2,-20);
+ ctx.lineTo(0,-32);
+ ctx.lineTo(2,-20);
+ ctx.fill();
+
+ ctx.restore();
+}
+
+/* ===== 공격 버튼 ===== */
+document.getElementById("attackBtn").addEventListener("touchstart",()=>{
+ attacking=true;
+ attackFrame=0;
+});
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
