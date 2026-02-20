@@ -430,13 +430,15 @@ function drawEnemy(e){
   if(e.attackFrame > 0){
 
     let t = (25 - e.attackFrame) / 25;   // 0→1
-    let angle = (-1 + t*2) * 1.0;        // -1 → +1
+    let start = 1.2;                    // 시작 각도
+    let end = -1.2;                     // 끝 각도
+
+    // 🔥 플레이어 방향 기준 시작 위치 결정
+    let angle = (start + (end - start) * t) * e.swingDir;
 
     ctx.save();
     ctx.translate(e.x, e.y-5);
-
-    // 🔥 플레이어 방향 기준 회전
-    ctx.rotate(angle * e.swingDir);
+    ctx.rotate(angle);
 
     // 팔처럼 보이게 (몸통색 동일)
     ctx.fillStyle="#006600";
