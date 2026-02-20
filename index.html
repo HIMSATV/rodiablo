@@ -349,7 +349,12 @@ function checkHit(){
 
 if(e.hp <= 0){
 
-  bloodPools.push({x:e.x,y:e.y,...});
+  bloodPools.push({
+    x: e.x,
+    y: e.y,
+    size: 10 + Math.random()*6
+  });
+
   slowMotion = 6;
 
   if(!player.ultiActive){
@@ -359,7 +364,6 @@ if(e.hp <= 0){
       player.ki = player.maxKi;
     }
   }
-
 }
   });
 
