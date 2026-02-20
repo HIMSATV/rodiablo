@@ -189,7 +189,8 @@ if(player.ultiActive){
       player.y = target.y;
 
       // 2배 데미지
-      let radius = 60;   // 🔥 작은 범위
+      let radius = 60;
+let hitSomeone = false;
 
 enemies.forEach(e=>{
   let dx = e.x - player.x;
@@ -197,10 +198,16 @@ enemies.forEach(e=>{
   let dist = Math.hypot(dx,dy);
 
   if(dist < radius){
-    e.hp -= 35;     // 단일기보다 살짝 약하게
+    e.hp -= 35;
     e.stun = 15;
+    hitSomeone = true;
   }
 });
+
+// 🔥 최소 한 명이라도 맞았을 때만 사운드
+if(hitSomeone){
+  hitSound();
+}
 
       shake = 15;
     }
