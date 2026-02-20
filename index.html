@@ -80,7 +80,13 @@ let player={
  hp:100,maxHp:100,
  invul:0,
  knockbackX:0,
- knockbackY:0
+ knockbackY:0,
+  ki:0,
+maxKi:100,
+
+ultiActive:false,
+ultiCount:0,
+ultiTimer:0,
 }; 
   
 let slowMotion = 0;
@@ -136,11 +142,25 @@ pad.addEventListener("touchend",()=>{
 });
 
 attackBtn.addEventListener("touchstart",()=>{
- attacking=true;
- attackFrame=0;
- swingSound();
- attackBtn.classList.add("active");
+
+  // 🔥 ===== 필살기 발동 트리거 =====
+  if(player.ki >= player.maxKi && enemies.length > 0 && !player.ultiActive){
+
+    player.ki = 0;
+    player.ultiActive = true;
+    player.ultiCount = 0;
+    player.ultiTimer = 0;
+
+    return; // 일반 공격 막기
+  }
+
+  // ===== 일반 공격 =====
+  attacking = true;
+  attackFrame = 0;
+  swingSound();
+  attackBtn.classList.add("active");
 });
+
 attackBtn.addEventListener("touchend",()=>{
  attackBtn.classList.remove("active");
 });
@@ -152,7 +172,39 @@ function circleCollide(a,b){
 
 /* ===== 업데이트 ===== */
 function update(){
+if(player.ultiActive){
 
+  player.ultiTimer++;
+
+  // 10프레임마다 순간이동+공격
+  if(player.ultiTimer % 10 === 0){
+
+    if(enemies.length > 0){
+
+      // 랜덤 적 선택
+      let target = enemies[Math.floor(Math.random() * enemies.length)];
+
+      // 순간이동
+      player.x = target.x;
+      player.y = target.y;
+
+      // 2배 데미지
+      target.hp -= 40;
+      target.stun = 20;
+
+      shake = 15;
+    }
+
+    player.ultiCount++;
+  }
+
+  // 5번 반복 후 종료
+  if(player.ultiCount >= 5){
+    player.ultiActive = false;
+  }
+
+  return; // 궁극기 중엔 일반 행동 중지
+}
   if(slowMotion > 0){
   slowMotion--;
   return;   // 🔥 모든 업데이트 일시정지
@@ -295,11 +347,20 @@ function checkHit(){
       });
     }
 
-    if(e.hp<=0){
-  bloodPools.push({x:e.x,y:e.y,size:14});
-  slowMotion = 6;   // 🔥 약 0.1초 (60fps 기준)
-}
+if(e.hp <= 0){
 
+  bloodPools.push({x:e.x,y:e.y,...});
+  slowMotion = 6;
+
+  if(!player.ultiActive){
+    player.ki += 20;
+
+    if(player.ki > player.maxKi){
+      player.ki = player.maxKi;
+    }
+  }
+
+}
   });
 
   enemies = enemies.filter(e => e.hp > 0);
