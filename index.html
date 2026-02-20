@@ -53,20 +53,63 @@ window.addEventListener("resize",resize);
 const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 function startBGM(){
 
-  let o = audioCtx.createOscillator();
-  let g = audioCtx.createGain();
+  let isPlaying = true;
 
-  o.type = "sawtooth";
-  o.frequency.value = 110; // 낮은 긴장감
+  function getTempo(){
+    if(killCount >= 100) return 150;
+    if(killCount >= 50) return 130;
+    return 110;
+  }
 
-  g.gain.value = 0.05;
+  function playBeat(){
 
-  o.connect(g);
-  g.connect(audioCtx.destination);
+    if(!isPlaying) return;
 
-  o.start();
+    let tempo = getTempo();
+    let beatTime = 60 / tempo;
+    let now = audioCtx.currentTime;
 
-  return o; // 나중에 정지 가능
+    // 킥
+    let kick = audioCtx.createOscillator();
+    let kickGain = audioCtx.createGain();
+
+    kick.type = "triangle";
+    kick.frequency.setValueAtTime(90, now);
+    kick.frequency.exponentialRampToValueAtTime(50, now + 0.12);
+
+    kickGain.gain.setValueAtTime(0.18, now);
+    kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+    kick.connect(kickGain);
+    kickGain.connect(audioCtx.destination);
+
+    kick.start(now);
+    kick.stop(now + 0.15);
+
+    // 하이톤
+    let tone = audioCtx.createOscillator();
+    let toneGain = audioCtx.createGain();
+
+    tone.type = "square";
+    tone.frequency.value = 220;
+
+    toneGain.gain.setValueAtTime(0.06, now + beatTime/2);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, now + beatTime/2 + 0.1);
+
+    tone.connect(toneGain);
+    toneGain.connect(audioCtx.destination);
+
+    tone.start(now + beatTime/2);
+    tone.stop(now + beatTime/2 + 0.1);
+
+    setTimeout(playBeat, beatTime * 1000);
+  }
+
+  playBeat();
+
+  return {
+    stop: () => isPlaying = false
+  };
 }
 
 let bgmOsc;
@@ -266,7 +309,7 @@ enemies.forEach(e=>{
 
   if(dist < radius){
 
-    e.hp -= 35;
+    e.hp -= 40;
     e.stun = 15;
     hitSomeone = true;
 
