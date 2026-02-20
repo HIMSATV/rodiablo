@@ -185,22 +185,22 @@ function update(){
 
     let dx = player.x - e.x;
     let dy = player.y - e.y;
+    let dist = Math.hypot(dx, dy);
 
-    // 🔥 적이 플레이어를 바라보는 방향 계산
-    let hit = false;
+    if(dist > 0){
 
-    if(Math.abs(dx) > Math.abs(dy)){
-      // 좌우 공격
-      if(dx > 0) hit = true;   // 플레이어가 오른쪽에 있음
-    } else {
-      // 상하 공격
-      if(dy > 0) hit = true;   // 플레이어가 아래에 있음
-    }
+      let nx = dx / dist;
+      let ny = dy / dist;
 
-    if(hit){
-      player.hp -= 10;
-      player.invul = 30;
-      shake = 10;
+      // 🔥 적의 공격 방향 벡터 (플레이어 쪽)
+      // 공격은 플레이어가 있는 방향이면 항상 허용
+      let dot = nx*dx + ny*dy;
+
+      if(dot > 0){   // 플레이어가 정면에 있을 때만
+        player.hp -= 10;
+        player.invul = 30;
+        shake = 10;
+      }
     }
   }
 
