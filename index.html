@@ -96,6 +96,7 @@ for(let i=0;i<6;i++){
   radius:14,
   stun:0,
   attackFrame:0
+  swingDir:1
  });
 }
 
@@ -175,8 +176,13 @@ function update(){
   }
 
   if(dist<45 && e.attackFrame===0){
-   e.attackFrame=25;
-  }
+  e.attackFrame = 25;
+
+  let dx = player.x - e.x;
+
+  // 🔥 플레이어가 왼쪽이면 -1, 오른쪽이면 1
+  e.swingDir = dx < 0 ? -1 : 1;
+}
 
   if(e.attackFrame > 0){
   e.attackFrame--;
@@ -421,26 +427,19 @@ function drawEnemy(e){
   ctx.fillRect(e.x-4,e.y-14,3,3);
   ctx.fillRect(e.x+1,e.y-14,3,3);
 
-  // 🔥 공격 모션 (팔처럼 보이게)
   if(e.attackFrame > 0){
 
-    let progress = 25 - e.attackFrame; // 0 → 25
-    let swing = 0;
+    let t = (25 - e.attackFrame) / 25;   // 0→1
+    let angle = (-1 + t*2) * 1.0;        // -1 → +1
 
     ctx.save();
     ctx.translate(e.x, e.y-5);
 
-    // 좌우 대칭 스윙
-    if(progress < 12){
-      swing = -0.8;
-    }else{
-      swing = 0.8;
-    }
+    // 🔥 플레이어 방향 기준 회전
+    ctx.rotate(angle * e.swingDir);
 
-    ctx.rotate(swing);
-
-    // 🔥 무기 색을 몸통색과 동일하게
-    ctx.fillStyle = "#006600";
+    // 팔처럼 보이게 (몸통색 동일)
+    ctx.fillStyle="#006600";
     ctx.fillRect(0,-3,28,6);
 
     ctx.restore();
