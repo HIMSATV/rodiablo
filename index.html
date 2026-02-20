@@ -96,6 +96,7 @@ let particles=[];
 let bloodPools=[];
 let shake=0;
 let killCount = 0;
+ let gameOver = false;
 for(let i=0;i<50;i++){
  enemies.push({
   x:(Math.random()-0.5)*600,
@@ -172,6 +173,10 @@ function circleCollide(a,b){
 
 /* ===== 업데이트 ===== */
 function update(){
+  if(player.hp <= 0){
+  gameOver = true;
+  return;
+}
 if(player.ultiActive){
 
   player.ultiTimer++;
@@ -205,9 +210,12 @@ enemies.forEach(e=>{
 
     // 🔥 여기 추가
     if(e.hp <= 0){
+      
+killCount++;
 
-      killCount++;
-
+if(killCount % 50 === 0){
+  player.hp = player.maxHp;
+}
       bloodPools.push({
         x: e.x,
         y: e.y,
@@ -407,6 +415,10 @@ function checkHit(){
 
 if(e.hp <= 0){
 killCount++;
+
+if(killCount % 50 === 0){
+  player.hp = player.maxHp;
+}
   bloodPools.push({
     x: e.x,
     y: e.y,
@@ -605,11 +617,14 @@ function drawUI(){
 }
 
 function loop(){
- update();
- draw();
- requestAnimationFrame(loop);
+  if(!gameOver){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  } else {
+    drawGameOver();
+  }
 }
-loop();
 </script>
 </body>
 </html>
