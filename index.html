@@ -159,7 +159,9 @@ let particles=[];
 let bloodPools=[];
 let shake=0;
 let killCount = 0;
- let gameOver = false;
+let gameOver = false;
+let baseDamage = 20;
+let ultiDamage = 35;
 for(let i=0;i<50;i++){
  enemies.push({
   x:(Math.random()-0.5)*600,
@@ -309,7 +311,7 @@ enemies.forEach(e=>{
 
   if(dist < radius){
 
-    e.hp -= 40;
+    e.hp -= ultiDamage;
     e.stun = 15;
     hitSomeone = true;
 
@@ -496,7 +498,7 @@ function checkHit(){
 
     // ===== 여기 도달하면 공격 성공 =====
 
-    e.hp -= 20;
+    e.hp -= baseDamage;
     e.stun = 15;
 
     let len = dist || 1;
@@ -520,7 +522,20 @@ function checkHit(){
     }
 
 if(e.hp <= 0){
-killCount++;
+
+  killCount++;
+
+  // 🔥 킬당 체력 5 회복
+  player.hp += 5;
+  if(player.hp > player.maxHp){
+    player.hp = player.maxHp;
+  }
+
+  // 🔥 킬당 체력 5 회복
+  player.hp += 5;
+  if(player.hp > player.maxHp){
+    player.hp = player.maxHp;
+  }
 
 if(killCount % 100 === 0){
   player.hp = player.maxHp;
