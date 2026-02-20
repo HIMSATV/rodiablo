@@ -189,8 +189,18 @@ if(player.ultiActive){
       player.y = target.y;
 
       // 2배 데미지
-      target.hp -= 40;
-      target.stun = 20;
+      let radius = 60;   // 🔥 작은 범위
+
+enemies.forEach(e=>{
+  let dx = e.x - player.x;
+  let dy = e.y - player.y;
+  let dist = Math.hypot(dx,dy);
+
+  if(dist < radius){
+    e.hp -= 35;     // 단일기보다 살짝 약하게
+    e.stun = 15;
+  }
+});
 
       shake = 15;
     }
