@@ -285,7 +285,34 @@ player.knockbackY *= 0.85;
    e.y+=dy/dist*0.8;
   }
  });
+// ===== 몬스터끼리 충돌 처리 =====
+for(let i=0;i<enemies.length;i++){
+  for(let j=i+1;j<enemies.length;j++){
 
+    let a = enemies[i];
+    let b = enemies[j];
+
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    let dist = Math.hypot(dx,dy);
+
+    let minDist = a.radius + b.radius;
+
+    if(dist < minDist && dist > 0){
+
+      let overlap = minDist - dist;
+      let nx = dx / dist;
+      let ny = dy / dist;
+
+      // 서로 반씩 밀어냄
+      a.x -= nx * overlap * 0.5;
+      a.y -= ny * overlap * 0.5;
+
+      b.x += nx * overlap * 0.5;
+      b.y += ny * overlap * 0.5;
+    }
+  }
+}
  if(attacking){
   attackFrame++;
   if(attackFrame===3)checkHit();
