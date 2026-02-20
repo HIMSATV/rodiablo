@@ -454,8 +454,12 @@ function draw(){
 
 // 🔥 킬 수 표시
 ctx.fillStyle = "white";
-ctx.font = "20px Arial";
-ctx.fillText("KILLS: " + killCount, 20, 30);
+ctx.font = "bold 22px Arial";
+ctx.strokeStyle = "black";
+ctx.lineWidth = 3;
+
+ctx.strokeText("KILLS: " + killCount, 20, 70);
+ctx.fillText("KILLS: " + killCount, 20, 70);
  drawPlayer(canvas.width/2,canvas.height/2);
  drawUI();
 }
