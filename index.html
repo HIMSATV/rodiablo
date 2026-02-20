@@ -198,13 +198,27 @@ enemies.forEach(e=>{
   let dist = Math.hypot(dx,dy);
 
   if(dist < radius){
+
     e.hp -= 35;
     e.stun = 15;
     hitSomeone = true;
+
+    // 🔥 여기 추가
+    if(e.hp <= 0){
+
+      killCount++;
+
+      bloodPools.push({
+        x: e.x,
+        y: e.y,
+        size: 10 + Math.random()*6
+      });
+
+      slowMotion = 6;
+    }
   }
 });
 
-// 🔥 최소 한 명이라도 맞았을 때만 사운드
 if(hitSomeone){
   hitSound();
 }
@@ -392,7 +406,7 @@ function checkHit(){
     }
 
 if(e.hp <= 0){
-
+killCount++;
   bloodPools.push({
     x: e.x,
     y: e.y,
