@@ -625,6 +625,21 @@ function loop(){
     drawGameOver();
   }
 }
+  function drawGameOver(){
+
+  ctx.fillStyle = "black";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle = "red";
+  ctx.font = "bold 60px Arial";
+  ctx.textAlign = "center";
+
+  ctx.fillText("YOU DIE", canvas.width/2, canvas.height/2);
+
+  ctx.font = "20px Arial";
+  ctx.fillStyle = "white";
+  ctx.fillText("Final Kills: " + killCount, canvas.width/2, canvas.height/2 + 50);
+}
 </script>
 </body>
 </html>
