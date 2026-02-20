@@ -623,7 +623,7 @@ function loop(){
     requestAnimationFrame(loop);
   } else {
     drawGameOver();
-    loop();
+  
   }
 }
   function drawGameOver(){
@@ -641,6 +641,7 @@ function loop(){
   ctx.fillStyle = "white";
   ctx.fillText("Final Kills: " + killCount, canvas.width/2, canvas.height/2 + 50);
 }
+  loop();
 </script>
 </body>
 </html>
