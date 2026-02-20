@@ -656,11 +656,13 @@ levelParticles.forEach(p=>{
 ctx.fillStyle = "white";
 ctx.font = "bold 22px Arial";
 ctx.strokeStyle = "black";
-ctx.lineWidth = 3;
+ctx.lineWidth = 4;
 
-ctx.strokeText("KILLS: " + killCount, 20, 70);
-ctx.fillText("KILLS: " + killCount, 20, 70);
- drawPlayer(canvas.width/2,canvas.height/2);
+ctx.strokeText("KILLS: " + killCount, 40, 70);
+ctx.fillText("KILLS: " + killCount, 40, 70); 
+ctx.shadowColor = "black";
+ctx.shadowBlur = 6;
+  drawPlayer(canvas.width/2,canvas.height/2);
  drawUI();
 }
 
