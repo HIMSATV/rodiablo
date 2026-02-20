@@ -157,8 +157,8 @@ function update(){
   slowMotion--;
   return;   // 🔥 모든 업데이트 일시정지
 }
- player.x+=joyDX*player.speed*1;
- player.y+=joyDY*player.speed*1;
+ player.x+=joyDX*player.speed*0.5;
+ player.y+=joyDY*player.speed*0.5;
 // 🔥 넉백 적용
 player.x += player.knockbackX;
 player.y += player.knockbackY;
