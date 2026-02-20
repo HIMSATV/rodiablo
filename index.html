@@ -95,7 +95,7 @@ let enemies=[];
 let particles=[];
 let bloodPools=[];
 let shake=0;
-
+let killCount = 0;
 for(let i=0;i<50;i++){
  enemies.push({
   x:(Math.random()-0.5)*600,
@@ -452,6 +452,10 @@ function draw(){
 
  ctx.restore();
 
+// 🔥 킬 수 표시
+ctx.fillStyle = "white";
+ctx.font = "20px Arial";
+ctx.fillText("KILLS: " + killCount, 20, 30);
  drawPlayer(canvas.width/2,canvas.height/2);
  drawUI();
 }
