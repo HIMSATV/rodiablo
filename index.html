@@ -408,26 +408,43 @@ function drawSword(x, y) {
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
 
- ctx.fillStyle="#006600";
- ctx.fillRect(e.x-10,e.y-12,20,22);
+  // 몸통
+  ctx.fillStyle="#006600";
+  ctx.fillRect(e.x-10,e.y-12,20,22);
 
- ctx.fillStyle="#00aa00";
- ctx.fillRect(e.x-7,e.y-20,14,8);
+  // 머리
+  ctx.fillStyle="#00aa00";
+  ctx.fillRect(e.x-7,e.y-20,14,8);
 
- ctx.fillStyle="red";
- ctx.fillRect(e.x-4,e.y-14,3,3);
- ctx.fillRect(e.x+1,e.y-14,3,3);
+  // 눈
+  ctx.fillStyle="red";
+  ctx.fillRect(e.x-4,e.y-14,3,3);
+  ctx.fillRect(e.x+1,e.y-14,3,3);
 
- if(e.attackFrame>0){
-  let progress=25-e.attackFrame;
-  ctx.save();
-  ctx.translate(e.x,e.y);
-  if(progress<10) ctx.rotate(-0.6);
-  if(progress>=10 && progress<=15) ctx.rotate(1.4);
-  ctx.fillStyle="#00ff00";
-  ctx.fillRect(0,-2,30,4);
-  ctx.restore();
- }
+  // 🔥 공격 모션 (팔처럼 보이게)
+  if(e.attackFrame > 0){
+
+    let progress = 25 - e.attackFrame; // 0 → 25
+    let swing = 0;
+
+    ctx.save();
+    ctx.translate(e.x, e.y-5);
+
+    // 좌우 대칭 스윙
+    if(progress < 12){
+      swing = -0.8;
+    }else{
+      swing = 0.8;
+    }
+
+    ctx.rotate(swing);
+
+    // 🔥 무기 색을 몸통색과 동일하게
+    ctx.fillStyle = "#006600";
+    ctx.fillRect(0,-3,28,6);
+
+    ctx.restore();
+  }
 }
 
 /* ===== UI ===== */
