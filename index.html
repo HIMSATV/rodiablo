@@ -175,6 +175,7 @@ let enemiesToSpawn = 0;
 let waveActive = false;
 let waveCooldown = 0;
   let fireZones = [];
+  let frameCount = 0;
 
 /* ===== 입력 ===== */
 let joyDX=0,joyDY=0;
@@ -293,7 +294,7 @@ enemies.push({
 function update(){
   // ===== 웨이브 시스템 =====
 // ===== 웨이브 시스템 =====
-
+frameCount++;
 if(!waveActive && enemies.length === 0){
 
   waveCooldown++;
@@ -660,9 +661,11 @@ fireZones.forEach(f=>{
   let dy = player.y - f.y;
   let dist = Math.hypot(dx,dy);
 
-  if(dist < f.radius && player.invul === 0){
-    player.hp -= 0.5;
+ if(dist < f.radius && player.invul === 0){
+  if(frameCount % 12 === 0){
+    player.hp -= 2 + killCount*0.03;
   }
+}
 });
 
 fireZones = fireZones.filter(f=>f.life > 0);
