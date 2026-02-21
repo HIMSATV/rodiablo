@@ -734,7 +734,7 @@ function updateBlood(){
 
 function drawBlood(){
 
-  ctx.save();  // 🔥 추가
+  ctx.save();
 
   bloodParticles.forEach(p=>{
     ctx.globalAlpha = p.life / 30;
@@ -744,14 +744,14 @@ function drawBlood(){
     ctx.fill();
   });
 
-  ctx.restore();  // 🔥 추가
-}
-
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 /* ===== 렌더 ===== */
 function draw(){
-
+ctx.setTransform(1,0,0,1,0,0);
+ctx.globalAlpha = 1;
+ctx.shadowBlur = 0;
+ctx.shadowColor = "transparent";
  ctx.fillStyle="#111";
  ctx.fillRect(0,0,canvas.width,canvas.height);
 
@@ -800,6 +800,9 @@ ctx.setTransform(1, 0, 0, 1, 0, 0);
 
 drawPlayer(canvas.width/2,canvas.height/2);
 drawUI();
+  ctx.globalAlpha = 1;
+ctx.shadowBlur = 0;
+ctx.shadowColor = "transparent";
 }
 
 /* ===== 플레이어 ===== */
