@@ -167,6 +167,7 @@ let baseDamage = 20;
 let ultiDamage = 40;
 let levelParticles = [];
 let arrows = [];
+let bloodParticles = [];
 for(let i=0;i<50;i++){
  enemies.push({
   x:(Math.random()-0.5)*600,
@@ -321,7 +322,7 @@ if(player.ultiActive){
       // 순간이동
       player.x = target.x;
       player.y = target.y;
-
+createBlood(player.x, player.y);
       // 2배 데미지
       let radius = 60;
 let hitSomeone = false;
@@ -541,7 +542,8 @@ for(let i=0;i<enemies.length;i++){
   p.life--;
  });
  particles=particles.filter(p=>p.life>0);
-levelParticles.forEach(p=>{
+ updateBlood();
+  levelParticles.forEach(p=>{
   p.x += p.vx;
   p.y += p.vy;
   p.life--;
@@ -696,7 +698,41 @@ if(player.kiOrbs < player.maxOrbs){
 
   enemies = enemies.filter(e => e.hp > 0);
 }
+function createBlood(x, y){
+  for(let i = 0; i < 30; i++){
+    bloodParticles.push({
+      x: x,
+      y: y,
+      vx: (Math.random()-0.5) * 10,
+      vy: (Math.random()-0.5) * 10,
+      size: Math.random()*4 + 2,
+      life: 30
+    });
+  }
+}
 
+function updateBlood(){
+  bloodParticles.forEach(p=>{
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.25; // 중력
+    p.life--;
+  });
+
+  bloodParticles = bloodParticles.filter(p=>p.life > 0);
+}
+
+function drawBlood(){
+  bloodParticles.forEach(p=>{
+    ctx.globalAlpha = p.life / 30;
+    ctx.fillStyle = "#8b0000";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  ctx.globalAlpha = 1;
+}
 /* ===== 렌더 ===== */
 function draw(){
 
@@ -730,6 +766,7 @@ function draw(){
   ctx.fillStyle="red";
   ctx.fillRect(p.x,p.y,3,3);
  });
+  drawBlood();
 
  enemies.forEach(e=>drawEnemy(e));
 levelParticles.forEach(p=>{
