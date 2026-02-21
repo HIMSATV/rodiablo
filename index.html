@@ -266,6 +266,17 @@ if(enemies.length >= 120) return;
     swingDir: 1,
     speed: 0.8 * speedBoost,
     damage: 10 * damageBoost
+    let isArcher = Math.random() < 0.4; // 40% 확률
+
+enemies.push({
+    x: x,
+    y: y,
+    size: 22,
+    speed: isArcher ? 1.0 : 1.5,
+    hp: isArcher ? 1 : 2,   // 🔥 약하게
+    type: isArcher ? "archer" : "melee",
+    shootCooldown: 0
+});
   });
 }
 /* ===== 업데이트 ===== */
