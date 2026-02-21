@@ -744,21 +744,9 @@ arrows.forEach(a=>{
  ctx.restore();
   // === UI는 카메라 영향 안 받게 ===
 ctx.setTransform(1, 0, 0, 1, 0, 0);
-ctx.textAlign = "left";
-ctx.fillStyle = "white";
-ctx.font = "bold 22px Arial";
-ctx.strokeStyle = "black";
-ctx.lineWidth = 4;
 
-// 🔥 킬 수 표시
-ctx.fillStyle = "white";
-ctx.font = "bold 22px Arial";
-ctx.strokeStyle = "black";
-ctx.lineWidth = 4; 
-ctx.shadowColor = "black";
-ctx.shadowBlur = 6;
-  drawPlayer(canvas.width/2,canvas.height/2);
- drawUI();
+drawPlayer(canvas.width/2,canvas.height/2);
+drawUI();
   if(flashEffect > 0){
     ctx.fillStyle = "rgba(0,255,100," + (flashEffect/15) + ")";
     ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -894,30 +882,52 @@ ctx.restore();
 }
 
 /* ===== UI ===== */
+
 function drawUI(){
+  drawHealthBar();
+  drawTextUI();
+  drawOrbUI();
+}
 
-  // 체력바
-  let w=200,h=20;
-  ctx.fillStyle="#550000";
-  ctx.fillRect(20,20,w,h);
-  ctx.fillStyle="red";
-  ctx.fillRect(20,20,w*(player.hp/player.maxHp),h);
-  ctx.strokeStyle="white";
-  ctx.strokeRect(20,20,w,h);
-// ===== 텍스트 설정 =====
-ctx.font = "bold 18px Arial";
-ctx.fillStyle = "white";
-ctx.strokeStyle = "black";
-ctx.lineWidth = 4;
+/* ===== 체력바 ===== */
+function drawHealthBar(){
 
-ctx.strokeText("Level: " + level, 20, 55);
-ctx.fillText("Level: " + level, 20, 55);
+  let w = 200, h = 20;
 
-ctx.strokeText("KILLS: " + killCount, 20, 80);
-ctx.fillText("KILLS: " + killCount, 20, 80);
-  // 🔥 기 구슬 UI
+  ctx.fillStyle = "#550000";
+  ctx.fillRect(20, 20, w, h);
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(20, 20, w * (player.hp/player.maxHp), h);
+
+  ctx.strokeStyle = "white";
+  ctx.strokeRect(20, 20, w, h);
+}
+
+/* ===== 레벨 + 킬 텍스트 ===== */
+function drawTextUI(){
+
+  ctx.save();
+
+  ctx.font = "bold 18px Arial";
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 4;
+
+  ctx.strokeText("Level: " + level, 20, 55);
+  ctx.fillText("Level: " + level, 20, 55);
+
+  ctx.strokeText("KILLS: " + killCount, 20, 80);
+  ctx.fillText("KILLS: " + killCount, 20, 80);
+
+  ctx.restore();
+}
+
+/* ===== 기 구슬 UI ===== */
+function drawOrbUI(){
+
   let centerX = canvas.width / 2;
-  let baseY = canvas.height - 70; // 조이스틱 위쪽
+  let baseY = canvas.height - 70;
 
   for(let i = 0; i < player.maxOrbs; i++){
 
@@ -926,25 +936,25 @@ ctx.fillText("KILLS: " + killCount, 20, 80);
     ctx.beginPath();
     ctx.arc(x, baseY, 10, 0, Math.PI * 2);
 
-    // 🔥 궁극기 발동 순간이면 무조건 5개 전부 밝게
     if(orbFlash > 0){
-        ctx.fillStyle = "#00ff88";
-        ctx.shadowColor = "#00ff88";
-        ctx.shadowBlur = 35;
+      ctx.fillStyle = "#00ff88";
+      ctx.shadowColor = "#00ff88";
+      ctx.shadowBlur = 35;
     }
     else if(i < player.kiOrbs){
-        ctx.fillStyle = "#00ff55";
-        ctx.shadowColor = "#00ff55";
-        ctx.shadowBlur = 15;
+      ctx.fillStyle = "#00ff55";
+      ctx.shadowColor = "#00ff55";
+      ctx.shadowBlur = 15;
     }
     else{
-        ctx.fillStyle = "#002211";
-        ctx.shadowBlur = 0;
+      ctx.fillStyle = "#002211";
+      ctx.shadowBlur = 0;
     }
 
     ctx.fill();
-}
-ctx.shadowBlur = 0;
+  }
+
+  ctx.shadowBlur = 0;
 }
 
 function loop(){
