@@ -160,6 +160,7 @@ let bloodPools=[];
 let shake=0;
 let killCount = 0;
 let gameOver = false;
+let flashEffect = 0;   // 🔥 화면 번쩍 효과용
 let level = 1;
 let baseDamage = 20;
 let ultiDamage = 40;
@@ -219,6 +220,8 @@ attackBtn.addEventListener("touchstart",()=>{
     player.ultiCount = 0;
     player.ultiTimer = 0;
 
+    flashEffect = 15;
+    
     return; // 일반 공격 막기
   }
 
@@ -611,6 +614,25 @@ if(player.kiOrbs < player.maxOrbs){
 /* ===== 렌더 ===== */
 function draw(){
 
+// 🔥 기 구슬 UI
+let centerX = canvas.width / 2;
+let baseY = canvas.height - 120; // 조이스틱 위쪽
+
+for(let i = 0; i < player.kiOrbs; i++){
+
+    let x = centerX - 60 + i * 30;
+
+    ctx.beginPath();
+    ctx.arc(x, baseY, 10, 0, Math.PI * 2);
+
+    ctx.fillStyle = "#00ff55";
+    ctx.shadowColor = "#00ff55";
+    ctx.shadowBlur = 15;
+
+    ctx.fill();
+}
+
+ctx.shadowBlur = 0;
  ctx.fillStyle="#111";
  ctx.fillRect(0,0,canvas.width,canvas.height);
 
@@ -668,6 +690,11 @@ ctx.shadowColor = "black";
 ctx.shadowBlur = 6;
   drawPlayer(canvas.width/2,canvas.height/2);
  drawUI();
+  if(flashEffect > 0){
+    ctx.fillStyle = "rgba(0,255,100," + (flashEffect/15) + ")";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    flashEffect--;
+}
 }
 
 /* ===== 플레이어 ===== */
