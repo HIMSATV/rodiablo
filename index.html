@@ -322,7 +322,10 @@ if(player.ultiActive){
       // 순간이동
       player.x = target.x;
       player.y = target.y;
-createBlood(player.x, player.y);
+   createBlood(player.x, player.y); // 이동 전
+player.x = target.x;
+player.y = target.y;
+createBlood(player.x, player.y); // 이동 후
       // 2배 데미지
       let radius = 60;
 let hitSomeone = false;
