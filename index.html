@@ -317,15 +317,19 @@ if(player.ultiActive){
     if(enemies.length > 0){
 
       // 랜덤 적 선택
-      let target = enemies[Math.floor(Math.random() * enemies.length)];
+ // 🔥 이동 전 위치 저장
+let oldX = player.x;
+let oldY = player.y;
 
-      // 순간이동
-      player.x = target.x;
-      player.y = target.y;
-   createBlood(player.x, player.y); // 이동 전
+// 🔥 이동 전 피 폭발
+createBlood(oldX, oldY);
+
+// 🔥 순간이동
 player.x = target.x;
 player.y = target.y;
-createBlood(player.x, player.y); // 이동 후
+
+// 🔥 이동 후 피 폭발
+createBlood(player.x, player.y);
       // 2배 데미지
       let radius = 60;
 let hitSomeone = false;
