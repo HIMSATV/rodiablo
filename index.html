@@ -977,16 +977,23 @@ player.hp = 100;
 
   enemies = [];
   for(let i=0;i<50;i++){
-    enemies.push({
-      x:(Math.random()-0.5)*600,
-      y:(Math.random()-0.5)*600,
-      hp:40,
-      radius:14,
-      stun:0,
-      attackFrame:0,
-      swingDir:1
-    });
-  }
+  let isArcher = Math.random() < 0.4;
+
+  enemies.push({
+    x:(Math.random()-0.5)*600,
+    y:(Math.random()-0.5)*600,
+    radius:14,
+    stun:0,
+    attackFrame:0,
+    swingDir:1,
+
+    type: isArcher ? "archer" : "melee",
+    hp: isArcher ? 20 : 40,
+    speed: isArcher ? 1.2 : 0.8,
+    damage: isArcher ? 5 : 10,
+    shootCooldown:0
+  });
+}
 spawnTimer = 0;
 spawnInterval = 120;
 
