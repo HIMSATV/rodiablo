@@ -159,6 +159,8 @@ let particles=[];
 let bloodPools=[];
 let shake=0;
 let killCount = 0;
+let killsForNextLevel = 20;
+let killsAtLevelStart = 0;
 let level = 1;
 let gameOver = false;
 let orbFlash = 0;
@@ -625,20 +627,22 @@ arrows = arrows.filter(a=>a.life > 0);
 }
   function checkLevelUp(){
 
-  let newLevel = Math.floor(killCount / 20) + 1;
+  if(killCount - killsAtLevelStart >= killsForNextLevel){
 
-  if(newLevel > level){
+    level++;
 
-    level = newLevel;
+    killsAtLevelStart = killCount;
 
-    // 🔥 능력 상승
+    // 🔥 다음 레벨은 더 많이 필요
+    killsForNextLevel += 5;
+
+    // 능력 상승
     player.maxHp += 10;
     player.hp = player.maxHp;
 
     baseDamage += 5;
     ultiDamage += 5;
 
-    // 🔥 황금빛 파티클 생성
     for(let i=0;i<60;i++){
       levelParticles.push({
         x: player.x + (Math.random()-0.5)*40,
