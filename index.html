@@ -449,11 +449,30 @@ player.knockbackY *= 0.85;
   return;
 }
 
-  if(dist>1){
-   let sp = e.speed || 0.8;
-e.x += dx/dist * sp;
-e.y += dy/dist * sp;
+  if(e.type === "archer"){
+
+  let preferredDistance = 200;
+
+  if(dist < preferredDistance - 20){
+    // 너무 가까우면 뒤로 도망
+    e.x -= dx/dist * e.speed;
+    e.y -= dy/dist * e.speed;
   }
+  else if(dist > preferredDistance + 20){
+    // 너무 멀면 살짝 접근
+    e.x += dx/dist * e.speed;
+    e.y += dy/dist * e.speed;
+  }
+
+}
+else{
+  // 근접 몬스터 기존 로직
+  if(dist>1){
+    let sp = e.speed || 0.8;
+    e.x += dx/dist * sp;
+    e.y += dy/dist * sp;
+  }
+}
  });
 // ===== 몬스터끼리 충돌 처리 =====
 for(let i=0;i<enemies.length;i++){
