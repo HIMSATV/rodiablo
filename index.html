@@ -1017,6 +1017,10 @@ function drawUI(){
   drawTextUI();
   drawOrbUI();
   drawHpOrb();
+  ctx.textAlign="center";
+ctx.font="bold 28px Arial";
+ctx.fillStyle="rgba(255,255,255,0.15)";
+ctx.fillText("WAVE " + (wave-1), canvas.width/2, 40);
 }
 
 /* ===== 체력바 ===== */
