@@ -270,8 +270,8 @@ function spawnEnemy(){
     type: isArcher ? "archer" : "melee",
 
     hp: isArcher ? 20 : 40 + killCount * 0.5,
-    speed: isArcher ? 1.2 : 0.8 * speedBoost,
-    damage: isArcher ? 5 : 10 * damageBoost,
+    speed: isArcher ? 0.5 : 0.8 * speedBoost,
+    damage: isArcher ? 10 : 10 * damageBoost,
 
     shootCooldown: 0
   });
@@ -990,8 +990,8 @@ player.hp = 100;
 
     type: isArcher ? "archer" : "melee",
     hp: isArcher ? 20 : 40,
-    speed: isArcher ? 1.2 : 0.8,
-    damage: isArcher ? 5 : 10,
+    speed: isArcher ? 0.5 : 0.8,
+    damage: isArcher ? 10 : 10,
     shootCooldown:0
   });
 }
