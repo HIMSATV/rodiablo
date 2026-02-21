@@ -246,10 +246,10 @@ function circleCollide(a,b){
 
 function spawnEnemy(){
 
-  if(enemies.length >= 120) return;
+  if(enemies.length >= 200) return;
 
   let angle = Math.random() * Math.PI * 2;
-  let distance = 400;
+  let distance = 300;
 
   let ex = player.x + Math.cos(angle) * distance;
   let ey = player.y + Math.sin(angle) * distance;
@@ -289,12 +289,15 @@ function update(){
  // 🔥 무한 스폰
 spawnTimer++;
 
-if(spawnTimer >= spawnInterval){
-  spawnEnemy();
+let difficulty = Math.floor(killCount / 15);
+let desiredEnemyCount = 20 + difficulty * 5;
+
+if(spawnTimer >= 20){
   spawnTimer = 0;
 
-  // 킬 수가 많아질수록 스폰 빨라짐 (최소 30프레임)
-  spawnInterval = Math.max(30, 120 - killCount);
+  while(enemies.length < desiredEnemyCount){
+    spawnEnemy();
+  }
 }
   if(player.hp <= 0){
     if(bgmOsc){
