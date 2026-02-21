@@ -504,17 +504,16 @@ player.knockbackY *= 0.85;
   let preferredDistance = 200;
 
   if(dist < preferredDistance - 20){
-    // 너무 가까우면 뒤로 도망
     e.x -= dx/dist * e.speed;
     e.y -= dy/dist * e.speed;
   }
   else if(dist > preferredDistance + 20){
-    // 너무 멀면 살짝 접근
     e.x += dx/dist * e.speed;
     e.y += dy/dist * e.speed;
   }
-// ===== 마법사 =====
-if(e.type === "mage"){
+
+}
+else if(e.type === "mage"){
 
   let preferredDistance = 220;
 
@@ -530,7 +529,6 @@ if(e.type === "mage"){
   e.castCooldown--;
 
   if(e.castCooldown <= 0){
-
     fireZones.push({
       x: player.x,
       y: player.y,
@@ -540,15 +538,16 @@ if(e.type === "mage"){
 
     e.castCooldown = 180;
   }
-}
+
 }
 else{
-  // 근접 몬스터 기존 로직
-  if(dist>1){
+
+  if(dist > 1){
     let sp = e.speed || 0.8;
     e.x += dx/dist * sp;
     e.y += dy/dist * sp;
   }
+
 }
    // 🔥 아처 화살 발사
 if(e.type === "archer"){
