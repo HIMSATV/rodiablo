@@ -159,6 +159,7 @@ let particles=[];
 let bloodPools=[];
 let shake=0;
 let killCount = 0;
+let level = 1;
 let gameOver = false;
 let orbFlash = 0;
 let flashEffect = 0;
@@ -907,7 +908,9 @@ function drawUI(){
   ctx.fillRect(20,20,w*(player.hp/player.maxHp),h);
   ctx.strokeStyle="white";
   ctx.strokeRect(20,20,w,h);
-
+ctx.fillStyle = "white";
+ctx.font = "16px Arial";
+ctx.fillText("Level: " + level, 20, 55);
   // 🔥 기 구슬 UI
   let centerX = canvas.width / 2;
   let baseY = canvas.height - 70; // 조이스틱 위쪽
