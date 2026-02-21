@@ -859,7 +859,11 @@ if(e.type === "archer"){
   ctx.fillRect(e.x-10,e.y-12,20,22);
 
   // 머리
-  ctx.fillStyle="#00aa00";
+  if(e.type === "archer"){
+  ctx.fillStyle = "#dddddd";
+}else{
+  ctx.fillStyle = "#00aa00";
+}
   ctx.fillRect(e.x-7,e.y-20,14,8);
 
   // 눈
