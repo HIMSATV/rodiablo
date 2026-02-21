@@ -223,7 +223,6 @@ attackBtn.addEventListener("touchstart",()=>{
     player.ultiCount = 0;
     player.ultiTimer = 0;
 
-    flashEffect = 15;
     
     return; // 일반 공격 막기
   }
@@ -795,11 +794,6 @@ ctx.setTransform(1, 0, 0, 1, 0, 0);
 
 drawPlayer(canvas.width/2,canvas.height/2);
 drawUI();
-  if(flashEffect > 0){
-    ctx.fillStyle = "rgba(0,255,100," + (flashEffect/15) + ")";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    flashEffect--;
-}
 }
 
 /* ===== 플레이어 ===== */
