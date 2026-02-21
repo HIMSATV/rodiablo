@@ -317,6 +317,7 @@ if(player.ultiActive){
     if(enemies.length > 0){
 
       // 랜덤 적 선택
+      let target = enemies[Math.floor(Math.random() * enemies.length)];
  // 🔥 이동 전 위치 저장
 let oldX = player.x;
 let oldY = player.y;
