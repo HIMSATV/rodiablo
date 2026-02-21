@@ -572,7 +572,8 @@ levelParticles = levelParticles.filter(p=>p.life > 0);
   });
 
 arrows = arrows.filter(a=>a.life > 0);
-function levelUpSound(){
+}
+  function levelUpSound(){
 
   let o = audioCtx.createOscillator();
   let g = audioCtx.createGain();
