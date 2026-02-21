@@ -768,81 +768,99 @@ function drawBlood(){
 }
 /* ===== 렌더 ===== */
 function draw(){
-ctx.setTransform(1,0,0,1,0,0);
-ctx.globalAlpha = 1;
-ctx.shadowBlur = 0;
-ctx.shadowColor = "transparent";
-ctx.filter = "none";
- ctx.fillStyle="#111";
- ctx.fillRect(0,0,canvas.width,canvas.height);
 
- let camX=player.x-canvas.width/2;
- let camY=player.y-canvas.height/2;
- let sx=shake?(Math.random()-0.5)*12:0;
- let sy=shake?(Math.random()-0.5)*12:0;
+  // ===== 기본 초기화 =====
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+  ctx.filter = "none";
 
- ctx.save();
- ctx.translate(-camX+sx,-camY+sy);
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
- let size=40;
- for(let x=-1000;x<1000;x+=size){
-  for(let y=-1000;y<1000;y+=size){
-   ctx.fillStyle=((x+y)/size)%2==0?"#1a1a1a":"#222";
-   ctx.fillRect(x,y,size,size);
-  }
- }
+  // ===== 카메라 계산 =====
+  let camX = player.x - canvas.width/2;
+  let camY = player.y - canvas.height/2;
 
- bloodPools.forEach(b=>{
+  let sx = shake ? (Math.random()-0.5)*12 : 0;
+  let sy = shake ? (Math.random()-0.5)*12 : 0;
+
+  // ===== 월드 영역 시작 =====
   ctx.save();
-  ctx.globalAlpha = b.life / 600;
-  ctx.fillStyle="#550000";
-  ctx.beginPath();
-  ctx.arc(b.x,b.y,b.size,0,Math.PI*2);
-  ctx.fill();
-  ctx.restore();
-});
+  ctx.translate(-camX + sx, -camY + sy);
 
- particles.forEach(p=>{
-  ctx.fillStyle="red";
-  ctx.fillRect(p.x,p.y,3,3);
- });
+  // 맵 타일
+  let size = 40;
+  for(let x=-1000;x<1000;x+=size){
+    for(let y=-1000;y<1000;y+=size){
+      ctx.fillStyle=((x+y)/size)%2==0?"#1a1a1a":"#222";
+      ctx.fillRect(x,y,size,size);
+    }
+  }
+
+  // 피 웅덩이
+  bloodPools.forEach(b=>{
+    ctx.save();
+    ctx.globalAlpha = b.life / 600;
+    ctx.fillStyle="#550000";
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,b.size,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // 일반 파티클
+  particles.forEach(p=>{
+    ctx.fillStyle="red";
+    ctx.fillRect(p.x,p.y,3,3);
+  });
+
   drawBlood();
 
- enemies.forEach(e=>drawEnemy(e));
-levelParticles.forEach(p=>{
-  ctx.fillStyle = "gold";
-  ctx.fillRect(p.x, p.y, 4, 4);
-});
-  // ===== 화살 그리기 =====
-arrows.forEach(a=>{
-  ctx.fillStyle = "white";
-  ctx.fillRect(a.x-2, a.y-2, 4, 4);
-});
- ctx.restore();
-  // === UI는 카메라 영향 안 받게 ===
-ctx.setTransform(1, 0, 0, 1, 0, 0);
-if(levelRing > 0){
+  // 몬스터
+  enemies.forEach(e=>drawEnemy(e));
 
-  let progress = 1 - levelRing / 40;
-  let radius = 20 + progress * 60;
+  // 레벨 파티클
+  levelParticles.forEach(p=>{
+    ctx.fillStyle="gold";
+    ctx.fillRect(p.x,p.y,4,4);
+  });
 
-  ctx.save();
-  ctx.globalAlpha = levelRing / 40;
-  ctx.strokeStyle = "gold";
-  ctx.lineWidth = 4;
-ctx.shadowColor = "gold";
-ctx.shadowBlur = 20;
-  ctx.beginPath();
-  ctx.arc(canvas.width/2, canvas.height/2 + 10, radius, 0, Math.PI*2);
-  ctx.stroke();
+  // 화살
+  arrows.forEach(a=>{
+    ctx.fillStyle="white";
+    ctx.fillRect(a.x-2, a.y-2, 4, 4);
+  });
 
+  // ===== 🔥 레벨업 링 (월드 좌표) =====
+  if(levelRing > 0){
+
+    let progress = 1 - levelRing / 40;
+    let radius = 20 + progress * 60;
+
+    ctx.save();
+    ctx.globalAlpha = levelRing / 40;
+    ctx.strokeStyle = "gold";
+    ctx.lineWidth = 4;
+    ctx.shadowColor = "gold";
+    ctx.shadowBlur = 20;
+
+    ctx.beginPath();
+    ctx.arc(player.x, player.y + 10, radius, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ===== 월드 영역 끝 =====
   ctx.restore();
-}
-drawPlayer(canvas.width/2,canvas.height/2);
-drawUI();
-  ctx.globalAlpha = 1;
-ctx.shadowBlur = 0;
-ctx.shadowColor = "transparent";
+
+  // ===== 플레이어는 화면 중앙 고정 =====
+  drawPlayer(canvas.width/2, canvas.height/2);
+
+  // ===== UI =====
+  drawUI();
 }
 
 /* ===== 플레이어 ===== */
