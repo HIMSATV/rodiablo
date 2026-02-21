@@ -160,7 +160,7 @@ let bloodPools=[];
 let shake=0;
 let killCount = 0;
 let gameOver = false;
-let flashEffect = 0;   // 🔥 화면 번쩍 효과용
+let orbFlash = 0;
 let level = 1;
 let baseDamage = 20;
 let ultiDamage = 40;
@@ -215,7 +215,7 @@ attackBtn.addEventListener("touchstart",()=>{
   // 🔥 궁극기 발동
   if(player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive){
 
-    player.kiOrbs = 0;
+    orbFlash = 20;   // 20프레임 빛남
     player.ultiActive = true;
     player.ultiCount = 0;
     player.ultiTimer = 0;
@@ -268,6 +268,13 @@ if(enemies.length >= 120) return;
 }
 /* ===== 업데이트 ===== */
 function update(){
+  if(orbFlash > 0){
+  orbFlash--;
+
+  if(orbFlash === 0){
+    player.kiOrbs = 0; // 빛난 뒤 사라짐
+  }
+}
  // 🔥 무한 스폰
 spawnTimer++;
 
@@ -614,25 +621,6 @@ if(player.kiOrbs < player.maxOrbs){
 /* ===== 렌더 ===== */
 function draw(){
 
-// 🔥 기 구슬 UI
-let centerX = canvas.width / 2;
-let baseY = canvas.height - 120; // 조이스틱 위쪽
-
-for(let i = 0; i < player.kiOrbs; i++){
-
-    let x = centerX - 60 + i * 30;
-
-    ctx.beginPath();
-    ctx.arc(x, baseY, 10, 0, Math.PI * 2);
-
-    ctx.fillStyle = "#00ff55";
-    ctx.shadowColor = "#00ff55";
-    ctx.shadowBlur = 15;
-
-    ctx.fill();
-}
-
-ctx.shadowBlur = 0;
  ctx.fillStyle="#111";
  ctx.fillRect(0,0,canvas.width,canvas.height);
 
@@ -814,13 +802,44 @@ function drawEnemy(e){
 
 /* ===== UI ===== */
 function drawUI(){
- let w=200,h=20;
- ctx.fillStyle="#550000";
- ctx.fillRect(20,20,w,h);
- ctx.fillStyle="red";
- ctx.fillRect(20,20,w*(player.hp/player.maxHp),h);
- ctx.strokeStyle="white";
- ctx.strokeRect(20,20,w,h);
+
+  // 체력바
+  let w=200,h=20;
+  ctx.fillStyle="#550000";
+  ctx.fillRect(20,20,w,h);
+  ctx.fillStyle="red";
+  ctx.fillRect(20,20,w*(player.hp/player.maxHp),h);
+  ctx.strokeStyle="white";
+  ctx.strokeRect(20,20,w,h);
+
+  // 🔥 기 구슬 UI
+  let centerX = canvas.width / 2;
+  let baseY = canvas.height - 140; // 조이스틱 위쪽
+
+  for(let i = 0; i < player.maxOrbs; i++){
+
+    let x = centerX - 60 + i * 30;
+
+    ctx.beginPath();
+    ctx.arc(x, baseY, 10, 0, Math.PI * 2);
+
+    if(i < player.kiOrbs){
+        ctx.fillStyle = "#00ff55";
+    } else {
+        ctx.fillStyle = "#003311";
+    }
+
+    if(orbFlash > 0){
+        ctx.shadowColor = "#00ff55";
+        ctx.shadowBlur = 25;
+    } else {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#00ff55";
+    }
+
+    ctx.fill();
+}
+ctx.shadowBlur = 0;
 }
 
 function loop(){
