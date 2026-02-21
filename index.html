@@ -174,6 +174,7 @@ let bloodParticles = [];
 let enemiesToSpawn = 0;
 let waveActive = false;
 let waveCooldown = 0;
+  let fireZones = [];
 
 /* ===== 입력 ===== */
 let joyDX=0,joyDY=0;
@@ -251,24 +252,42 @@ function spawnEnemy(){
   let damageBoost = 1 + killCount * 0.005;
 
   // 🔥 여기서 먼저 궁수 여부 결정
-  let isArcher = Math.random() < 0.3;
+  let rand = Math.random();
+let type;
 
-  enemies.push({
-    x: ex,
-    y: ey,
-    radius: 14,
-    stun: 0,
-    attackFrame: 0,
-    swingDir: 1,
+if(rand < 0.2){
+  type = "mage";
+}
+else if(rand < 0.5){
+  type = "archer";
+}
+else{
+  type = "melee";
+}
 
-    type: isArcher ? "archer" : "melee",
+enemies.push({
+  x: ex,
+  y: ey,
+  radius: 14,
+  stun: 0,
+  attackFrame: 0,
+  swingDir: 1,
+  type: type,
 
-    hp: isArcher ? 20 + killCount * 0.1 : 40 + killCount * 0.2,
-    speed: isArcher ? 0.5 : 0.8,
-    damage: isArcher ? 15 + killCount * 0.06 : 10 * (1 + killCount * 0.005),
+  hp: type==="mage" ? 35 + killCount*0.15 :
+      type==="archer" ? 20 + killCount*0.1 :
+      40 + killCount*0.2,
 
-    shootCooldown: 0
-  });
+  speed: type==="mage" ? 0.4 :
+         type==="archer" ? 0.5 : 0.8,
+
+  damage: type==="mage" ? 8 + killCount*0.04 :
+          type==="archer" ? 15 + killCount*0.06 :
+          10 * (1 + killCount*0.005),
+
+  shootCooldown: 0,
+  castCooldown: 120
+});
 }
 /* ===== 업데이트 ===== */
 function update(){
@@ -493,7 +512,34 @@ player.knockbackY *= 0.85;
     e.x += dx/dist * e.speed;
     e.y += dy/dist * e.speed;
   }
+// ===== 마법사 =====
+if(e.type === "mage"){
 
+  let preferredDistance = 220;
+
+  if(dist < preferredDistance - 20){
+    e.x -= dx/dist * e.speed;
+    e.y -= dy/dist * e.speed;
+  }
+  else if(dist > preferredDistance + 20){
+    e.x += dx/dist * e.speed;
+    e.y += dy/dist * e.speed;
+  }
+
+  e.castCooldown--;
+
+  if(e.castCooldown <= 0){
+
+    fireZones.push({
+      x: player.x,
+      y: player.y,
+      radius: 45,
+      life: 120
+    });
+
+    e.castCooldown = 180;
+  }
+}
 }
 else{
   // 근접 몬스터 기존 로직
@@ -606,6 +652,20 @@ levelParticles = levelParticles.filter(p=>p.life > 0);
 
 arrows = arrows.filter(a=>a.life > 0);
 }
+  // ===== 화염 장판 =====
+fireZones.forEach(f=>{
+  f.life--;
+
+  let dx = player.x - f.x;
+  let dy = player.y - f.y;
+  let dist = Math.hypot(dx,dy);
+
+  if(dist < f.radius && player.invul === 0){
+    player.hp -= 0.5;
+  }
+});
+
+fireZones = fireZones.filter(f=>f.life > 0);
   function levelUpSound(){
 
   let o = audioCtx.createOscillator();
@@ -809,7 +869,15 @@ ctx.filter = "none";
   ctx.fill();
   ctx.restore();
 });
-
+fireZones.forEach(f=>{
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = "orange";
+  ctx.beginPath();
+  ctx.arc(f.x, f.y, f.radius, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+});
  particles.forEach(p=>{
   ctx.fillStyle="red";
   ctx.fillRect(p.x,p.y,3,3);
@@ -919,8 +987,12 @@ function drawSword(x, y) {
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
 if(e.type === "archer"){
-  ctx.fillStyle = "#cccccc"; // 뼈색
-}else{
+  ctx.fillStyle = "#cccccc";
+}
+else if(e.type === "mage"){
+  ctx.fillStyle = "#550088";
+}
+else{
   ctx.fillStyle = "#006600";
 }
   // 몸통
