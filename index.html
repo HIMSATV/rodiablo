@@ -651,6 +651,13 @@ levelParticles.forEach(p=>{
   ctx.fillRect(p.x, p.y, 4, 4);
 });
  ctx.restore();
+  // === UI는 카메라 영향 안 받게 ===
+ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+ctx.fillStyle = "white";
+ctx.font = "bold 22px Arial";
+ctx.strokeStyle = "black";
+ctx.lineWidth = 4;
 
 // 🔥 킬 수 표시
 ctx.fillStyle = "white";
