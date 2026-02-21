@@ -733,6 +733,9 @@ function updateBlood(){
 }
 
 function drawBlood(){
+
+  ctx.save();  // 🔥 추가
+
   bloodParticles.forEach(p=>{
     ctx.globalAlpha = p.life / 30;
     ctx.fillStyle = "#8b0000";
@@ -740,6 +743,9 @@ function drawBlood(){
     ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
     ctx.fill();
   });
+
+  ctx.restore();  // 🔥 추가
+}
 
   ctx.globalAlpha = 1;
 }
@@ -988,7 +994,7 @@ function drawOrbUI(){
   ctx.restore();   // 🔥 2️⃣ 여기 추가
 }
   function drawHpOrb(){
-
+ctx.save();
   let radius = 25;
   let x = canvas.width - 50;
   let y = 50;
