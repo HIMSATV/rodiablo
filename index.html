@@ -159,6 +159,7 @@ let particles=[];
 let bloodPools=[];
 let shake=0;
 let killCount = 0;
+let levelRing = 0;
 let level = 1;
 let gameOver = false;
 let orbFlash = 0;
@@ -606,6 +607,9 @@ levelParticles = levelParticles.filter(p=>p.life > 0);
 
 arrows = arrows.filter(a=>a.life > 0);
 }
+ if(levelRing > 0){
+  levelRing--;
+} 
   function levelUpSound(){
 
   let o = audioCtx.createOscillator();
@@ -633,22 +637,12 @@ arrows = arrows.filter(a=>a.life > 0);
     level = newLevel;
 
     // 🔥 능력 상승
-    player.maxHp += 10;
+    player.maxHp += 5;
     player.hp = player.maxHp;
 
     baseDamage += 5;
     ultiDamage += 5;
-
-    // 🔥 황금빛 파티클 생성
-    for(let i=0;i<60;i++){
-      levelParticles.push({
-        x: player.x + (Math.random()-0.5)*40,
-        y: player.y - 40,
-        vx: (Math.random()-0.5)*2,
-        vy: Math.random()*3 + 2,
-        life: 60
-      });
-    }
+levelRing = 40;  // 40프레임 동안 유지
 
     levelUpSound();
   }
@@ -827,7 +821,23 @@ arrows.forEach(a=>{
  ctx.restore();
   // === UI는 카메라 영향 안 받게 ===
 ctx.setTransform(1, 0, 0, 1, 0, 0);
+if(levelRing > 0){
 
+  let progress = 1 - levelRing / 40;
+  let radius = 20 + progress * 60;
+
+  ctx.save();
+  ctx.globalAlpha = levelRing / 40;
+  ctx.strokeStyle = "gold";
+  ctx.lineWidth = 4;
+ctx.shadowColor = "gold";
+ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.arc(canvas.width/2, canvas.height/2 + 10, radius, 0, Math.PI*2);
+  ctx.stroke();
+
+  ctx.restore();
+}
 drawPlayer(canvas.width/2,canvas.height/2);
 drawUI();
   ctx.globalAlpha = 1;
