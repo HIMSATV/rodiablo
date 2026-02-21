@@ -251,7 +251,7 @@ function spawnEnemy(){
   let damageBoost = 1 + killCount * 0.005;
 
   // 🔥 여기서 먼저 궁수 여부 결정
-  let isArcher = Math.random() < 0.4;
+  let isArcher = Math.random() < 0.3;
 
   enemies.push({
     x: ex,
@@ -263,9 +263,9 @@ function spawnEnemy(){
 
     type: isArcher ? "archer" : "melee",
 
-    hp: isArcher ? 20 : 40 + killCount * 0.25,
+    hp: isArcher ? 20 + killCount * 0.1 : 40 + killCount * 0.2,
     speed: isArcher ? 0.5 : 0.8,
-    damage: isArcher ? 15 : 10 * damageBoost,
+    damage: isArcher ? 15 + killCount * 0.06 : 10 * (1 + killCount * 0.005),
 
     shootCooldown: 0
   });
