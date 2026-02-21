@@ -1030,6 +1030,11 @@ ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
       ctx.fill();
     }
   }
+      // ===== 체력 숫자 =====
+  ctx.fillStyle = "white";
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(Math.floor(player.hp), x, y+6);
   ctx.restore();
 }
 
