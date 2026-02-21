@@ -473,6 +473,29 @@ else{
     e.y += dy/dist * sp;
   }
 }
+   // 🔥 아처 화살 발사
+if(e.type === "archer"){
+
+  e.shootCooldown--;
+
+  if(e.shootCooldown <= 0){
+
+    let len = dist || 1;
+    let nx = dx / len;
+    let ny = dy / len;
+
+    arrows.push({
+      x: e.x,
+      y: e.y,
+      vx: nx * 5,
+      vy: ny * 5,
+      life: 120,
+      damage: e.damage
+    });
+
+    e.shootCooldown = 90; // 1.5초 간격
+  }
+}
  });
 // ===== 몬스터끼리 충돌 처리 =====
 for(let i=0;i<enemies.length;i++){
