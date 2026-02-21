@@ -1130,7 +1130,10 @@ function loop(){
   }
 }
   function resetGame(){
-
+if(bgmOsc){
+  bgmOsc.stop();
+  bgmOsc = null;
+}
   // 플레이어 초기화
   player.x = 0;
   player.y = 0;
