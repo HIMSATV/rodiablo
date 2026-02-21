@@ -956,6 +956,8 @@ function drawTextUI(){
 /* ===== 기 구슬 UI ===== */
 function drawOrbUI(){
 
+  ctx.save();   // 🔥 1️⃣ 여기 추가
+
   let centerX = canvas.width / 2;
   let baseY = canvas.height - 70;
 
@@ -978,13 +980,12 @@ function drawOrbUI(){
     }
     else{
       ctx.fillStyle = "#002211";
-      ctx.shadowBlur = 0;
     }
 
     ctx.fill();
   }
 
-  ctx.shadowBlur = 0;
+  ctx.restore();   // 🔥 2️⃣ 여기 추가
 }
   function drawHpOrb(){
 
