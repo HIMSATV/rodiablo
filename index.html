@@ -150,7 +150,7 @@ ultiActive:false,
 ultiCount:0,
 ultiTimer:0,
 }; 
-  
+let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
 let spawnInterval = 120; // 처음엔 2초마다
@@ -884,25 +884,13 @@ ctx.restore();
 /* ===== UI ===== */
 
 function drawUI(){
-  drawHealthBar();
   drawTextUI();
   drawOrbUI();
+  drawHpOrb();
 }
 
 /* ===== 체력바 ===== */
-function drawHealthBar(){
 
-  let w = 200, h = 20;
-
-  ctx.fillStyle = "#550000";
-  ctx.fillRect(20, 20, w, h);
-
-  ctx.fillStyle = "red";
-  ctx.fillRect(20, 20, w * (player.hp/player.maxHp), h);
-
-  ctx.strokeStyle = "white";
-  ctx.strokeRect(20, 20, w, h);
-}
 
 /* ===== 레벨 + 킬 텍스트 ===== */
 function drawTextUI(){
@@ -955,6 +943,78 @@ function drawOrbUI(){
   }
 
   ctx.shadowBlur = 0;
+}
+  function drawHpOrb(){
+
+  let radius = 65;
+  let x = canvas.width - 90;
+  let y = 90;
+
+  hpWaveOffset += 0.08;
+
+  let hpPercent = player.hp / player.maxHp;
+  let liquidHeight = radius * 2 * hpPercent;
+  let topY = y + radius - liquidHeight;
+
+  // ===== 외곽 금속 테두리 =====
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 8, 0, Math.PI * 2);
+  ctx.fillStyle = "#111";
+  ctx.fill();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = "#660000";
+  ctx.stroke();
+
+  // ===== 내부 클리핑 =====
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.clip();
+
+  // 빈 부분 배경
+  ctx.fillStyle = "#220000";
+  ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+
+  // ===== 액체 물결 =====
+  ctx.beginPath();
+  ctx.moveTo(x-radius, y+radius);
+
+  for(let i=0;i<=radius*2;i++){
+    let wave = Math.sin(i*0.1 + hpWaveOffset) * 5;
+    ctx.lineTo(x-radius+i, topY + wave);
+  }
+
+  ctx.lineTo(x+radius, y+radius);
+  ctx.closePath();
+
+  ctx.fillStyle = "red";
+  ctx.fill();
+
+  // ===== 반사광 효과 =====
+  let glow = ctx.createRadialGradient(
+    x-25, y-25, 5,
+    x, y, radius
+  );
+
+  glow.addColorStop(0, "rgba(255,255,255,0.5)");
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ===== HP 낮으면 깜빡임 =====
+  if(hpPercent < 0.3){
+    if(Math.floor(Date.now()/200)%2===0){
+      ctx.fillStyle="rgba(255,0,0,0.3)";
+      ctx.beginPath();
+      ctx.arc(x,y,radius+10,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
 }
 
 function loop(){
