@@ -397,8 +397,29 @@ if(hitSomeone){
   // 5번 반복 후 종료
 if(player.ultiCount >= 5){
 
-  enemies = enemies.filter(e => e.hp > 0);  // ← 여기 추가
+  // 🔥 마지막 위치 저장
+  let fx = player.x;
+  let fy = player.y;
 
+  // 🔥 큰 피 폭발
+  for(let i=0;i<80;i++){
+    bloodParticles.push({
+      x: fx,
+      y: fy,
+      vx: (Math.random()-0.5) * 15,
+      vy: (Math.random()-0.5) * 15,
+      size: Math.random()*6 + 3,
+      life: 40
+    });
+  }
+
+  // 🔥 강한 화면 연출
+  slowMotion = 8;   // 0.2초 정지
+  shake = 25;       // 강한 흔들림
+
+  finishSound();    // 피니시 사운드
+
+  enemies = enemies.filter(e => e.hp > 0);
   player.ultiActive = false;
 }
 
