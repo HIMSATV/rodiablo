@@ -971,7 +971,12 @@ function drawOrbUI(){
   ctx.lineWidth = 4;
   ctx.strokeStyle = "#000";
   ctx.stroke();
-
+// 붉은 얇은 내부 링
+ctx.beginPath();
+ctx.arc(x, y, radius+6, 0, Math.PI*2);
+ctx.strokeStyle = "#aa0000";
+ctx.lineWidth = 2;
+ctx.stroke();
   // ===== 내부 클리핑 =====
   ctx.save();
   ctx.beginPath();
@@ -1010,7 +1015,12 @@ function drawOrbUI(){
   ctx.arc(x-15, y-20, 18, 0, Math.PI*2);
   ctx.fillStyle = "rgba(255,255,255,0.25)";
   ctx.fill();
-
+// 유리 전체 광택
+let glass = ctx.createRadialGradient(x-10, y-15, 5, x, y, radius);
+glass.addColorStop(0, "rgba(255,255,255,0.25)");
+glass.addColorStop(1, "rgba(255,255,255,0)");
+ctx.fillStyle = glass;
+ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
   // ===== 저체력 깜빡임 =====
   if(hpPercent < 0.3){
     if(Math.floor(Date.now()/200)%2===0){
