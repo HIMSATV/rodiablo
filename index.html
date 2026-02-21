@@ -515,7 +515,7 @@ player.knockbackY *= 0.85;
 }
 else if(e.type === "mage"){
 
-  let preferredDistance = 220;
+  let preferredDistance = 140;
 
   if(dist < preferredDistance - 20){
     e.x -= dx/dist * e.speed;
@@ -532,7 +532,7 @@ else if(e.type === "mage"){
     fireZones.push({
       x: player.x,
       y: player.y,
-      radius: 45,
+      radius: 20,
       life: 120
     });
 
@@ -662,7 +662,7 @@ fireZones.forEach(f=>{
 
  if(dist < f.radius && player.invul === 0){
   if(frameCount % 12 === 0){
-    player.hp -= 2 + killCount*0.03;
+player.hp -= 1.5 + killCount*0.02;
   }
 }
 });
@@ -872,12 +872,31 @@ ctx.filter = "none";
   ctx.restore();
 });
 fireZones.forEach(f=>{
+
   ctx.save();
-  ctx.globalAlpha = 0.6;
+
+  // 바닥 기본 원 (색 유지)
+  ctx.globalAlpha = 0.5;
   ctx.fillStyle = "orange";
   ctx.beginPath();
   ctx.arc(f.x, f.y, f.radius, 0, Math.PI*2);
   ctx.fill();
+
+  // 🔥 위로 올라가는 불꽃
+  for(let i=0;i<6;i++){
+
+    let flameHeight = 10 + Math.sin(frameCount*0.2 + i)*6;
+
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = "orange";
+
+    ctx.beginPath();
+    ctx.moveTo(f.x - 6 + i*2, f.y);
+    ctx.lineTo(f.x - 3 + i*2, f.y - flameHeight);
+    ctx.lineTo(f.x + i*2, f.y);
+    ctx.fill();
+  }
+
   ctx.restore();
 });
  particles.forEach(p=>{
@@ -1284,3 +1303,4 @@ enemiesToSpawn = 30;
 </script>
 </body>
 </html>
+ 
