@@ -386,7 +386,7 @@ if(!waveActive && enemies.length === 0 && !bossAlive){
     waveCooldown = 0;
 
     // 🔥 시작 30마리 + 웨이브당 10 증가
-    enemiesToSpawn = 30 + (wave-1) * 30;
+    enemiesToSpawn = 30 + (wave-1) * 10;
 
     // 🔥 최대 80마리 제한
     if(enemiesToSpawn > 120){
@@ -462,21 +462,7 @@ createBlood(player.x, player.y);
 let hitSomeone = false;
 
 enemies.forEach(e=>{
-  // ===== 보스 2페이즈 =====
-if(e.type === "boss" && !e.phase2Used){
-
-  if(e.hp <= e.maxHp * 0.5){
-
-    e.swordPulled = true;
-    e.phase2Used = true;
-
-    e.hp = e.maxHp;      // 🔥 풀피 회복
-    e.speed *= 1.6;      // 더 빨라짐
-    e.damage *= 1.8;     // 더 강해짐
-
-    shake = 25;
-  }
-}
+  
   let dx = e.x - player.x;
   let dy = e.y - player.y;
   let dist = Math.hypot(dx,dy);
@@ -732,6 +718,20 @@ tileY = Math.floor(nextY / tileSize);
 
 if(!map[tileY] || map[tileY][tileX] !== 1){
   e.y = nextY;
+}
+    // 🔥 항상 체크
+if(!e.phase2Used && e.hp <= e.maxHp * 0.5){
+
+  e.phase2Used = true;
+  e.swordPulled = true;
+
+  e.maxHp *= 1.5;
+  e.hp = e.maxHp;
+
+  e.speed *= 1.4;
+  e.damage *= 1.5;
+
+  shake = 30;
 }
   }
 }
