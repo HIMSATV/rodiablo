@@ -354,7 +354,9 @@ function update(){
   // ===== 웨이브 시스템 =====
 // ===== 웨이브 시스템 =====
 frameCount++;
-if(!waveActive && enemies.length === 0){
+let bossAlive = enemies.some(e => e.type === "boss");
+
+if(!waveActive && enemies.length === 0 && !bossAlive){
 
   waveCooldown++;
 
@@ -625,11 +627,49 @@ else if(e.type === "mage"){
 }
 else if(e.type === "boss"){
 
-  if(dist > 1){
-    e.x += dx/dist * e.speed;
-    e.y += dy/dist * e.speed;
+  // ===== 돌진 쿨타임 감소 =====
+  if(!e.chargeCooldown) e.chargeCooldown = 180;
+  if(!e.charging) e.charging = false;
+
+  e.chargeCooldown--;
+
+  let dx = player.x - e.x;
+  let dy = player.y - e.y;
+  let dist = Math.hypot(dx,dy);
+
+  // ===== 돌진 시작 =====
+  if(e.chargeCooldown <= 0 && !e.charging){
+
+    let len = dist || 1;
+    e.chargeVX = (dx/len) * 10;   // 돌진 속도
+    e.chargeVY = (dy/len) * 10;
+
+    e.charging = true;
+    e.chargeTime = 25;   // 25프레임 돌진
+    shake = 15;
+
   }
 
+  // ===== 돌진 중 =====
+  if(e.charging){
+
+    e.x += e.chargeVX;
+    e.y += e.chargeVY;
+
+    e.chargeTime--;
+
+    if(e.chargeTime <= 0){
+      e.charging = false;
+      e.chargeCooldown = 240; // 다음 돌진까지 4초
+    }
+
+  }else{
+    // 평소엔 천천히 추적
+    if(dist > 1){
+      e.x += dx/dist * e.speed;
+      e.y += dy/dist * e.speed;
+    }
+  }
 }
 else{
 
