@@ -210,7 +210,15 @@ let bossSpawned = false;
 let joyDX=0,joyDY=0;
 let attacking=false;
 let attackFrame=0;
+let keys = {};
 
+window.addEventListener("keydown", e=>{
+  keys[e.key] = true;
+});
+
+window.addEventListener("keyup", e=>{
+  keys[e.key] = false;
+});
 const pad=document.getElementById("movePad");
 const stick=document.getElementById("stick");
 const attackBtn=document.getElementById("attackBtn");
@@ -484,27 +492,44 @@ function update(){
   enemies = enemies.filter(e=>e.hp>0);
   player.ultiActive = false;
 }
-  function updateEnemySystem(){
+function updateEnemySystem(){
 
-packs.forEach(pack=>{
+  packs.forEach(pack=>{
+    let dx = player.x - pack.x;
+    let dy = player.y - pack.y;
+    let dist = Math.hypot(dx,dy);
 
-  let dx = player.x - pack.x;
-  let dy = player.y - pack.y;
-  let dist = Math.hypot(dx,dy);
+    if(dist < 600){
+      pack.activated = true;
+    }
+  });
 
-  if(dist < 600){
-    pack.activated = true;
+  enemies.forEach(e=>{
+
+    if(e.pack && !e.pack.activated) return;
+
+    updateSingleEnemy(e);
+  });
+}
+  function updateMelee(e){
+
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+
+  if(dist > 0){
+    e.x += dx / dist * e.speed;
+    e.y += dy / dist * e.speed;
   }
-
-});
-
-enemies.forEach(e=>{
-
-  if(e.pack && !e.pack.activated) return;
-
-  updateSingleEnemy(e);
-});
-
+}
+  function updateArcher(e){
+  updateMelee(e);
+}
+  function updateMage(e){
+  updateMelee(e);
+}
+  function updateBoss(e){
+  updateMelee(e);
 }
   function updateSingleEnemy(e){
 
@@ -538,7 +563,59 @@ enemies.forEach(e=>{
 
   updateParticles();
   updateBlood();
+}
+function updateCombatSystem(){
+  if(attacking){
+    attackFrame++;
+    if(attackFrame === 3) checkHit();
+    if(attackFrame > 8){
+      attacking = false;
+      attackFrame = 0;
+    }
+  }
+}
+
+  function updateMovement(){
+
+  let dx = 0;
+  let dy = 0;
+
+  if(keys["ArrowLeft"] || keys["a"]) dx -= player.speed;
+  if(keys["ArrowRight"] || keys["d"]) dx += player.speed;
+  if(keys["ArrowUp"] || keys["w"]) dy -= player.speed;
+  if(keys["ArrowDown"] || keys["s"]) dy += player.speed;
+
+  player.x += dx;
+  player.y += dy;
+}
+  function updateInvulnerability(){
+  if(player.invul > 0){
+    player.invul--;
+  }
+}
+  function updateEnvironmentSystem(){
   updateShake();
+}
+function updateShake(){
+  if(shake > 0){
+    shake--;
+  }
+}
+
+function updateArrows(){
+  
+  for(let i = arrows.length - 1; i >= 0; i--){
+
+    const a = arrows[i];
+
+    a.x += a.dx;
+    a.y += a.dy;
+
+    if(a.x < 0 || a.x > canvas.width ||
+       a.y < 0 || a.y > canvas.height){
+      arrows.splice(i,1);
+    }
+  }
 }
   
 
@@ -1291,7 +1368,7 @@ for(let i=0;i<20;i++){
 
   createPack(px, py, 10 + Math.floor(Math.random()*6));
 }
- 
+}
   function drawGameOver(){
 
   ctx.fillStyle = "black";
