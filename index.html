@@ -620,7 +620,7 @@ if(explosionActive){
   enemies = enemies.filter(e=>e.hp>0);
 
   explosionActive = false;
-  shake = 25;
+  shake = 35;
 }
   for(let i=0;i<enemies.length;i++){
   for(let j=i+1;j<enemies.length;j++){
@@ -946,13 +946,6 @@ fireZones.forEach(f=>{
  });
   drawBlood();
 
-if(explosionActive){
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, 120, 0, Math.PI*2);
-  ctx.strokeStyle = "orange";
-  ctx.lineWidth = 8;
-  ctx.stroke();
-}
  enemies.forEach(e=>drawEnemy(e));
 levelParticles.forEach(p=>{
   ctx.fillStyle = "gold";
