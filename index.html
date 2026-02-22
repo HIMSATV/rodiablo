@@ -326,19 +326,24 @@ enemies.push(enemy);
 
 function spawnBoss(){
 
+  let scale = 1 + level * 0.15;   // 🔥 레벨당 15% 증가
+
   let boss = {
     x: player.x + 350,
     y: player.y,
     radius: 30,
     type: "boss",
-    hp: 800,
-    maxHp: 800,
-    speed: 0.6,
-    damage: 25,
+
+    maxHp: 800 * scale,
+    hp: 800 * scale,
+
+    speed: 0.6 + level * 0.02,
+    damage: 25 * scale,
+
     stun: 0,
     attackFrame: 0,
-    swordPulled: false,   // 🔥 2페이즈 여부
-    phase2Used: false     // 🔥 1회 제한
+    swordPulled: false,
+    phase2Used: false
   };
 
   enemies.push(boss);
@@ -1473,6 +1478,8 @@ waveCooldown = 0;
 enemiesToSpawn = 0;
   killCount = 0;
 level = 1;
+    killsAtLevelStart = 0;
+killsForNextLevel = 20;
 baseDamage = 20;
 ultiDamage = 40;
 
