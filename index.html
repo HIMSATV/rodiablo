@@ -394,6 +394,12 @@ enemies.forEach(e=>{
       
 killCount++;
 checkLevelUp();
+      // 🔥 궁극기 킬은 20% 확률 충전
+if(Math.random() < 0.2){
+  if(player.kiOrbs < player.maxOrbs){
+    player.kiOrbs++;
+  }
+}
    player.levelGlow = 60; // 60프레임 = 약 1초   
       bloodPools.push({
   x: e.x,
@@ -603,9 +609,12 @@ if(explosionActive){
     player.hp = player.maxHp;
   }
 
+  // 🔥 20% 확률 충전
+if(Math.random() < 0.2){
   if(player.kiOrbs < player.maxOrbs){
     player.kiOrbs++;
   }
+}
 
   bloodPools.push({
     x: e.x,
