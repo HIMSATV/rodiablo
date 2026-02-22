@@ -1577,12 +1577,7 @@ function resetGame(){
   bgmOsc = startBGM();
 }
 
-  if(gameOver){
-    resetGame();
-    loop();
-  }
 
-});
 
 // ===== 공격 아이콘 그리기 =====
 const iconCanvas = document.getElementById("attackIcon");
@@ -1594,7 +1589,8 @@ iconCtx.translate(30, 34);
 iconCtx.scale(1.4, 1.4);
 drawSwordShape(iconCtx);
 iconCtx.restore();
-
+  
+resetGame();
 loop();
 </script>
 </body>
