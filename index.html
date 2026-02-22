@@ -584,7 +584,10 @@ function updateCombatSystem(){
   if(keys["ArrowRight"] || keys["d"]) dx += player.speed;
   if(keys["ArrowUp"] || keys["w"]) dy -= player.speed;
   if(keys["ArrowDown"] || keys["s"]) dy += player.speed;
-
+    
+  dx += joyDX * player.speed;
+  dy += joyDY * player.speed;
+    
   player.x += dx;
   player.y += dy;
 }
