@@ -187,6 +187,7 @@ let waveCooldown = 0;
   let fireZones = [];
   let frameCount = 0;
   let explosionActive = false;
+  let bossSpawned = false;
 
 /* ===== 입력 ===== */
 let joyDX=0,joyDY=0;
@@ -322,6 +323,27 @@ if(Math.random() < 0.1){
 
 enemies.push(enemy);
 }
+
+function spawnBoss(){
+
+  let boss = {
+    x: player.x + 350,
+    y: player.y,
+    radius: 30,
+    type: "boss",
+    hp: 800,
+    maxHp: 800,
+    speed: 0.6,
+    damage: 25,
+    stun: 0,
+    attackFrame: 0,
+    swordPulled: false,   // 🔥 2페이즈 여부
+    phase2Used: false     // 🔥 1회 제한
+  };
+
+  enemies.push(boss);
+}
+  
 /* ===== 업데이트 ===== */
 function update(){
   // ===== 웨이브 시스템 =====
@@ -344,10 +366,15 @@ if(!waveActive && enemies.length === 0){
     }
 
     wave++;
+    bossSpawned = false;
   }
 }
 
 if(waveActive){
+ if(wave % 5 === 0 && !bossSpawned){
+  spawnBoss();
+  bossSpawned = true;
+}
 
   if(enemiesToSpawn > 0){
     spawnEnemy();
@@ -407,6 +434,21 @@ createBlood(player.x, player.y);
 let hitSomeone = false;
 
 enemies.forEach(e=>{
+  // ===== 보스 2페이즈 =====
+if(e.type === "boss" && !e.phase2Used){
+
+  if(e.hp <= e.maxHp * 0.5){
+
+    e.swordPulled = true;
+    e.phase2Used = true;
+
+    e.hp = e.maxHp;      // 🔥 풀피 회복
+    e.speed *= 1.6;      // 더 빨라짐
+    e.damage *= 1.8;     // 더 강해짐
+
+    shake = 25;
+  }
+}
   let dx = e.x - player.x;
   let dy = e.y - player.y;
   let dist = Math.hypot(dx,dy);
@@ -535,8 +577,7 @@ player.knockbackY *= 0.85;
   }
   return;
 }
-
-  if(e.type === "archer"){
+if(e.type === "archer"){
 
   let preferredDistance = 200;
 
@@ -577,6 +618,14 @@ else if(e.type === "mage"){
   }
 
 }
+else if(e.type === "boss"){
+
+  if(dist > 1){
+    e.x += dx/dist * e.speed;
+    e.y += dy/dist * e.speed;
+  }
+
+}
 else{
 
   if(dist > 1){
@@ -586,6 +635,7 @@ else{
   }
 
 }
+  
    // 🔥 아처 화살 발사
 if(e.type === "archer"){
 
@@ -1085,6 +1135,38 @@ function drawSwordShape(c){
 }
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
+  if(e.type === "boss"){
+
+  ctx.fillStyle = "#777777";
+  ctx.fillRect(e.x-20, e.y-25, 40, 50);
+
+  ctx.fillStyle = "#999999";
+  ctx.fillRect(e.x-15, e.y-35, 30, 15);
+
+  // 눈
+  ctx.fillStyle = "red";
+  ctx.fillRect(e.x-6, e.y-15, 4,4);
+  ctx.fillRect(e.x+2, e.y-15, 4,4);
+
+  // 🔥 1페이즈 - 몸에 박힌 칼
+  if(!e.swordPulled){
+    ctx.save();
+    ctx.translate(e.x+5, e.y-5);
+    ctx.rotate(0.7);
+    drawSwordShape(ctx);
+    ctx.restore();
+  }
+  else{
+    // 🔥 2페이즈 - 손에 칼
+    ctx.save();
+    ctx.translate(e.x+28, e.y);
+    ctx.rotate(0.2);
+    drawSwordShape(ctx);
+    ctx.restore();
+  }
+
+  return;
+}
 if(e.isElite){
 
   if(e.eliteColor === "yellow"){
