@@ -908,7 +908,7 @@ e.hp -= dealt;
 e.stun = 15;
 
 // 🔥 흡혈 10%
-let heal = dealt * 0.05,
+let heal = dealt * 0.05;
 player.hp += heal;
 if(player.hp > player.maxHp){
   player.hp = player.maxHp;
