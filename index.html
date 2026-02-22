@@ -980,9 +980,26 @@ function drawPlayer(x,y){
  ctx.fillRect(x-8,y-26,4,8);
  ctx.fillRect(x+4,y-26,4,8);
 
- ctx.fillStyle="#fff";
- ctx.fillRect(x-3,y-14,2,2);
- ctx.fillRect(x+1,y-14,2,2);
+// 기본 흰 눈
+ctx.fillStyle = "#fff";
+ctx.fillRect(x-3,y-14,2,2);
+ctx.fillRect(x+1,y-14,2,2);
+
+// 🔥 궁극기 발광 오버레이
+if(player.ultiActive){
+
+  ctx.save();
+
+  ctx.shadowColor = "#ff6600";
+  ctx.shadowBlur = 25;
+
+  ctx.fillStyle = "#ffaa00";
+
+  ctx.fillRect(x-3,y-14,2,2);
+  ctx.fillRect(x+1,y-14,2,2);
+
+  ctx.restore();
+}
 
  drawSword(x,y);
 }
