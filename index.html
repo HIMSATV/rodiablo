@@ -297,7 +297,7 @@ function spawnEnemy(){
          type==="archer" ? 0.5 : 0.8,
 
   damage: type==="mage" ? 5 + killCount*0.04 :
-          type==="archer" ? 12 + scale*0.020 :
+          type==="archer" ? 12 + scale*0.04 :
           10 * (1 + killCount*0.0035),
 
   shootCooldown: 0,
@@ -509,7 +509,7 @@ if(player.ultiCount >= 5){
   player.ultiActive = false;
 }
 
-  return; // 궁극기 중엔 일반 행동 중지
+   // 궁극기 중엔 일반 행동 중지
 }
   if(slowMotion > 0){
   slowMotion--;
@@ -861,12 +861,12 @@ if(player.levelGlow > 0){
     killsForNextLevel += 5;
 
     // 능력 상승
-    player.maxHp += 15;
+    player.maxHp += 10;
     player.hp = player.maxHp;
 
-    baseDamage += 5;
-    ultiDamage += 5;
-player.levelGlow = 60; // 60프레임 = 약 1초
+    baseDamage *= 1 + level * 0.01;
+    ultiDamage *= 1 + level * 0.015;
+    player.levelGlow = 60; // 60프레임 = 약 1초
     for(let i=0;i<60;i++){
       levelParticles.push({
         x: player.x + (Math.random()-0.5)*40,
