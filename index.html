@@ -1237,6 +1237,7 @@ function drawUI(){
   drawTextUI();
   drawOrbUI();
   drawHpOrb();
+  drawBossHpBar(); // 🔥 여기 추가
 }
 
 /* ===== 체력바 ===== */
@@ -1388,7 +1389,47 @@ ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
   ctx.fillText(Math.floor(player.hp), x, y+6);
   ctx.restore();
 }
+function drawBossHpBar(){
 
+  // 보스 찾기
+  let boss = enemies.find(e => e.type === "boss");
+  if(!boss) return;
+
+  let barWidth = canvas.width * 0.6;
+  let barHeight = 20;
+  let x = canvas.width/2 - barWidth/2;
+  let y = 20;
+
+  let percent = boss.hp / boss.maxHp;
+  if(percent < 0) percent = 0;
+
+  ctx.save();
+
+  // 배경
+  ctx.fillStyle = "#220000";
+  ctx.fillRect(x, y, barWidth, barHeight);
+
+  // 체력
+  let grad = ctx.createLinearGradient(x, y, x, y + barHeight);
+  grad.addColorStop(0, "#ff3333");
+  grad.addColorStop(1, "#880000");
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y, barWidth * percent, barHeight);
+
+  // 테두리
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#550000";
+  ctx.strokeRect(x, y, barWidth, barHeight);
+
+  // 텍스트
+  ctx.fillStyle = "white";
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("BOSS", canvas.width/2, y - 5);
+
+  ctx.restore();
+}
 function loop(){
   if(!gameOver){
     update();
