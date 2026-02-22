@@ -253,47 +253,45 @@ function spawnEnemy(){
   let ex = player.x + Math.cos(angle) * distance;
   let ey = player.y + Math.sin(angle) * distance;
 
-  let damageBoost = 1 + killCount * 0.005;
-
-  // 🔥 여기서 먼저 궁수 여부 결정
   let rand = Math.random();
-let type;
+  let type;
 
-if(rand < 0.2){
-  type = "mage";
-}
-else if(rand < 0.5){
-  type = "archer";
-}
-else{
-  type = "melee";
-}
+  if(rand < 0.2){
+    type = "mage";
+  }
+  else if(rand < 0.5){
+    type = "archer";
+  }
+  else{
+    type = "melee";
+  }
 
-enemies.push({
-  x: ex,
-  y: ey,
-  radius: 14,
-  stun: 0,
-  attackFrame: 0,
-  swingDir: 1,
-  type: type,
+  // 🔥 여기서 scale 미리 계산
+  let scale = Math.min(killCount, 200);
 
-  hp: type==="mage" ? 35 + killCount*0.15 :
-      type==="archer" ? 20 + killCount*0.1 :
-      40 + killCount*0.2,
+  enemies.push({
+    x: ex,
+    y: ey,
+    radius: 14,
+    stun: 0,
+    attackFrame: 0,
+    swingDir: 1,
+    type: type,
 
-  speed: type==="mage" ? 0.4 :
-         type==="archer" ? 0.5 : 0.8,
+    hp: type==="mage" ? 35 + killCount*0.15 :
+        type==="archer" ? 20 + killCount*0.1 :
+        40 + killCount*0.2,
 
-  damage: type==="mage" ? 8 + killCount*0.04 :
-          type==="archer" ? let scale = Math.min(killCount, 200);
+    speed: type==="mage" ? 0.4 :
+           type==="archer" ? 0.5 : 0.8,
 
-damage: 12 + scale*0.035 :
-          10 * (1 + killCount*0.006),
+    damage: type==="mage" ? 8 + killCount*0.04 :
+            type==="archer" ? 12 + scale*0.035 :
+            10 * (1 + killCount*0.006),
 
-  shootCooldown: 0,
-  castCooldown: 120
-});
+    shootCooldown: 0,
+    castCooldown: 120
+  });
 }
 /* ===== 업데이트 ===== */
 function update(){
