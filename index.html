@@ -296,9 +296,9 @@ function spawnEnemy(){
   speed: type==="mage" ? 0.4 :
          type==="archer" ? 0.5 : 0.8,
 
-  damage: type==="mage" ? 8 + killCount*0.04 :
-          type==="archer" ? 12 + scale*0.035 :
-          10 * (1 + killCount*0.006),
+  damage: type==="mage" ? 5 + killCount*0.04 :
+          type==="archer" ? 12 + scale*0.020 :
+          10 * (1 + killCount*0.0035),
 
   shootCooldown: 0,
   castCooldown: 120
@@ -861,7 +861,7 @@ if(player.levelGlow > 0){
     killsForNextLevel += 5;
 
     // 능력 상승
-    player.maxHp += 10;
+    player.maxHp += 15;
     player.hp = player.maxHp;
 
     baseDamage += 5;
@@ -902,8 +902,17 @@ function checkHit(){
 
     // ===== 여기 도달하면 공격 성공 =====
 
-    e.hp -= baseDamage;
+  let dealt = baseDamage;
+
+e.hp -= dealt;
 e.stun = 15;
+
+// 🔥 흡혈 10%
+let heal = dealt * 0.2;
+player.hp += heal;
+if(player.hp > player.maxHp){
+  player.hp = player.maxHp;
+}
 
 // 🔥 평타 적중 시 20% 기 오브 충전
 if(Math.random() < 0.2){
