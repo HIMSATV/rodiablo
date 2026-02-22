@@ -511,6 +511,15 @@ function updateEnemySystem(){
     updateSingleEnemy(e);
   });
 }
+  function updateParticles(){
+  particles.forEach(p=>{
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+  });
+
+  particles = particles.filter(p=>p.life > 0);
+}
   function updateMelee(e){
 
   const dx = player.x - e.x;
