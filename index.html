@@ -1512,102 +1512,70 @@ function spawnRandomBoss(){
     phase2Used: false
   });
 }
-  function resetGame(){
-if(bgmOsc){
-  bgmOsc.stop();
-  bgmOsc = null;
-}
-  // 플레이어 초기화
+function resetGame(){
+
+  if(bgmOsc){
+    bgmOsc.stop();
+    bgmOsc = null;
+  }
+
   player.x = mapSize * tileSize / 2;
-player.y = mapSize * tileSize / 2;
-  player.hp = player.maxHp;
+  player.y = mapSize * tileSize / 2;
+  player.hp = 100;
+  player.maxHp = 100;
   player.invul = 0;
-  player.knockbackX = 0;
-  player.knockbackY = 0;
   player.kiOrbs = 0;
   player.ultiActive = false;
   player.ultiCount = 0;
   player.ultiTimer = 0;
   player.levelGlow = 0;
- 
-  killCount = 0;
-level = 1;
-    killsAtLevelStart = 0;
-killsForNextLevel = 20;
-baseDamage = 20;
-ultiDamage = 40;
 
-player.maxHp = 100;
-player.hp = 100;
+  killCount = 0;
+  level = 1;
+  killsAtLevelStart = 0;
+  killsForNextLevel = 20;
+  baseDamage = 20;
+  ultiDamage = 40;
+
+  enemies = [];
+  packs = [];
   particles = [];
   bloodPools = [];
+  bloodParticles = [];
+  arrows = [];
+  levelParticles = [];
+
+  spawnTimer = 0;
+  spawnInterval = 120;
+
   shake = 0;
   slowMotion = 0;
-bloodParticles = [];
-arrows = [];
-levelParticles = [];
-enemies = [];
 
-spawnTimer = 0;
-spawnInterval = 120;
-
-bgmOsc = startBGM();
   gameOver = false;
-    document.getElementById("ui").style.display = "flex";
-packs = [];
+  document.getElementById("ui").style.display = "flex";
 
-for(let i=0;i<20;i++){
+  // 🔥 팩 생성
+  for(let i=0;i<20;i++){
 
-  let tileX, tileY;
+    let tileX, tileY;
 
-  while(true){
-    tileX = Math.floor(Math.random()*mapSize);
-    tileY = Math.floor(Math.random()*mapSize);
+    while(true){
+      tileX = Math.floor(Math.random()*mapSize);
+      tileY = Math.floor(Math.random()*mapSize);
+      if(map[tileY][tileX] === 0) break;
+    }
 
-    if(map[tileY][tileX] === 0) break;
+    let px = tileX * tileSize + tileSize/2;
+    let py = tileY * tileSize + tileSize/2;
+
+    createPack(px, py, 20 + Math.floor(Math.random()*12));
   }
 
-  let px = tileX * tileSize + tileSize/2;
-  let py = tileY * tileSize + tileSize/2;
+  // 🔥 보스 한 마리
+  spawnRandomBoss();
 
-
-    // 기존 적 팩 생성 후
-for(let i=0;i<20;i++){
-  let tileX, tileY;
-  while(true){
-    tileX = Math.floor(Math.random()*mapSize);
-    tileY = Math.floor(Math.random()*mapSize);
-    if(map[tileY][tileX] === 0) break;
-  }
-  let px = tileX * tileSize + tileSize/2;
-  let py = tileY * tileSize + tileSize/2;
-  createPack(px, py, 20 + Math.floor(Math.random()*12));
+  bgmOsc = startBGM();
 }
-
-// 🔥 랜덤 위치 보스 소환
-spawnRandomBoss();
-}
-  
-  function drawGameOver(){
-
-  ctx.fillStyle = "black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  ctx.fillStyle = "red";
-  ctx.font = "bold 60px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("YOU DIE", canvas.width/2, canvas.height/2);
-
-  ctx.font = "20px Arial";
-  ctx.fillStyle = "white";
-  ctx.fillText("Final Kills: " + killCount, canvas.width/2, canvas.height/2 + 50);
-  ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 90);
-}
-  canvas.addEventListener("touchstart", function(){
-
-  if(!bgmOsc){
-    bgmOsc = startBGM();  // 첫 터치에 음악 시작
-  }
 
   if(gameOver){
     resetGame();
