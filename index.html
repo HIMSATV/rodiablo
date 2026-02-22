@@ -908,7 +908,7 @@ e.hp -= dealt;
 e.stun = 15;
 
 // 🔥 흡혈 10%
-let heal = dealt * 0.2;
+let heal = dealt * 0.05,
 player.hp += heal;
 if(player.hp > player.maxHp){
   player.hp = player.maxHp;
@@ -947,7 +947,7 @@ if(e.hp <= 0){
   checkLevelUp();
 
   // 🔥 킬당 체력 5 회복
-  player.hp += 5;
+  player.hp += 1;
   if(player.hp > player.maxHp){
     player.hp = player.maxHp;
   }
