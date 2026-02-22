@@ -160,6 +160,16 @@ ultiActive:false,
 ultiCount:0,
 ultiTimer:0,
 }; 
+  let tileSize = 64;
+
+let map = [
+ [1,1,1,1,1,1,1,1,1,1],
+ [1,0,0,0,0,0,0,0,0,1],
+ [1,0,0,2,2,0,0,0,0,1],
+ [1,0,0,0,0,0,3,0,0,1],
+ [1,0,0,0,0,0,0,0,0,1],
+ [1,1,1,1,1,1,1,1,1,1],
+];
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
@@ -515,11 +525,23 @@ if(player.ultiCount >= 5){
   slowMotion--;
   return;   // 🔥 모든 업데이트 일시정지
 }
- player.x+=joyDX*player.speed*0.5;
- player.y+=joyDY*player.speed*0.5;
-// 🔥 넉백 적용
-player.x += player.knockbackX;
-player.y += player.knockbackY;
+// X 먼저
+let nextX = player.x + joyDX * player.speed * 0.5 + player.knockbackX;
+let tileX = Math.floor(nextX / tileSize);
+let tileY = Math.floor(player.y / tileSize);
+
+if(!map[tileY] || map[tileY][tileX] !== 1){
+  player.x = nextX;
+}
+
+// Y 따로
+let nextY = player.y + joyDY * player.speed * 0.5 + player.knockbackY;
+tileX = Math.floor(player.x / tileSize);
+tileY = Math.floor(nextY / tileSize);
+
+if(!map[tileY] || map[tileY][tileX] !== 1){
+  player.y = nextY;
+}
 
 // 서서히 감속
 player.knockbackX *= 0.85;
@@ -1017,6 +1039,24 @@ function drawBlood(){
 }
 /* ===== 렌더 ===== */
 function draw(){
+  for(let y = 0; y < map.length; y++){
+  for(let x = 0; x < map[y].length; x++){
+
+    let tile = map[y][x];
+
+    if(tile === 0) ctx.fillStyle = "#222";
+    if(tile === 1) ctx.fillStyle = "#555";
+    if(tile === 2) ctx.fillStyle = "blue";
+    if(tile === 3) ctx.fillStyle = "red";
+
+    ctx.fillRect(
+      x * tileSize,
+      y * tileSize,
+      tileSize,
+      tileSize
+    );
+  }
+}
 ctx.setTransform(1,0,0,1,0,0);
 ctx.globalAlpha = 1;
 ctx.shadowBlur = 0;
