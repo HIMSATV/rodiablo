@@ -176,6 +176,7 @@ let waveActive = false;
 let waveCooldown = 0;
   let fireZones = [];
   let frameCount = 0;
+  let explosionActive = false;
 
 /* ===== 입력 ===== */
 let joyDX=0,joyDY=0;
@@ -214,7 +215,9 @@ attackBtn.addEventListener("touchstart",()=>{
 
   // 🔥 궁극기 발동
   if(player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive){
-
+if(player.kiOrbs === player.maxOrbs){
+  explosionActive = true;
+}
     orbFlash = 20;   // 20프레임 빛남
     player.ultiActive = true;
     player.ultiCount = 0;
@@ -574,7 +577,34 @@ if(e.type === "archer"){
 }
  });
 // ===== 몬스터끼리 충돌 처리 =====
-for(let i=0;i<enemies.length;i++){
+// ===== 화면 삭제 폭발 =====
+if(explosionActive){
+
+  let radius = 120;
+
+  enemies.forEach(e=>{
+
+    let dx = e.x - player.x;
+    let dy = e.y - player.y;
+
+    // 🔥 멀면 계산 안 함 (최적화 핵심)
+    if(Math.abs(dx) > radius || Math.abs(dy) > radius) return;
+
+    let dist = Math.hypot(dx,dy);
+
+    if(dist < radius){
+      e.hp = 0;
+      killCount++;
+    }
+
+  });
+
+  enemies = enemies.filter(e=>e.hp>0);
+
+  explosionActive = false;
+  shake = 25;
+}
+  for(let i=0;i<enemies.length;i++){
   for(let j=i+1;j<enemies.length;j++){
 
     let a = enemies[i];
@@ -890,7 +920,6 @@ fireZones.forEach(f=>{
     ctx.lineTo(f.x + i*2, f.y);
     ctx.fill();
   }
-
   ctx.restore();
 });
  particles.forEach(p=>{
@@ -899,6 +928,13 @@ fireZones.forEach(f=>{
  });
   drawBlood();
 
+if(explosionActive){
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 120, 0, Math.PI*2);
+  ctx.strokeStyle = "orange";
+  ctx.lineWidth = 8;
+  ctx.stroke();
+}
  enemies.forEach(e=>drawEnemy(e));
 levelParticles.forEach(p=>{
   ctx.fillStyle = "gold";
