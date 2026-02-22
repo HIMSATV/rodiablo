@@ -160,16 +160,24 @@ ultiActive:false,
 ultiCount:0,
 ultiTimer:0,
 }; 
-  let tileSize = 64;
+  let map = [];
+let mapSize = 50;   // 🔥 50x50
 
-let map = [
- [1,1,1,1,1,1,1,1,1,1],
- [1,0,0,0,0,0,0,0,0,1],
- [1,0,0,2,2,0,0,0,0,1],
- [1,0,0,0,0,0,3,0,0,1],
- [1,0,0,0,0,0,0,0,0,1],
- [1,1,1,1,1,1,1,1,1,1],
-];
+for(let y=0; y<mapSize; y++){
+  let row = [];
+
+  for(let x=0; x<mapSize; x++){
+
+    if(x===0 || y===0 || x===mapSize-1 || y===mapSize-1){
+      row.push(1); // 외곽 벽
+    }else{
+      row.push(0); // 바닥
+    }
+
+  }
+
+  map.push(row);
+}
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
@@ -268,70 +276,73 @@ function spawnEnemy(){
 
   if(enemies.length >= 120) return;
 
-  let angle = Math.random() * Math.PI * 2;
-  let distance = 300;
+  let tileX, tileY;
 
-  let ex = player.x + Math.cos(angle) * distance;
-  let ey = player.y + Math.sin(angle) * distance;
+  // 🔥 바닥 타일 나올 때까지 반복
+  while(true){
+
+    tileX = Math.floor(Math.random() * mapSize);
+    tileY = Math.floor(Math.random() * mapSize);
+
+    if(map[tileY][tileX] === 0){
+      break;
+    }
+  }
+
+  let ex = tileX * tileSize + tileSize/2;
+  let ey = tileY * tileSize + tileSize/2;
 
   let rand = Math.random();
   let type;
 
-  if(rand < 0.2){
-    type = "mage";
-  }
-  else if(rand < 0.5){
-    type = "archer";
-  }
-  else{
-    type = "melee";
-  }
+  if(rand < 0.2) type = "mage";
+  else if(rand < 0.5) type = "archer";
+  else type = "melee";
 
-  // 🔥 여기서 scale 미리 계산
   let scale = Math.min(killCount, 200);
 
- let enemy = {
-  x: ex,
-  y: ey,
-  radius: 14,
-  stun: 0,
-  attackFrame: 0,
-  swingDir: 1,
-  type: type,
+  let enemy = {
+    x: ex,
+    y: ey,
+    radius: 14,
+    stun: 0,
+    attackFrame: 0,
+    swingDir: 1,
+    type: type,
 
-  hp: type==="mage" ? 35 + killCount*0.15 :
-      type==="archer" ? 20 + killCount*0.1 :
-      40 + killCount*0.2,
+    hp: type==="mage" ? 35 + killCount*0.15 :
+        type==="archer" ? 20 + killCount*0.1 :
+        40 + killCount*0.2,
 
-  speed: type==="mage" ? 0.4 :
-         type==="archer" ? 0.5 : 0.8,
+    speed: type==="mage" ? 0.4 :
+           type==="archer" ? 0.5 : 0.8,
 
-  damage: type==="mage" ? 5 + killCount*0.04 :
-          type==="archer" ? 12 + scale*0.04 :
-          10 * (1 + killCount*0.0035),
+    damage: type==="mage" ? 5 + killCount*0.04 :
+            type==="archer" ? 12 + scale*0.04 :
+            10 * (1 + killCount*0.0035),
 
-  shootCooldown: 0,
-  castCooldown: 120
-};
+    shootCooldown: 0,
+    castCooldown: 120
+  };
 
-// 🔥 ===== 엘리트 추가 =====
-if(Math.random() < 0.1){
+  // 🔥 엘리트 유지
+  if(Math.random() < 0.1){
 
-  enemy.isElite = true;
+    enemy.isElite = true;
 
-  // 색상 랜덤
-  if(Math.random() < 0.5){
-    enemy.eliteColor = "yellow";
-  }else{
-    enemy.eliteColor = "blue";
+    if(Math.random() < 0.5){
+      enemy.eliteColor = "yellow";
+    }else{
+      enemy.eliteColor = "blue";
+    }
+
+    enemy.speed *= 1.6;
+    enemy.damage *= 2;
+    enemy.radius *= 1.2;
+    enemy.hp *= 2.5;
   }
 
-  enemy.speed *= 1.6;      // 더 빠름
-  enemy.damage *= 2;       // 더 아픔
-  enemy.radius *= 1.2;     // 약간 큼
-}
-
-enemies.push(enemy);
+  enemies.push(enemy);
 }
 
 function spawnBoss(){
@@ -1592,8 +1603,8 @@ if(bgmOsc){
   bgmOsc = null;
 }
   // 플레이어 초기화
-  player.x = 0;
-  player.y = 0;
+  player.x = mapSize * tileSize / 2;
+player.y = mapSize * tileSize / 2;
   player.hp = player.maxHp;
   player.invul = 0;
   player.knockbackX = 0;
