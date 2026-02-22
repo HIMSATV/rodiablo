@@ -675,11 +675,14 @@ if(explosionActive){
     if(Math.abs(dx) > radius || Math.abs(dy) > radius) return;
 
     let dist = Math.hypot(dx,dy);
+if(dist < radius){
 
-    if(dist < radius){
+  // 🔥 보스는 광역궁 면역
+  if(e.type === "boss") return;
 
   e.hp = 0;
   killCount++;
+   
   checkLevelUp();
 
   player.hp += 5;
@@ -855,7 +858,14 @@ function checkHit(){
     // ===== 여기 도달하면 공격 성공 =====
 
     e.hp -= baseDamage;
-    e.stun = 15;
+e.stun = 15;
+
+// 🔥 평타 적중 시 20% 기 오브 충전
+if(Math.random() < 0.2){
+  if(player.kiOrbs < player.maxOrbs){
+    player.kiOrbs++;
+  }
+}
 
     let len = dist || 1;
     let nx = dx / len;
@@ -1426,7 +1436,7 @@ function drawBossHpBar(){
   ctx.fillStyle = "white";
   ctx.font = "bold 16px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("BOSS", canvas.width/2, y - 5);
+  ctx.fillText("HILLOCK", canvas.width/2, y - 5);
 
   ctx.restore();
 }
