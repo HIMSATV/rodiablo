@@ -675,8 +675,11 @@ function createPack(cx, cy, count){
   packs.push(pack);
 }
   function teleportTo(target){
-  player.x = target.x;
-  player.y = target.y;
+  // 목표로 가되, 못 가면 이동 안 함
+  if(canMoveTo(target.x, target.y)){
+    player.x = target.x;
+    player.y = target.y;
+  }
 }
 function dealUltimateDamage(){
 
@@ -1114,6 +1117,14 @@ function updateMovement(){
 
   let dx = 0;
   let dy = 0;
+  
+  if(Math.abs(dx) > Math.abs(dy)){
+  if(dx > 0) player.dir = "right";
+  else if(dx < 0) player.dir = "left";
+}else{
+  if(dy > 0) player.dir = "down";
+  else if(dy < 0) player.dir = "up";
+}
 
   if(keys["ArrowLeft"] || keys["a"]) dx -= player.speed;
   if(keys["ArrowRight"] || keys["d"]) dx += player.speed;
@@ -1367,8 +1378,10 @@ function checkHit(){
       spawnHitBlood(e.x, e.y, 14);
     }else{
       e.stun = 15;
-      e.x += nx * 18;
-      e.y += ny * 18;
+      let ex = e.x + nx*18;
+let ey = e.y + ny*18;
+if(canEnemyMoveTo(e, ex, e.y)) e.x = ex;
+if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
     }
 
     // 타격감 사운드
