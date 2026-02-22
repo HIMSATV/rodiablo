@@ -353,11 +353,16 @@ if(
 
 function spawnBoss(){
 
-  let scale = 1 + level * 0.15;   // 🔥 레벨당 15% 증가
+  let scale = 1 + level * 0.15;
+
+  let tileX = Math.floor(player.x / tileSize);
+  let tileY = Math.floor(player.y / tileSize);
+
+  if(!map[tileY] || map[tileY][tileX] !== 0) return;
 
   let boss = {
-    x: Math.max(tileSize*2, Math.min(player.x + 350, mapSize*tileSize - tileSize*2)),
-    y: player.y,
+    x: tileX * tileSize + tileSize/2,
+    y: tileY * tileSize + tileSize/2,
     radius: 30,
     type: "boss",
 
