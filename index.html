@@ -44,8 +44,8 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
  <div id="movePad"><div id="stick"></div></div>
  <div id="attackBtn">
   <canvas id="attackIcon" width="60" height="60"></canvas>
+ </div>
 </div>
-
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
@@ -371,6 +371,37 @@ function circleCollide(a,b){
  return Math.hypot(a.x-b.x,a.y-b.y) < a.radius + b.radius;
 }
 // ===== 유틸 =====
+  function dist2(ax, ay, bx, by){
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx*dx + dy*dy;
+}
+
+function spawnHitBlood(x, y, amount=10){
+  // ✅ 상한선 (맵핑 최적화)
+  if(bloodParticles.length > 320) return;
+
+  for(let i=0;i<amount;i++){
+    bloodParticles.push({
+      x: x + (Math.random()-0.5)*6,
+      y: y + (Math.random()-0.5)*6,
+      vx: (Math.random()-0.5) * 6,
+      vy: (Math.random()-0.5) * 6,
+      size: Math.random()*3 + 1.5,
+      life: 22
+    });
+  }
+
+  // ✅ 피 웅덩이도 상한
+  if(bloodPools.length < 140){
+    bloodPools.push({
+      x: x + (Math.random()-0.5)*8,
+      y: y + (Math.random()-0.5)*8,
+      size: 5 + Math.random()*4,
+      life: 280
+    });
+  }
+}
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
 // ===== 플레이어 피격 처리 =====
@@ -645,47 +676,36 @@ function createPack(cx, cy, count){
 }
 function dealUltimateDamage(){
 
-  let radius = 200;   // 🔥 폭발 범위
+  const radius = 200;
+  const r2 = radius * radius;
 
-  enemies.forEach(e=>{
+  // ✅ 궁극기 연출은 “최대한 가볍게”
+  // - hypot 금지(제곱거리)
+  // - 파티클/피 상한 강제
 
-    let dist = Math.hypot(e.x-player.x, e.y-player.y);
+  for(let i=0; i<enemies.length; i++){
+    const e = enemies[i];
 
-    if(dist < radius){
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    if(dx*dx + dy*dy > r2) continue;
 
-      if(e.invul <= 0){
-  e.hp = 0;
-}         // 🔥 즉사
-      e.stun = 30;
+    // 보스 무적이면 스킵(원하면 지워)
+    if(e.type === "boss" && e.invul > 0) continue;
 
-      createBlood(e.x, e.y);
-      function spawnHitBlood(x, y, amount=10){
-  for(let i=0;i<amount;i++){
-    bloodParticles.push({
-      x: x + (Math.random()-0.5)*6,
-      y: y + (Math.random()-0.5)*6,
-      vx: (Math.random()-0.5) * 6,
-      vy: (Math.random()-0.5) * 6,
-      size: Math.random()*3 + 1.5,
-      life: 22
-    });
-  }
+    // 즉사
+    if(e.invul <= 0){
+      e.hp = 0;
+    }
+    e.stun = 30;
 
-  // 작은 피 웅덩이도 살짝
-  bloodPools.push({
-    x: x + (Math.random()-0.5)*8,
-    y: y + (Math.random()-0.5)*8,
-    size: 5 + Math.random()*4,
-    life: 280
-  });
+    // 피(가벼운 버전)
+    spawnHitBlood(e.x, e.y, 18);
 
-  // 너무 많으면 컷 (안정장치)
-  if(bloodParticles.length > 380) bloodParticles.splice(0, 60);
-  if(bloodPools.length > 160) bloodPools.splice(0, bloodPools.length-160);
-}
-
-      // 폭발 파티클
-      for(let i=0;i<20;i++){
+    // 폭발 파티클(상한)
+    if(particles.length < 240){
+      const spawnCount = 12; // 20 -> 12로 줄여도 충분히 화려함
+      for(let k=0;k<spawnCount;k++){
         particles.push({
           x: e.x,
           y: e.y,
@@ -695,11 +715,10 @@ function dealUltimateDamage(){
         });
       }
     }
-  });
+  }
 
-  shake = 35;     // 강한 화면 흔들림
+  shake = Math.max(shake, 35);
 }
-
 function bossEnterPhase2(boss){
 
   boss.swordPulled = true;
@@ -865,9 +884,7 @@ function updateEnemySystem(){
   packs.forEach(pack=>{
     let dx = player.x - pack.x;
     let dy = player.y - pack.y;
-    let dist = Math.hypot(dx,dy);
-
-    if(dist < 600){
+    if(dx*dx + dy*dy < 600*600){
       pack.activated = true;
     }
   });
@@ -1294,108 +1311,113 @@ function updateArrows(){
 }
 /* ===== 공격 ===== */
 function checkHit(){
-  
-  let range = 45;
 
-  enemies.forEach(e => {
+  const range = 45;
+  const hitLimit = 12;  // ✅ 한 번 공격에 최대 12명만 처리(최적화)
+  let hitDone = 0;
 
-    let dx = e.x - player.x;
-    let dy = e.y - player.y;
-    let dist = Math.hypot(dx, dy);
+  for(let i=0;i<enemies.length;i++){
+    const e = enemies[i];
 
-    // 🔥 기존 거리 체크 유지
-    if(dist > range + e.radius) return;
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
 
-    // 🔥 방향 제한 추가
-    if(player.dir === "up" && dy >= 0) return;
-    if(player.dir === "down" && dy <= 0) return;
-    if(player.dir === "right" && dx <= 0) return;
-    if(player.dir === "left" && dx >= 0) return;
+    const r = range + e.radius;
+    if(dx*dx + dy*dy > r*r) continue;
 
-    // ===== 여기 도달하면 공격 성공 =====
-let len = dist || 1;
-let nx = dx / len;
-let ny = dy / len;
-let dealt = baseDamage;
+    // 🔥 방향 제한
+    if(player.dir === "up" && dy >= 0) continue;
+    if(player.dir === "down" && dy <= 0) continue;
+    if(player.dir === "right" && dx <= 0) continue;
+    if(player.dir === "left" && dx >= 0) continue;
 
-// ✅ 보스 무적 체크 (스턴/넉백 면역)
-const bossInvul = (e.type === "boss" && e.invul > 0);
+    // 히트 수 제한
+    hitDone++;
+    if(hitDone > hitLimit) break;
 
-// 데미지(무적이면 안 닳음)
-if(e.invul <= 0){
-  e.hp -= dealt;
-}
+    // ✅ 노멀라이즈(한 번만 hypot)
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = dx / len;
+    const ny = dy / len;
 
-// 🔥 흡혈(무적이어도 가능하게 유지하려면 그대로 둠)
-let heal = dealt * 0.05;
-player.hp = Math.min(player.maxHp, player.hp + heal);
+    let dealt = baseDamage;
 
-// 🔥 평타 적중 시 20% 기 오브 충전
-if(Math.random() < 0.2 && player.kiOrbs < player.maxOrbs){
-  player.kiOrbs++;
-}
+    const bossInvul = (e.type === "boss" && e.invul > 0);
 
-// 스턴/넉백은 보스 무적 중엔 면역
-// ✅ 보스 무적 연출 중에도 피 튀김(데미지는 안 들어감)
-if(bossInvul){
-  // 무적 중: 피만 튀김 + 둔탁 소리
-  spawnHitBlood(e.x, e.y, 14);
-} else {
-  // 평소: 스턴/넉백
-  e.stun = 15;
-  e.x += nx * 18;
-  e.y += ny * 18;
-}
+    // 데미지(무적이면 안 닳음)
+    if(e.invul <= 0){
+      e.hp -= dealt;
+    }
 
-// 타격감
-if(bossInvul) thudSound();
-else hitSound();
-shake = 12;
+    // 흡혈
+    const heal = dealt * 0.05;
+    player.hp = Math.min(player.maxHp, player.hp + heal);
 
-particles.push({
-  x:e.x,
-  y:e.y,
-  vx:nx*4 + (Math.random()-0.5)*4,
-  vy:ny*4 + (Math.random()-0.5)*4,
-  life:30
-});;
-    
+    // 기 오브 20%
+    if(Math.random() < 0.2 && player.kiOrbs < player.maxOrbs){
+      player.kiOrbs++;
+    }
 
-if(e.hp <= 0){
-// ✅ 스코어
-score += (e.type === "boss") ? 2000 : (e.isElite ? 250 : 100);
-if(score > bestScore) bestScore = score;
-  killCount++;
-  checkLevelUp();
+    // 스턴/넉백: 보스 무적 중 면역
+    if(bossInvul){
+      spawnHitBlood(e.x, e.y, 14);
+    }else{
+      e.stun = 15;
+      e.x += nx * 18;
+      e.y += ny * 18;
+    }
 
-  // 🔥 킬당 체력 5 회복
-  player.hp += 1;
-  if(player.hp > player.maxHp){
-    player.hp = player.maxHp;
+    // 타격감 사운드
+    if(bossInvul) thudSound();
+    else hitSound();
+
+    shake = 12;
+
+    // 파티클(상한선 권장)
+    if(particles.length < 220){
+      particles.push({
+        x: e.x,
+        y: e.y,
+        vx: nx*4 + (Math.random()-0.5)*4,
+        vy: ny*4 + (Math.random()-0.5)*4,
+        life: 30
+      });
+    }
+
+    // 킬 처리
+    if(e.hp <= 0){
+      score += (e.type === "boss") ? 2000 : (e.isElite ? 250 : 100);
+      if(score > bestScore) bestScore = score;
+
+      killCount++;
+      checkLevelUp();
+
+      player.hp = Math.min(player.maxHp, player.hp + 1);
+
+      if(bloodPools.length < 140){
+        bloodPools.push({
+          x: e.x,
+          y: e.y,
+          size: 10 + Math.random()*6,
+          life: 600
+        });
+      }
+
+      slowMotion = 6;
+
+      if(player.kiOrbs < player.maxOrbs){
+        player.kiOrbs++;
+      }
+    }
   }
 
-  bloodPools.push({
-  x: e.x,
-  y: e.y,
-  size: 10 + Math.random()*6,
-  life: 600  // 10초 (60fps 기준)
-});
-
-  slowMotion = 6;
-
-  // 🟢 기 구슬 증가
-if(player.kiOrbs < player.maxOrbs){
-  player.kiOrbs++;
-}
-}
-  });
-
+  // 죽은 적 정리
   enemies = enemies.filter(e => e.hp > 0);
-
-packs.forEach(pack=>{
-  pack.enemies = pack.enemies.filter(e=>e.hp>0);
-});
+  packs.forEach(pack=>{
+    pack.enemies = pack.enemies.filter(e=>e.hp>0);
+  });
 }
+
 function createBlood(x, y){
   for(let i = 0; i < 30; i++){
     bloodParticles.push({
