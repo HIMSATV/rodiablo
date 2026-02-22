@@ -1107,13 +1107,18 @@ else{
   
   ctx.fillRect(e.x-10,e.y-12,20,22);
 
-  // 머리
-  if(e.type === "archer"){
+  // ===== 머리 색상 =====
+if(e.type === "archer"){
   ctx.fillStyle = "#dddddd";
-}else{
-  ctx.fillStyle = "#00aa00";
 }
-  ctx.fillRect(e.x-7,e.y-20,14,8);
+else if(e.type === "mage"){
+  ctx.fillStyle = "#550088";   // 🔥 마법사 머리도 보라
+}
+else{
+  ctx.fillStyle = "#00aa00";   // 근접만 초록
+}
+
+ctx.fillRect(e.x-7,e.y-20,14,8);
 
   // 눈
   ctx.fillStyle="red";
