@@ -464,6 +464,16 @@ function update(){
   updateInvulnerability();
   updateLevelGlow();
 }
+  function handleGameOver(){
+  gameOver = true;
+  document.getElementById("ui").style.display = "none";
+}
+
+function updateLevelGlow(){
+  if(player.levelGlow > 0){
+    player.levelGlow--;
+  }
+}
   function updateUltimateSystem(){
 
   if(!player.ultiActive) return;
