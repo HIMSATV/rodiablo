@@ -359,6 +359,16 @@ if(
 }
 function spawnEnemyAt(ex, ey, pack){
 
+  let tileX = Math.floor(ex / tileSize);
+  let tileY = Math.floor(ey / tileSize);
+
+  if(
+    !map[tileY] ||
+    map[tileY][tileX] !== 0
+  ){
+    return; // 바닥 아니면 생성 취소
+  }
+
   if(enemies.length >= 200) return;
 
   let rand = Math.random();
@@ -373,11 +383,9 @@ function spawnEnemyAt(ex, ey, pack){
     attackFrame: 0,
     swingDir: 1,
     type: type,
-
     hp: 40,
     speed: type==="melee"?0.8:0.5,
     damage: 10,
-
     shootCooldown: 0,
     castCooldown: 120,
     pack: pack
@@ -438,7 +446,21 @@ function createPack(cx, cy, count){
 
   packs.push(pack);
 }
-  
+  function teleportTo(target){
+  player.x = target.x;
+  player.y = target.y;
+}
+  function dealUltimateDamage(){
+
+  enemies.forEach(e=>{
+    if(Math.hypot(e.x-player.x, e.y-player.y) < 80){
+      e.hp -= ultiDamage;
+      e.stun = 20;
+    }
+  });
+
+  shake = 20;
+}
 /* ===== 업데이트 ===== */
 function update(){
 
@@ -692,10 +714,12 @@ function updateSpawnSystem(){
     let py = player.y + Math.sin(angle) * distance;
 
     // 맵 범위 체크
-    if(px > 0 && py > 0 &&
-       px < mapSize*tileSize &&
-       py < mapSize*tileSize){
+   let margin = 200;
 
+if(px > margin &&
+   py > margin &&
+   px < mapSize*tileSize - margin &&
+   py < mapSize*tileSize - margin)
       createPack(px, py, 8 + Math.floor(Math.random()*5));
     }
 
