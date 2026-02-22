@@ -1464,26 +1464,40 @@ function loop(){
 function spawnRandomBoss(){
   if(enemies.some(e => e.type === "boss")) return;
 
-  let tileX, tileY;
-  let bx, by;
+  let bx = player.x + 500;
+  let by = player.y;
 
-  while(true){
-    tileX = Math.floor(Math.random() * mapSize);
-    tileY = Math.floor(Math.random() * mapSize);
+  let found = false;
+
+  for(let i = 0; i < 100; i++){
+
+    let tileX = Math.floor(Math.random() * mapSize);
+    let tileY = Math.floor(Math.random() * mapSize);
 
     if(map[tileY][tileX] !== 0) continue;
 
-    bx = tileX * tileSize + tileSize/2;
-    by = tileY * tileSize + tileSize/2;
+    let tx = tileX * tileSize + tileSize/2;
+    let ty = tileY * tileSize + tileSize/2;
 
-    let dist = Math.hypot(bx - player.x, by - player.y);
+    let dist = Math.hypot(tx - player.x, ty - player.y);
 
-    if(dist > 400) break;   // 🔥 플레이어와 400px 이상 떨어진 곳
+    if(dist > 300){
+      bx = tx;
+      by = ty;
+      found = true;
+      break;
+    }
+  }
+
+  if(!found){
+    // fallback — 플레이어 오른쪽 고정
+    bx = player.x + 300;
+    by = player.y;
   }
 
   let scale = 1 + level * 0.15;
 
-  let boss = {
+  enemies.push({
     x: bx,
     y: by,
     radius: 30,
@@ -1496,9 +1510,7 @@ function spawnRandomBoss(){
     attackFrame: 0,
     swordPulled: false,
     phase2Used: false
-  };
-
-  enemies.push(boss);
+  });
 }
   function resetGame(){
 if(bgmOsc){
@@ -1558,8 +1570,7 @@ for(let i=0;i<20;i++){
   let px = tileX * tileSize + tileSize/2;
   let py = tileY * tileSize + tileSize/2;
 
-  createPack(px, py, 20 + Math.floor(Math.random()*12));
-}
+
     // 기존 적 팩 생성 후
 for(let i=0;i<20;i++){
   let tileX, tileY;
