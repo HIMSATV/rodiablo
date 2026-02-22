@@ -59,6 +59,20 @@ resize();
 window.addEventListener("resize",resize);
 
 /* ===== 사운드 ===== */
+  let audioUnlocked = false;
+
+function unlockAudio(){
+  if(audioUnlocked) return;
+  audioUnlocked = true;
+
+  audioCtx.resume().then(()=>{
+    if(!bgmOsc) bgmOsc = startBGM();
+  });
+}
+
+window.addEventListener("touchstart", unlockAudio, { once:true });
+window.addEventListener("mousedown", unlockAudio, { once:true });
+window.addEventListener("keydown", unlockAudio, { once:true });
 const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 function startBGM(){
 
@@ -132,16 +146,89 @@ let bgmOsc;
  o.connect(g); g.connect(audioCtx.destination);
  o.start(); o.stop(audioCtx.currentTime+0.12);
 }
-function hitSound(){
- let o=audioCtx.createOscillator();
- let g=audioCtx.createGain();
- o.type="square";
- o.frequency.value=100;
- g.gain.value=0.25;
- o.connect(g); g.connect(audioCtx.destination);
- o.start(); o.stop(audioCtx.currentTime+0.08);
-}
+function bossUnsheatheSound(){
+  let now = audioCtx.currentTime;
 
+  // 저음 상승 효과
+  let o1 = audioCtx.createOscillator();
+  let g1 = audioCtx.createGain();
+
+  o1.type = "sawtooth";
+  o1.frequency.setValueAtTime(120, now);
+  o1.frequency.exponentialRampToValueAtTime(600, now + 0.6);
+
+  g1.gain.setValueAtTime(0.4, now);
+  g1.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+  o1.connect(g1);
+  g1.connect(audioCtx.destination);
+
+  o1.start(now);
+  o1.stop(now + 0.6);
+
+  // 금속음
+  let o2 = audioCtx.createOscillator();
+  let g2 = audioCtx.createGain();
+
+  o2.type = "triangle";
+  o2.frequency.setValueAtTime(900, now);
+  o2.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+
+  g2.gain.setValueAtTime(0.3, now);
+  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+  o2.connect(g2);
+  g2.connect(audioCtx.destination);
+
+  o2.start(now);
+  o2.stop(now + 0.4);
+}
+function thudSound(){
+  let now = audioCtx.currentTime;
+
+  // 저음 "둥" + 살짝 노이즈 느낌
+  let o = audioCtx.createOscillator();
+  let g = audioCtx.createGain();
+
+  o.type = "sine";
+  o.frequency.setValueAtTime(120, now);
+  o.frequency.exponentialRampToValueAtTime(55, now + 0.14);
+
+  g.gain.setValueAtTime(0.32, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+  o.connect(g);
+  g.connect(audioCtx.destination);
+
+  o.start(now);
+  o.stop(now + 0.18);
+
+  // 살짝 "쿵" 질감용 짧은 클릭(선택)
+  let o2 = audioCtx.createOscillator();
+  let g2 = audioCtx.createGain();
+
+  o2.type = "triangle";
+  o2.frequency.setValueAtTime(220, now);
+  o2.frequency.exponentialRampToValueAtTime(90, now + 0.08);
+
+  g2.gain.setValueAtTime(0.12, now);
+  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+  o2.connect(g2);
+  g2.connect(audioCtx.destination);
+
+  o2.start(now);
+  o2.stop(now + 0.09);
+}
+function hitSound(){
+  let o=audioCtx.createOscillator();
+  let g=audioCtx.createGain();
+  o.type="square";
+  o.frequency.value=100;
+  g.gain.value=0.25;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime+0.08);
+}
 /* ===== 플레이어 ===== */
 let player={
  x:0,y:0,
@@ -205,6 +292,10 @@ let fireZones = [];
 let frameCount = 0;
 let explosionActive = false;
 let bossSpawned = false;
+let score = 0;
+let bestScore = 0;
+let bossTimer = 0;            // 보스 주기
+let bossInterval = 45 * 60;   // 45초(60fps 기준), 난이도에 따라 줄어듦
 
 /* ===== 입력 ===== */
 let joyDX=0,joyDY=0;
@@ -279,7 +370,88 @@ attackBtn.addEventListener("touchend",()=>{
 function circleCollide(a,b){
  return Math.hypot(a.x-b.x,a.y-b.y) < a.radius + b.radius;
 }
+// ===== 유틸 =====
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
+// ===== 플레이어 피격 처리 =====
+function damagePlayer(dmg, knockX, knockY){
+  if(player.invul > 0 || gameOver) return;
+
+  player.hp -= dmg;
+  player.invul = 25;         // 약 0.4초 무적(60fps 기준)
+  shake = Math.max(shake, 10);
+
+  // 넉백(즉시 반영)
+  player.x += knockX;
+  player.y += knockY;
+
+  if(player.hp <= 0){
+    handleGameOver();
+  }
+}
+
+// ===== 적 근접 공격 =====
+function enemyTryMeleeAttack(e){
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+
+  const reach = e.type === "boss" ? 70 : 42;
+
+  // 너무 멀면 공격 리셋
+  if(dist > reach){
+    e.attackFrame = 0;
+    return;
+  }
+
+  // 공격 진행
+  e.attackFrame++;
+
+  // 타격 프레임 (중간쯤)
+  if(e.attackFrame === 12){
+    const len = dist || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+
+    const kb = e.type === "boss" ? 30 : 18;
+    damagePlayer(e.damage, nx*kb, ny*kb);
+    hitSound();
+  }
+
+  // 공격 종료
+  if(e.attackFrame >= 25){
+    e.attackFrame = 0;
+  }
+}
+
+// ===== 아처 화살 발사 =====
+function spawnArrow(fromX, fromY, toX, toY, damage){
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const dist = Math.hypot(dx, dy) || 1;
+
+  const speed = 7.5;
+
+  arrows.push({
+    x: fromX,
+    y: fromY,
+    dx: dx/dist * speed,
+    dy: dy/dist * speed,
+    damage: damage,
+    life: 240  // 4초 정도
+  });
+}
+
+// ===== 메이지 장판 생성 =====
+function spawnFireZone(x, y, damage){
+  fireZones.push({
+    x, y,
+    radius: 55,
+    life: 180,     // 3초
+    tick: 0,
+    damage: damage
+  });
+}
 function spawnEnemy(){
 
   if(enemies.length >= 300) return;
@@ -340,7 +512,8 @@ if(
   };
 
   // 🔥 엘리트 유지
-  if(Math.random() < 0.1){
+  let eliteChance = 0.06 + Math.min(0.14, killCount * 0.001); // 6%~20%
+if(Math.random() < eliteChance){
 
     enemy.isElite = true;
 
@@ -397,34 +570,53 @@ function spawnEnemyAt(ex, ey, pack){
 }
 
 function spawnBoss(){
- if(enemies.some(e => e.type === "boss")) return;
+  if(enemies.some(e => e.type === "boss")) return;
+
   let scale = 1 + level * 0.15;
 
-  let tileX = Math.floor(player.x / tileSize);
-  let tileY = Math.floor(player.y / tileSize);
+  // 플레이어 근처 랜덤 스폰 (너무 가까우면 안)
+  let bx = player.x + 300;
+  let by = player.y;
 
-  if(!map[tileY] || map[tileY][tileX] !== 0) return;
+  // 간단 보정(벽 피하기)
+  let tries = 80;
+  while(tries--){
+    let angle = Math.random()*Math.PI*2;
+    let dist = 320 + Math.random()*220;
+    let tx = player.x + Math.cos(angle)*dist;
+    let ty = player.y + Math.sin(angle)*dist;
 
-  let boss = {
-    x: tileX * tileSize + tileSize/2,
-    y: tileY * tileSize + tileSize/2,
+    let tileX = Math.floor(tx / tileSize);
+    let tileY = Math.floor(ty / tileSize);
+
+    if(map[tileY] && map[tileY][tileX] === 0){
+      bx = tileX * tileSize + tileSize/2;
+      by = tileY * tileSize + tileSize/2;
+      break;
+    }
+  }
+
+  enemies.push({
+    x: bx,
+    y: by,
     radius: 30,
     type: "boss",
-
     maxHp: 800 * scale,
     hp: 800 * scale,
-
     speed: 0.6 + level * 0.02,
     damage: 25 * scale,
-
     stun: 0,
     attackFrame: 0,
     swordPulled: false,
-    phase2Used: false
-  };
+    phase2Used: false,
 
-  enemies.push(boss);
+    dashCooldown: 120,
+    cleaveCooldown: 160,
+    invul: 0,
+    phaseLock: 0
+  });
 }
+
 function createPack(cx, cy, count){
 
   let pack = {
@@ -461,10 +653,36 @@ function dealUltimateDamage(){
 
     if(dist < radius){
 
-      e.hp = 0;          // 🔥 즉사
+      if(e.invul <= 0){
+  e.hp = 0;
+}         // 🔥 즉사
       e.stun = 30;
 
       createBlood(e.x, e.y);
+      function spawnHitBlood(x, y, amount=10){
+  for(let i=0;i<amount;i++){
+    bloodParticles.push({
+      x: x + (Math.random()-0.5)*6,
+      y: y + (Math.random()-0.5)*6,
+      vx: (Math.random()-0.5) * 6,
+      vy: (Math.random()-0.5) * 6,
+      size: Math.random()*3 + 1.5,
+      life: 22
+    });
+  }
+
+  // 작은 피 웅덩이도 살짝
+  bloodPools.push({
+    x: x + (Math.random()-0.5)*8,
+    y: y + (Math.random()-0.5)*8,
+    size: 5 + Math.random()*4,
+    life: 280
+  });
+
+  // 너무 많으면 컷 (안정장치)
+  if(bloodParticles.length > 380) bloodParticles.splice(0, 60);
+  if(bloodPools.length > 160) bloodPools.splice(0, bloodPools.length-160);
+}
 
       // 폭발 파티클
       for(let i=0;i<20;i++){
@@ -482,10 +700,102 @@ function dealUltimateDamage(){
   shake = 35;     // 강한 화면 흔들림
 }
 
+function bossEnterPhase2(boss){
 
+  boss.swordPulled = true;
+  boss.phase2Used = true;
+
+  boss.speed *= 1.25;
+  boss.damage *= 1.2;
+
+  // 🔥 2초 무적
+  boss.invul = 120;
+
+  // 🔥 연출 동안 보스만 멈춤 (0.6초)
+  boss.phaseLock = 36;
+
+  shake = 30;
+  bossUnsheatheSound();
+
+  // 폭발 파티클
+  for(let i=0;i<80;i++){
+    particles.push({
+      x: boss.x,
+      y: boss.y,
+      vx: (Math.random()-0.5)*10,
+      vy: (Math.random()-0.5)*10,
+      life: 50
+    });
+  }
+}
+function bossDash(boss){
+  // 플레이어 방향으로 짧은 돌진(벽 충돌 고려)
+  const dx = player.x - boss.x;
+  const dy = player.y - boss.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const nx = dx / dist;
+  const ny = dy / dist;
+
+  // 돌진 거리/스텝
+  const dashDist = 220;
+  const steps = 18;
+
+  let hit = false;
+
+  for(let i=0;i<steps;i++){
+    let px = boss.x + nx * (dashDist/steps);
+    let py = boss.y + ny * (dashDist/steps);
+
+    if(canEnemyMoveTo(boss, px, py)){
+      boss.x = px;
+      boss.y = py;
+    }else{
+      break; // 벽이면 중단
+    }
+
+    // 돌진 중 충돌 판정 (한 번만)
+    if(!hit){
+      const d = Math.hypot(player.x - boss.x, player.y - boss.y);
+      if(d < boss.radius + player.radius + 10){
+        damagePlayer(boss.damage*1.2, nx*34, ny*34);
+        hit = true;
+      }
+    }
+  }
+
+  shake = Math.max(shake, 16);
+}
+
+function bossCleave(boss){
+  // 광역 원형 베기(시각: 파티클, 판정: 원형)
+  const radius = 140;
+
+  // 연출
+  for(let i=0;i<70;i++){
+    const a = Math.random()*Math.PI*2;
+    const r = Math.random()*radius;
+    particles.push({
+      x: boss.x + Math.cos(a)*r,
+      y: boss.y + Math.sin(a)*r,
+      vx: Math.cos(a)*2 + (Math.random()-0.5)*2,
+      vy: Math.sin(a)*2 + (Math.random()-0.5)*2,
+      life: 35
+    });
+  }
+
+  const dist = Math.hypot(player.x - boss.x, player.y - boss.y);
+  if(dist < radius){
+    const dx = player.x - boss.x;
+    const dy = player.y - boss.y;
+    const len = Math.hypot(dx, dy) || 1;
+    damagePlayer(boss.damage*1.6, (dx/len)*42, (dy/len)*42);
+  }
+
+  shake = Math.max(shake, 22);
+}
 /* ===== 업데이트 ===== */
 function update(){
-
+  frameCount++;
   if(gameOver) return;
 
   updatePlayerState();
@@ -496,7 +806,6 @@ function update(){
   updateEffectSystem();
   updateEnvironmentSystem();
   updateSpawnSystem();
-
 }
   function updatePlayerState(){
 
@@ -570,6 +879,23 @@ function updateEnemySystem(){
     updateSingleEnemy(e);
   });
 }
+    function updateLevelParticles(){
+  for(let i = levelParticles.length - 1; i >= 0; i--){
+    const p = levelParticles[i];
+
+    p.ox += p.vx;
+    p.oy -= p.vy;       // 🔥 위로 떠오르게
+    p.vy *= 0.97;       // 점점 느려지게(선택)
+    p.life--;
+
+    if(p.life <= 0) levelParticles.splice(i,1);
+  }
+
+  // 너무 많으면 컷(선택)
+  if(levelParticles.length > 200){
+    levelParticles.splice(0, levelParticles.length - 200);
+  }
+}
   function updateParticles(){
   particles.forEach(p=>{
     p.x += p.vx;
@@ -579,41 +905,127 @@ function updateEnemySystem(){
 
   particles = particles.filter(p=>p.life > 0);
 }
-  function updateMelee(e){
-
+function updateMelee(e){
   const dx = player.x - e.x;
   const dy = player.y - e.y;
   const dist = Math.hypot(dx, dy);
 
+  // 이동(벽 충돌 포함)
   if(dist > 0){
-
     let moveX = dx / dist * e.speed;
     let moveY = dy / dist * e.speed;
 
     let newX = e.x + moveX;
     let newY = e.y + moveY;
 
-    // 🔥 X축 먼저
-    if(canEnemyMoveTo(e, newX, e.y)){
-      e.x = newX;
+    if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
+    if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
+  }
+
+  // 근접 공격 시도
+  enemyTryMeleeAttack(e);
+}
+
+function updateArcher(e){
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+
+  // 일정 거리 유지(너무 가까우면 도망, 멀면 접근)
+  const desired = 240;
+  if(dist < desired - 40){
+    // 도망
+    const len = dist || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+
+    const newX = e.x - nx * e.speed * 1.2;
+    const newY = e.y - ny * e.speed * 1.2;
+
+    if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
+    if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
+  }else if(dist > desired + 80){
+    // 접근
+    updateMelee(e); // 이동+근접 시도 (근접은 거의 안 닿음)
+  }
+
+  // 사격
+  e.shootCooldown--;
+  if(e.shootCooldown <= 0 && dist < 520){
+    spawnArrow(e.x, e.y, player.x, player.y, e.damage);
+    e.shootCooldown = 80 + Math.floor(Math.random()*40); // 1.3~2초
+  }
+}
+
+function updateMage(e){
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+
+  // 너무 붙으면 살짝 뒤로
+  if(dist < 180){
+    const len = dist || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+
+    const newX = e.x - nx * e.speed * 1.4;
+    const newY = e.y - ny * e.speed * 1.4;
+
+    if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
+    if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
+  }else{
+    // 적당히 접근
+    updateMelee(e);
+  }
+
+  // 시전(장판)
+  e.castCooldown--;
+  if(e.castCooldown <= 0 && dist < 520){
+    spawnFireZone(player.x, player.y, e.damage); // 플레이어 위치에 깔기
+    e.castCooldown = 140 + Math.floor(Math.random()*50); // 2.3~3.1초
+  }
+}
+
+function updateBoss(e){
+
+  // 2페이즈 진입 조건: HP 50% 이하
+  if(!e.phase2Used && e.hp <= e.maxHp * 0.5){
+    bossEnterPhase2(e);
+  }
+
+  // 기본 추적 + 근접 공격
+  updateMelee(e);
+
+  // 2페이즈 스킬
+  if(e.swordPulled){
+
+    e.dashCooldown--;
+    e.cleaveCooldown--;
+
+    const dist = Math.hypot(player.x - e.x, player.y - e.y);
+
+    // 돌진: 중거리에서
+    if(e.dashCooldown <= 0 && dist > 160 && dist < 520){
+      bossDash(e);
+      e.dashCooldown = 160 + Math.floor(Math.random()*70);
     }
 
-    // 🔥 Y축 따로
-    if(canEnemyMoveTo(e, e.x, newY)){
-      e.y = newY;
+    // 광역베기: 근거리에서
+    if(e.cleaveCooldown <= 0 && dist < 220){
+      bossCleave(e);
+      e.cleaveCooldown = 200 + Math.floor(Math.random()*80);
     }
   }
 }
-  function updateArcher(e){
-  updateMelee(e);
-}
-  function updateMage(e){
-  updateMelee(e);
-}
-  function updateBoss(e){
-  updateMelee(e);
-}
-  function updateSingleEnemy(e){
+function updateSingleEnemy(e){
+
+  if(e.invul > 0) e.invul--;
+
+  // 🔥 2페이즈 연출: 보스만 정지
+  if(e.phaseLock > 0){
+    e.phaseLock--;
+    return;
+  }
 
   if(e.stun > 0){
     e.stun--;
@@ -621,30 +1033,50 @@ function updateEnemySystem(){
   }
 
   switch(e.type){
-    case "archer":
-      updateArcher(e);
-      break;
-
-    case "mage":
-      updateMage(e);
-      break;
-
-    case "boss":
-      updateBoss(e);
-      break;
-
-    default:
-      updateMelee(e);
+    case "archer": updateArcher(e); break;
+    case "mage": updateMage(e); break;
+    case "boss": updateBoss(e); break;
+    default: updateMelee(e);
   }
 }
-  function updateProjectileSystem(){
+function updateProjectileSystem(){
   updateArrows();
-  //updateFireZones();
+  updateFireZones(); // ✅ 이거 켜기
 }
-  function updateEffectSystem(){
+  function updateFireZones(){
 
+  for(let i = fireZones.length - 1; i >= 0; i--){
+    const f = fireZones[i];
+    f.life--;
+    f.tick++;
+
+    // 10프레임마다 데미지 체크(약 0.16초)
+    if(f.tick % 10 === 0){
+      const dist = Math.hypot(player.x - f.x, player.y - f.y);
+      if(dist < f.radius){
+        // 장판은 넉백 거의 없음
+        damagePlayer(Math.max(1, f.damage*0.6), 0, 0);
+      }
+    }
+
+    if(f.life <= 0){
+      fireZones.splice(i,1);
+    }
+  }
+}
+function updateEffectSystem(){
   updateParticles();
   updateBlood();
+  updateLevelParticles();
+
+  // ✅ 피 웅덩이 수명 감소
+  for(let i=bloodPools.length-1;i>=0;i--){
+    bloodPools[i].life--;
+    if(bloodPools[i].life <= 0) bloodPools.splice(i,1);
+  }
+
+  // (선택) 너무 많으면 컷
+  if(bloodPools.length > 120) bloodPools.splice(0, bloodPools.length-120);
 }
 function updateCombatSystem(){
   if(attacking){
@@ -726,6 +1158,7 @@ function updateShake(){
 }
 function updateSpawnSystem(){
 
+  // ===== 팩 스폰 =====
   spawnTimer++;
 
   if(spawnTimer >= spawnInterval){
@@ -749,24 +1182,62 @@ function updateSpawnSystem(){
       createPack(px, py, 18 + Math.floor(Math.random()*10));
     }
 
-    // 점점 빨라지게
+    // 점점 빨라지게 (최소 40)
     if(spawnInterval > 40){
       spawnInterval -= 1;
     }
   }
+
+  // ===== 보스 주기 =====
+  bossTimer++;
+
+  bossInterval = Math.max(25*60, 45*60 - level*3*60);
+
+  if(bossTimer >= bossInterval){
+    bossTimer = 0;
+
+    if(!enemies.some(e => e.type === "boss")){
+      spawnRandomBoss();
+    }
+  }
 }
 function updateArrows(){
-  
+
   for(let i = arrows.length - 1; i >= 0; i--){
 
     const a = arrows[i];
 
     a.x += a.dx;
     a.y += a.dy;
+    a.life--;
 
-    if(a.x < 0 || a.x > canvas.width ||
-       a.y < 0 || a.y > canvas.height){
+    // 타일 충돌(벽에 닿으면 제거)
+    const tx = Math.floor(a.x / tileSize);
+    const ty = Math.floor(a.y / tileSize);
+    if(!map[ty] || map[ty][tx] === 1){
       arrows.splice(i,1);
+      continue;
+    }
+
+    // 플레이어 충돌
+    const px = player.x, py = player.y;
+    const dist = Math.hypot(a.x - px, a.y - py);
+
+    if(dist < player.radius + 4){
+      // 넉백 방향
+      const dx = px - a.x;
+      const dy = py - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      damagePlayer(a.damage, (dx/len)*14, (dy/len)*14);
+
+      arrows.splice(i,1);
+      continue;
+    }
+
+    // 수명 끝
+    if(a.life <= 0){
+      arrows.splice(i,1);
+      continue;
     }
   }
 }
@@ -808,15 +1279,15 @@ function updateArrows(){
     baseDamage *= 1 + level * 0.01;
     ultiDamage *= 1 + level * 0.015;
     player.levelGlow = 60; // 60프레임 = 약 1초
-    for(let i=0;i<60;i++){
-      levelParticles.push({
-        x: player.x + (Math.random()-0.5)*40,
-        y: player.y - 40,
-        vx: (Math.random()-0.5)*2,
-        vy: Math.random()*3 + 2,
-        life: 60
-      });
-    }
+   for(let i=0;i<60;i++){
+  levelParticles.push({
+    ox: (Math.random()-0.5)*40,   // ✅ 플레이어 기준 오프셋
+    oy: -40 + (Math.random()-0.5)*10,
+    vx: (Math.random()-0.5)*2,
+    vy: Math.random()*3 + 2,
+    life: 60
+  });
+}
 
     levelUpSound();
   }
@@ -842,47 +1313,58 @@ function checkHit(){
     if(player.dir === "left" && dx >= 0) return;
 
     // ===== 여기 도달하면 공격 성공 =====
+let len = dist || 1;
+let nx = dx / len;
+let ny = dy / len;
+let dealt = baseDamage;
 
-  let dealt = baseDamage;
+// ✅ 보스 무적 체크 (스턴/넉백 면역)
+const bossInvul = (e.type === "boss" && e.invul > 0);
 
-e.hp -= dealt;
-e.stun = 15;
-
-// 🔥 흡혈 10%
-let heal = dealt * 0.05;
-player.hp += heal;
-if(player.hp > player.maxHp){
-  player.hp = player.maxHp;
+// 데미지(무적이면 안 닳음)
+if(e.invul <= 0){
+  e.hp -= dealt;
 }
+
+// 🔥 흡혈(무적이어도 가능하게 유지하려면 그대로 둠)
+let heal = dealt * 0.05;
+player.hp = Math.min(player.maxHp, player.hp + heal);
 
 // 🔥 평타 적중 시 20% 기 오브 충전
-if(Math.random() < 0.2){
-  if(player.kiOrbs < player.maxOrbs){
-    player.kiOrbs++;
-  }
+if(Math.random() < 0.2 && player.kiOrbs < player.maxOrbs){
+  player.kiOrbs++;
 }
 
-    let len = dist || 1;
-    let nx = dx / len;
-    let ny = dy / len;
+// 스턴/넉백은 보스 무적 중엔 면역
+// ✅ 보스 무적 연출 중에도 피 튀김(데미지는 안 들어감)
+if(bossInvul){
+  // 무적 중: 피만 튀김 + 둔탁 소리
+  spawnHitBlood(e.x, e.y, 14);
+} else {
+  // 평소: 스턴/넉백
+  e.stun = 15;
+  e.x += nx * 18;
+  e.y += ny * 18;
+}
 
-    e.x += nx * 18;
-    e.y += ny * 18;
+// 타격감
+if(bossInvul) thudSound();
+else hitSound();
+shake = 12;
 
-    hitSound();
-    shake = 12;
-
-      particles.push({
-        x:e.x,
-        y:e.y,
-        vx:nx*4 + (Math.random()-0.5)*4,
-        vy:ny*4 + (Math.random()-0.5)*4,
-        life:30
-      });
+particles.push({
+  x:e.x,
+  y:e.y,
+  vx:nx*4 + (Math.random()-0.5)*4,
+  vy:ny*4 + (Math.random()-0.5)*4,
+  life:30
+});;
     
 
 if(e.hp <= 0){
-
+// ✅ 스코어
+score += (e.type === "boss") ? 2000 : (e.isElite ? 250 : 100);
+if(score > bestScore) bestScore = score;
   killCount++;
   checkLevelUp();
 
@@ -1035,7 +1517,7 @@ fireZones.forEach(f=>{
  enemies.forEach(e=>drawEnemy(e));
 levelParticles.forEach(p=>{
   ctx.fillStyle = "gold";
-  ctx.fillRect(p.x, p.y, 4, 4);
+  ctx.fillRect(player.x + p.ox, player.y + p.oy, 4, 4);
 });
   // ===== 화살 그리기 =====
 arrows.forEach(a=>{
@@ -1156,7 +1638,16 @@ function drawSwordShape(c){
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
   if(e.type === "boss"){
-
+// 무적 중 붉은 오라
+if(e.invul > 0){
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  ctx.fillStyle = "red";
+  ctx.beginPath();
+  ctx.arc(e.x, e.y, e.radius + 10, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
   ctx.fillStyle = "#777777";
   ctx.fillRect(e.x-20, e.y-25, 40, 50);
 
@@ -1258,10 +1749,84 @@ function drawUI(){
   drawOrbUI();
   drawHpOrb();
   drawBossHpBar(); // 🔥 여기 추가
+  drawMiniMap();
+drawScoreUI();
 }
 
 /* ===== 체력바 ===== */
+function drawScoreUI(){
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.font = "bold 16px Arial";
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 4;
 
+  ctx.strokeText("SCORE: " + score, 20, 105);
+  ctx.fillText("SCORE: " + score, 20, 105);
+
+  ctx.font = "bold 13px Arial";
+  ctx.strokeText("BEST: " + bestScore, 20, 125);
+  ctx.fillText("BEST: " + bestScore, 20, 125);
+
+  ctx.restore();
+}
+
+function drawMiniMap(){
+  // 미니맵 크기/위치
+  const w = 150;
+  const h = 150;
+  const x0 = canvas.width - w - 20;
+  const y0 = canvas.height - h - 20;
+
+  ctx.save();
+
+  // 배경
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(x0, y0, w, h);
+
+  // 스케일(맵 전체를 미니맵에)
+  const mapW = mapSize * tileSize;
+  const mapH = mapSize * tileSize;
+  const sx = w / mapW;
+  const sy = h / mapH;
+
+  // 벽(외곽만 있어도 테두리 느낌)
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = "#555";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x0+1, y0+1, w-2, h-2);
+
+  // 플레이어
+  ctx.fillStyle = "#ff4444";
+  ctx.fillRect(
+    x0 + player.x * sx - 2,
+    y0 + player.y * sy - 2,
+    4, 4
+  );
+
+  // 적들(너무 많으면 일부만)
+  let drawCount = 0;
+  for(let i=0;i<enemies.length;i++){
+    if(drawCount > 200) break;
+
+    const e = enemies[i];
+    if(e.type === "boss"){
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x0 + e.x*sx - 3, y0 + e.y*sy - 3, 6, 6);
+    }else if(e.isElite){
+      ctx.fillStyle = "#00aaff";
+      ctx.fillRect(x0 + e.x*sx - 2, y0 + e.y*sy - 2, 4, 4);
+    }else{
+      ctx.fillStyle = "#00ff55";
+      ctx.fillRect(x0 + e.x*sx - 1, y0 + e.y*sy - 1, 2, 2);
+    }
+    drawCount++;
+  }
+
+  ctx.restore();
+}
 
 /* ===== 레벨 + 킬 텍스트 ===== */
 function drawTextUI(){
@@ -1450,6 +2015,21 @@ function drawBossHpBar(){
 
   ctx.restore();
 }
+  function drawGameOver(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="rgba(0,0,0,0.6)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle="white";
+  ctx.font="bold 40px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+
+  ctx.font="bold 18px Arial";
+  ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 40);
+}
+canvas.addEventListener("touchstart", ()=>{ if(gameOver) resetGame(); });
+canvas.addEventListener("mousedown", ()=>{ if(gameOver) resetGame(); });
 function loop(){
   if(!gameOver){
     update();
@@ -1464,13 +2044,11 @@ function loop(){
 function spawnRandomBoss(){
   if(enemies.some(e => e.type === "boss")) return;
 
-  let bx = player.x + 500;
+  let bx = player.x + 300;
   let by = player.y;
 
-  let found = false;
-
-  for(let i = 0; i < 100; i++){
-
+  // 맵 랜덤 바닥 타일에서, 플레이어랑 300 이상 떨어진 곳
+  for(let i=0;i<120;i++){
     let tileX = Math.floor(Math.random() * mapSize);
     let tileY = Math.floor(Math.random() * mapSize);
 
@@ -1479,20 +2057,10 @@ function spawnRandomBoss(){
     let tx = tileX * tileSize + tileSize/2;
     let ty = tileY * tileSize + tileSize/2;
 
-    let dist = Math.hypot(tx - player.x, ty - player.y);
-
-    if(dist > 300){
-      bx = tx;
-      by = ty;
-      found = true;
+    if(Math.hypot(tx - player.x, ty - player.y) > 300){
+      bx = tx; by = ty;
       break;
     }
-  }
-
-  if(!found){
-    // fallback — 플레이어 오른쪽 고정
-    bx = player.x + 300;
-    by = player.y;
   }
 
   let scale = 1 + level * 0.15;
@@ -1509,7 +2077,12 @@ function spawnRandomBoss(){
     stun: 0,
     attackFrame: 0,
     swordPulled: false,
-    phase2Used: false
+    phase2Used: false,
+
+    dashCooldown: 120,
+    cleaveCooldown: 160,
+    invul: 0,
+    phaseLock: 0
   });
 }
 function resetGame(){
@@ -1536,7 +2109,9 @@ function resetGame(){
   killsForNextLevel = 20;
   baseDamage = 20;
   ultiDamage = 40;
-
+ score = 0;
+ bossTimer = 0;
+ bossInterval = 45 * 60;
   enemies = [];
   packs = [];
   particles = [];
@@ -1554,27 +2129,50 @@ function resetGame(){
   gameOver = false;
   document.getElementById("ui").style.display = "flex";
 
-  // 🔥 팩 생성
-  for(let i=0;i<20;i++){
+  // 🔥 팩 생성: 시작 주변 2개 보장 + 랜덤 12개
+// 1) 주변 보장
+for(let i=0;i<2;i++){
+  let angle = Math.random()*Math.PI*2;
+  let dist = 260 + Math.random()*180;
+  let px = player.x + Math.cos(angle)*dist;
+  let py = player.y + Math.sin(angle)*dist;
 
-    let tileX, tileY;
+  // 타일 보정
+  let tx = clamp(Math.floor(px/tileSize), 1, mapSize-2);
+  let ty = clamp(Math.floor(py/tileSize), 1, mapSize-2);
 
-    while(true){
-      tileX = Math.floor(Math.random()*mapSize);
-      tileY = Math.floor(Math.random()*mapSize);
-      if(map[tileY][tileX] === 0) break;
+  if(map[ty][tx] !== 0){
+    // 근처 바닥 찾기
+    for(let k=0;k<50;k++){
+      let rx = clamp(tx + (Math.floor(Math.random()*7)-3), 1, mapSize-2);
+      let ry = clamp(ty + (Math.floor(Math.random()*7)-3), 1, mapSize-2);
+      if(map[ry][rx] === 0){ tx=rx; ty=ry; break; }
     }
-
-    let px = tileX * tileSize + tileSize/2;
-    let py = tileY * tileSize + tileSize/2;
-
-    createPack(px, py, 20 + Math.floor(Math.random()*12));
   }
 
+  createPack(tx*tileSize + tileSize/2, ty*tileSize + tileSize/2, 18 + Math.floor(Math.random()*10));
+}
+
+// 2) 나머지 랜덤
+for(let i=0;i<12;i++){
+
+  let tileX, tileY;
+
+  while(true){
+    tileX = Math.floor(Math.random()*mapSize);
+    tileY = Math.floor(Math.random()*mapSize);
+    if(map[tileY][tileX] === 0) break;
+  }
+
+  let px = tileX * tileSize + tileSize/2;
+  let py = tileY * tileSize + tileSize/2;
+
+  createPack(px, py, 18 + Math.floor(Math.random()*12));
+}
   // 🔥 보스 한 마리
   spawnRandomBoss();
 
-  bgmOsc = startBGM();
+  //bgmOsc = startBGM();
 }
 
 
