@@ -293,8 +293,7 @@ let fireZones = [];
 let frameCount = 0;
 let explosionActive = false;
 let bossSpawned = false;
-let score = 0;
-let bestScore = 0;
+let bestKill = 0;
 let bossTimer = 0;            // 보스 주기
 let bossInterval = 45 * 60;   // 45초(60fps 기준), 난이도에 따라 줄어듦
 
@@ -1405,8 +1404,9 @@ if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
 
     // 킬 처리
     if(e.hp <= 0){
-      score += (e.type === "boss") ? 2000 : (e.isElite ? 250 : 100);
-      if(score > bestScore) bestScore = score;
+     if(killCount > bestKill){
+  bestKill = killCount;
+}
 
       killCount++;
       checkLevelUp();
@@ -1791,7 +1791,6 @@ function drawUI(){
   drawHpOrb();
   drawBossHpBar(); // 🔥 여기 추가
   drawMiniMap();
-drawScoreUI();
 }
 
 /* ===== 체력바 ===== */
@@ -1884,6 +1883,10 @@ function drawTextUI(){
 
   ctx.strokeText("KILLS: " + killCount, 20, 80);
   ctx.fillText("KILLS: " + killCount, 20, 80);
+
+  ctx.font = "bold 15px Arial";
+  ctx.strokeText("BEST KILL: " + bestKill, 20, 105);
+  ctx.fillText("BEST KILL: " + bestKill, 20, 105);
 
   ctx.restore();
 }
@@ -2150,7 +2153,7 @@ function resetGame(){
   killsForNextLevel = 20;
   baseDamage = 20;
   ultiDamage = 40;
- score = 0;
+ 
  bossTimer = 0;
  bossInterval = 45 * 60;
   enemies = [];
