@@ -499,7 +499,6 @@ player.knockbackY *= 0.85;
 }
     }
   }
-
   return;
 }
 
@@ -716,7 +715,10 @@ player.hp -= 1.5 + killCount*0.02;
 });
 
 fireZones = fireZones.filter(f=>f.life > 0);
+if(player.levelGlow > 0){
+  player.levelGlow--;
 }
+
 
   function levelUpSound(){
 
@@ -1304,6 +1306,7 @@ if(bgmOsc){
   player.ultiActive = false;
   player.ultiCount = 0;
   player.ultiTimer = 0;
+  player.levelGlow = 0;
  wave = 1;
 waveActive = false;
 waveCooldown = 0;
