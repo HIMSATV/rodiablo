@@ -1064,26 +1064,22 @@ drawSwordShape(ctx);
 
   ctx.restore();
 }
- function drawSwordShape(ctx){
+function drawSwordShape(c){
+  c.fillStyle = "#552200";
+  c.fillRect(-2, 6, 4, 8);
 
-  // 손잡이
-  ctx.fillStyle = "#552200";
-  ctx.fillRect(-2, 6, 4, 8);
+  c.fillStyle = "#bbbbbb";
+  c.fillRect(-8, 6, 16, 3);
 
-  // 가드
-  ctx.fillStyle = "#bbbbbb";
-  ctx.fillRect(-8, 6, 16, 3);
+  c.fillStyle = "#dddddd";
+  c.fillRect(-2, -20, 4, 26);
 
-  // 칼날
-  ctx.fillStyle = "#dddddd";
-  ctx.fillRect(-2, -20, 4, 26);
-
-  ctx.beginPath();
-  ctx.moveTo(-2, -20);
-  ctx.lineTo(0, -32);
-  ctx.lineTo(2, -20);
-  ctx.fill();
-} 
+  c.beginPath();
+  c.moveTo(-2, -20);
+  c.lineTo(0, -32);
+  c.lineTo(2, -20);
+  c.fill();
+}
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
 if(e.type === "archer"){
