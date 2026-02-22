@@ -250,18 +250,19 @@ pad.addEventListener("touchend",()=>{
 attackBtn.addEventListener("touchstart",()=>{
 
   // 🔥 궁극기 발동
-  if(player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive){
-if(player.kiOrbs === player.maxOrbs){
-  explosionActive = true;
-}
-    orbFlash = 20;   // 20프레임 빛남
-    player.ultiActive = true;
-    player.ultiCount = 0;
-    player.ultiTimer = 0;
+if(player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive){
 
-    
-    return; // 일반 공격 막기
-  }
+  player.kiOrbs = 0;   // 🔥 즉시 구슬 제거
+  orbFlash = 0;
+
+  explosionActive = true;
+
+  player.ultiActive = true;
+  player.ultiCount = 0;
+  player.ultiTimer = 0;
+
+  return;
+}
 
   // 일반 공격
   attacking = true;
@@ -450,14 +451,36 @@ function createPack(cx, cy, count){
   player.x = target.x;
   player.y = target.y;
 }
-  function dealUltimateDamage(){
+function dealUltimateDamage(){
+
+  let radius = 200;   // 🔥 폭발 범위
 
   enemies.forEach(e=>{
-    if(Math.hypot(e.x-player.x, e.y-player.y) < 80){
-      e.hp -= ultiDamage;
-      e.stun = 20;
+
+    let dist = Math.hypot(e.x-player.x, e.y-player.y);
+
+    if(dist < radius){
+
+      e.hp = 0;          // 🔥 즉사
+      e.stun = 30;
+
+      createBlood(e.x, e.y);
+
+      // 폭발 파티클
+      for(let i=0;i<20;i++){
+        particles.push({
+          x: e.x,
+          y: e.y,
+          vx: (Math.random()-0.5)*10,
+          vy: (Math.random()-0.5)*10,
+          life: 40
+        });
+      }
     }
   });
+
+  shake = 35;     // 강한 화면 흔들림
+}
 
   shake = 20;
 }
