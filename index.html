@@ -183,7 +183,7 @@ player.y = mapSize * tileSize / 2;
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
-let spawnInterval = 120; // 처음엔 2초마다
+let spawnInterval = 90; // 처음엔 2초마다
 let enemies=[];
 let packs = [];
 let particles=[];
@@ -281,7 +281,7 @@ function circleCollide(a,b){
 
 function spawnEnemy(){
 
-  if(enemies.length >= 120) return;
+  if(enemies.length >= 300) return;
 
   let tileX, tileY;
 
@@ -521,9 +521,13 @@ function updateLevelGlow(){
   dealUltimateDamage();
   player.ultiCount++;
 }
-  function endUltimate(){
+function endUltimate(){
+
   enemies = enemies.filter(e=>e.hp>0);
+
   player.ultiActive = false;
+  player.kiOrbs = 0;   // 🔥 기 초기화
+  explosionActive = false;
 }
 function updateEnemySystem(){
 
@@ -720,11 +724,11 @@ function updateSpawnSystem(){
       px < mapSize * tileSize - margin &&
       py < mapSize * tileSize - margin
     ){
-      createPack(px, py, 8 + Math.floor(Math.random()*5));
+      createPack(px, py, 18 + Math.floor(Math.random()*10));
     }
 
     // 점점 빨라지게
-    if(spawnInterval > 60){
+    if(spawnInterval > 40){
       spawnInterval -= 1;
     }
   }
@@ -1493,7 +1497,7 @@ for(let i=0;i<20;i++){
   let px = tileX * tileSize + tileSize/2;
   let py = tileY * tileSize + tileSize/2;
 
-  createPack(px, py, 10 + Math.floor(Math.random()*6));
+  createPack(px, py, 20 + Math.floor(Math.random()*12));
 }
 }
   function drawGameOver(){
