@@ -59,6 +59,7 @@ resize();
 window.addEventListener("resize",resize);
 
 /* ===== 사운드 ===== */
+  const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
   let audioUnlocked = false;
 
 function unlockAudio(){
@@ -73,7 +74,7 @@ function unlockAudio(){
 window.addEventListener("touchstart", unlockAudio, { once:true });
 window.addEventListener("mousedown", unlockAudio, { once:true });
 window.addEventListener("keydown", unlockAudio, { once:true });
-const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  
 function startBGM(){
 
   let isPlaying = true;
@@ -412,9 +413,12 @@ function damagePlayer(dmg, knockX, knockY){
   player.invul = 25;         // 약 0.4초 무적(60fps 기준)
   shake = Math.max(shake, 10);
 
-  // 넉백(즉시 반영)
-  player.x += knockX;
-  player.y += knockY;
+   // 넉백(벽 체크)
+  let nx = player.x + knockX;
+  let ny = player.y + knockY;
+
+  if(canMoveTo(nx, player.y)) player.x = nx;
+  if(canMoveTo(player.x, ny)) player.y = ny;
 
   if(player.hp <= 0){
     handleGameOver();
