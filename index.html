@@ -451,6 +451,7 @@ function update(){
   updateProjectileSystem();
   updateEffectSystem();
   updateEnvironmentSystem();
+  updateSpawnSystem();
 
 }
   function updatePlayerState(){
@@ -537,8 +538,22 @@ function updateEnemySystem(){
   const dist = Math.hypot(dx, dy);
 
   if(dist > 0){
-    e.x += dx / dist * e.speed;
-    e.y += dy / dist * e.speed;
+
+    let moveX = dx / dist * e.speed;
+    let moveY = dy / dist * e.speed;
+
+    let newX = e.x + moveX;
+    let newY = e.y + moveY;
+
+    // 🔥 X축 먼저
+    if(canEnemyMoveTo(e, newX, e.y)){
+      e.x = newX;
+    }
+
+    // 🔥 Y축 따로
+    if(canEnemyMoveTo(e, e.x, newY)){
+      e.y = newY;
+    }
   }
 }
   function updateArcher(e){
@@ -594,7 +609,7 @@ function updateCombatSystem(){
   }
 }
 
-  function updateMovement(){
+function updateMovement(){
 
   let dx = 0;
   let dy = 0;
@@ -603,12 +618,50 @@ function updateCombatSystem(){
   if(keys["ArrowRight"] || keys["d"]) dx += player.speed;
   if(keys["ArrowUp"] || keys["w"]) dy -= player.speed;
   if(keys["ArrowDown"] || keys["s"]) dy += player.speed;
-    
+
   dx += joyDX * player.speed;
   dy += joyDY * player.speed;
-    
-  player.x += dx;
-  player.y += dy;
+
+  let newX = player.x + dx;
+  let newY = player.y + dy;
+
+  // 🔥 X축 먼저
+  if(canMoveTo(newX, player.y)){
+    player.x = newX;
+  }
+
+  // 🔥 Y축 따로
+  if(canMoveTo(player.x, newY)){
+    player.y = newY;
+  }
+}
+  function canMoveTo(x,y){
+
+  let left = Math.floor((x - player.radius) / tileSize);
+  let right = Math.floor((x + player.radius) / tileSize);
+  let top = Math.floor((y - player.radius) / tileSize);
+  let bottom = Math.floor((y + player.radius) / tileSize);
+
+  return (
+    map[top] && map[top][left] === 0 &&
+    map[top] && map[top][right] === 0 &&
+    map[bottom] && map[bottom][left] === 0 &&
+    map[bottom] && map[bottom][right] === 0
+  );
+}
+  function canEnemyMoveTo(enemy, x, y){
+
+  let left = Math.floor((x - enemy.radius) / tileSize);
+  let right = Math.floor((x + enemy.radius) / tileSize);
+  let top = Math.floor((y - enemy.radius) / tileSize);
+  let bottom = Math.floor((y + enemy.radius) / tileSize);
+
+  return (
+    map[top] && map[top][left] === 0 &&
+    map[top] && map[top][right] === 0 &&
+    map[bottom] && map[bottom][left] === 0 &&
+    map[bottom] && map[bottom][right] === 0
+  );
 }
   function updateInvulnerability(){
   if(player.invul > 0){
@@ -623,7 +676,35 @@ function updateShake(){
     shake--;
   }
 }
+function updateSpawnSystem(){
 
+  spawnTimer++;
+
+  if(spawnTimer >= spawnInterval){
+
+    spawnTimer = 0;
+
+    // 플레이어에서 떨어진 위치에 새 팩 생성
+    let angle = Math.random() * Math.PI * 2;
+    let distance = 700;
+
+    let px = player.x + Math.cos(angle) * distance;
+    let py = player.y + Math.sin(angle) * distance;
+
+    // 맵 범위 체크
+    if(px > 0 && py > 0 &&
+       px < mapSize*tileSize &&
+       py < mapSize*tileSize){
+
+      createPack(px, py, 8 + Math.floor(Math.random()*5));
+    }
+
+    // 점점 빨라지게
+    if(spawnInterval > 60){
+      spawnInterval -= 1;
+    }
+  }
+}
 function updateArrows(){
   
   for(let i = arrows.length - 1; i >= 0; i--){
