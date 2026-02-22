@@ -293,7 +293,6 @@ let fireZones = [];
 let frameCount = 0;
 let explosionActive = false;
 let bossSpawned = false;
-let bestKill = 0;
 let bossTimer = 0;            // 보스 주기
 let bossInterval = 45 * 60;   // 45초(60fps 기준), 난이도에 따라 줄어듦
 
@@ -1403,10 +1402,6 @@ if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
     }
 
     // 킬 처리
-    if(e.hp <= 0){
-     if(killCount > bestKill){
-  bestKill = killCount;
-}
 
       killCount++;
       checkLevelUp();
@@ -1884,10 +1879,6 @@ function drawTextUI(){
   ctx.strokeText("KILLS: " + killCount, 20, 80);
   ctx.fillText("KILLS: " + killCount, 20, 80);
 
-  ctx.font = "bold 15px Arial";
-  ctx.strokeText("BEST KILL: " + bestKill, 20, 105);
-  ctx.fillText("BEST KILL: " + bestKill, 20, 105);
-
   ctx.restore();
 }
 
@@ -2078,11 +2069,10 @@ function loop(){
   if(!gameOver){
     update();
     draw();
-    requestAnimationFrame(loop);
   } else {
     drawGameOver();
-  
   }
+  requestAnimationFrame(loop); // ✅ 게임오버여도 계속 루프 유지
 }
   // 🔥 맵 랜덤 위치에 보스 소환
 function spawnRandomBoss(){
