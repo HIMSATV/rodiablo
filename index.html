@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Oni Samurai</title>
+<style>
+body{
+  margin:0;
+  background:black;
+  overflow:hidden;
+  touch-action:none;
+}
+canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
+#ui{
+ position:fixed;bottom:0;width:100%;height:120px;
+ background:#111;border-top:3px solid #550000;
+ display:flex;align-items:center;justify-content:space-between;
+ padding:0 25px;box-sizing:border-box;
+}
+#movePad{position:relative;width:90px;height:90px;border-radius:50%;background:#222;}
+#stick{position:absolute;width:40px;height:40px;border-radius:50%;background:#666;left:25px;top:25px;}
+#attackBtn{
+ width:90px;height:90px;border-radius:50%;
+ background:#990000;border:3px solid #ff4444;
+ display:flex;align-items:center;justify-content:center;
+ font-size:26px;color:white;
+}
+#attackBtn.active{background:red;transform:scale(.85);}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+ <div id="movePad"><div id="stick"></div></div>
+ <div id="attackBtn">
+  <canvas id="attackIcon" width="60" height="60"></canvas>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const uiHeight=120;
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight-uiHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+/* ===== 사운드 ===== */
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+function startBGM(){
+
+  let isPlaying = true;
+
+  function getTempo(){
+    if(killCount >= 100) return 150;
+    if(killCount >= 50) return 130;
+    return 110;
+  }
+
+  function playBeat(){
+
+    if(!isPlaying) return;
+
+    let tempo = getTempo();
+    let beatTime = 60 / tempo;
+    let now = audioCtx.currentTime;
+
+    // 킥
+    let kick = audioCtx.createOscillator();
+    let kickGain = audioCtx.createGain();
+
+    kick.type = "triangle";
+    kick.frequency.setValueAtTime(90, now);
+    kick.frequency.exponentialRampToValueAtTime(50, now + 0.12);
+
+    kickGain.gain.setValueAtTime(0.18, now);
+    kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+    kick.connect(kickGain);
+    kickGain.connect(audioCtx.destination);
+
+    kick.start(now);
+    kick.stop(now + 0.15);
+
+    // 하이톤
+    let tone = audioCtx.createOscillator();
+    let toneGain = audioCtx.createGain();
+
+    tone.type = "square";
+    tone.frequency.value = 220;
+
+    toneGain.gain.setValueAtTime(0.06, now + beatTime/2);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, now + beatTime/2 + 0.1);
+
+    tone.connect(toneGain);
+    toneGain.connect(audioCtx.destination);
+
+    tone.start(now + beatTime/2);
+    tone.stop(now + beatTime/2 + 0.1);
+
+    setTimeout(playBeat, beatTime * 1000);
+  }
+
+  playBeat();
+
+  return {
+    stop: () => isPlaying = false
+  };
+}
+
+let bgmOsc;
+  function swingSound(){
+ let o=audioCtx.createOscillator();
+ let g=audioCtx.createGain();
+ o.type="sawtooth";
+ o.frequency.setValueAtTime(700,audioCtx.currentTime);
+ o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+0.12);
+ g.gain.value=0.15;
+ o.connect(g); g.connect(audioCtx.destination);
+ o.start(); o.stop(audioCtx.currentTime+0.12);
+}
+function hitSound(){
+ let o=audioCtx.createOscillator();
+ let g=audioCtx.createGain();
+ o.type="square";
+ o.frequency.value=100;
+ g.gain.value=0.25;
+ o.connect(g); g.connect(audioCtx.destination);
+ o.start(); o.stop(audioCtx.currentTime+0.08);
+}
+
+/* ===== 플레이어 ===== */
+let player={
+ x:0,y:0,
+ dir:"left",
+ speed:5,
+ radius:14,
+ hp:100,maxHp:100,
+ invul:0,
+ knockbackX:0,
+ knockbackY:0,
+ kiOrbs: 0,
+maxOrbs: 5,
+  levelGlow: 0,
+
+ultiActive:false,
+ultiCount:0,
+ultiTimer:0,
+}; 
+let hpWaveOffset = 0;
+let slowMotion = 0;
+let spawnTimer = 0;
+let spawnInterval = 120; // 처음엔 2초마다
+let enemies=[];
+let particles=[];
+let bloodPools=[];
+let shake=0;
+let killCount = 0;
+let killsForNextLevel = 20;
+let killsAtLevelStart = 0;
+let level = 1;
+let gameOver = false;
+let orbFlash = 0;
+let flashEffect = 0;
+let baseDamage = 20;
+let ultiDamage = 40;
+let levelParticles = [];
+let arrows = [];
+let bloodParticles = [];
+  let wave = 1;
+let enemiesToSpawn = 0;
+let waveActive = false;
+let waveCooldown = 0;
+  let fireZones = [];
+  let frameCount = 0;
+  let explosionActive = false;
+
+/* ===== 입력 ===== */
+let joyDX=0,joyDY=0;
+let attacking=false;
+let attackFrame=0;
+
+const pad=document.getElementById("movePad");
+const stick=document.getElementById("stick");
+const attackBtn=document.getElementById("attackBtn");
+let joyActive=false;
+
+pad.addEventListener("touchstart",()=>joyActive=true);
+pad.addEventListener("touchmove",e=>{
+ if(!joyActive)return;
+ let r=pad.getBoundingClientRect();
+ let x=e.touches[0].clientX-r.left-45;
+ let y=e.touches[0].clientY-r.top-45;
+ let d=Math.hypot(x,y);
+ let max=30;
+ if(d>max){x*=max/d;y*=max/d;}
+ stick.style.left=(x+25)+"px";
+ stick.style.top=(y+25)+"px";
+ joyDX=x/max; joyDY=y/max;
+
+ if(Math.abs(x)>Math.abs(y))
+  player.dir=x>0?"right":"left";
+ else
+  player.dir=y>0?"down":"up";
+});
+pad.addEventListener("touchend",()=>{
+ joyActive=false;joyDX=joyDY=0;
+ stick.style.left="25px";stick.style.top="25px";
+});
+
+attackBtn.addEventListener("touchstart",()=>{
+
+  // 🔥 궁극기 발동
+  if(player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive){
+if(player.kiOrbs === player.maxOrbs){
+  explosionActive = true;
+}
+    orbFlash = 20;   // 20프레임 빛남
+    player.ultiActive = true;
+    player.ultiCount = 0;
+    player.ultiTimer = 0;
+
+    
+    return; // 일반 공격 막기
+  }
+
+  // 일반 공격
+  attacking = true;
+  attackFrame = 0;
+  swingSound();
+  attackBtn.classList.add("active");
+});
+
+attackBtn.addEventListener("touchend",()=>{
+ attackBtn.classList.remove("active");
+});
+
+/* ===== 충돌 ===== */
+function circleCollide(a,b){
+ return Math.hypot(a.x-b.x,a.y-b.y) < a.radius + b.radius;
+}
+
+function spawnEnemy(){
+
+  if(enemies.length >= 80) return;
+
+  let angle = Math.random() * Math.PI * 2;
+  let distance = 300;
+
+  let ex = player.x + Math.cos(angle) * distance;
+  let ey = player.y + Math.sin(angle) * distance;
+
+  let rand = Math.random();
+  let type;
+
+  if(rand < 0.2){
+    type = "mage";
+  }
+  else if(rand < 0.5){
+    type = "archer";
+  }
+  else{
+    type = "melee";
+  }
+
+  // 🔥 여기서 scale 미리 계산
+  let scale = Math.min(killCount, 200);
+
+  enemies.push({
+    x: ex,
+    y: ey,
+    radius: 14,
+    stun: 0,
+    attackFrame: 0,
+    swingDir: 1,
+    type: type,
+
+    hp: type==="mage" ? 35 + killCount*0.15 :
+        type==="archer" ? 20 + killCount*0.1 :
+        40 + killCount*0.2,
+
+    speed: type==="mage" ? 0.4 :
+           type==="archer" ? 0.5 : 0.8,
+
+    damage: type==="mage" ? 8 + killCount*0.04 :
+            type==="archer" ? 12 + scale*0.035 :
+            10 * (1 + killCount*0.006),
+
+    shootCooldown: 0,
+    castCooldown: 120
+  });
+}
+/* ===== 업데이트 ===== */
+function update(){
+  // ===== 웨이브 시스템 =====
+// ===== 웨이브 시스템 =====
+frameCount++;
+if(!waveActive && enemies.length === 0){
+
+  waveCooldown++;
+
+  if(waveCooldown > 120){ // 2초 대기
+    waveActive = true;
+    waveCooldown = 0;
+
+    // 🔥 시작 30마리 + 웨이브당 10 증가
+    enemiesToSpawn = 30 + (wave-1) * 10;
+
+    // 🔥 최대 80마리 제한
+    if(enemiesToSpawn > 80){
+      enemiesToSpawn = 80;
+    }
+
+    wave++;
+  }
+}
+
+if(waveActive){
+
+  if(enemiesToSpawn > 0){
+    spawnEnemy();
+    enemiesToSpawn--;
+  }
+
+  if(enemiesToSpawn <= 0 && enemies.length === 0){
+    waveActive = false;
+  }
+}
+  if(orbFlash > 0){
+  orbFlash--;
+
+  if(orbFlash === 0){
+    player.kiOrbs = 0; // 빛난 뒤 사라짐
+  }
+}
+ // 🔥 무한 스폰
+
+  if(player.hp <= 0){
+    if(bgmOsc){
+  bgmOsc.stop();
+}
+  gameOver = true;
+
+  // 🔥 UI 숨기기
+  document.getElementById("ui").style.display = "none";
+
+  return;
+}
+if(player.ultiActive){
+
+  player.ultiTimer++;
+
+  // 10프레임마다 순간이동+공격
+  if(player.ultiTimer % 10 === 0){
+
+    if(enemies.length > 0){
+
+      // 랜덤 적 선택
+      let target = enemies[Math.floor(Math.random() * enemies.length)];
+ // 🔥 이동 전 위치 저장
+let oldX = player.x;
+let oldY = player.y;
+
+// 🔥 이동 전 피 폭발
+createBlood(oldX, oldY);
+
+// 🔥 순간이동
+player.x = target.x;
+player.y = target.y;
+
+// 🔥 이동 후 피 폭발
+createBlood(player.x, player.y);
+      // 2배 데미지
+      let radius = 60;
+let hitSomeone = false;
+
+enemies.forEach(e=>{
+  let dx = e.x - player.x;
+  let dy = e.y - player.y;
+  let dist = Math.hypot(dx,dy);
+
+  if(dist < radius){
+
+    e.hp -= ultiDamage;
+    e.stun = 15;
+    hitSomeone = true;
+
+    // 🔥 여기 추가
+    if(e.hp <= 0){
+      
+killCount++;
+checkLevelUp();
+      // 🔥 궁극기 킬은 20% 확률 충전
+if(Math.random() < 0.2){
+  if(player.kiOrbs < player.maxOrbs){
+    player.kiOrbs++;
+  }
+}
+   player.levelGlow = 60; // 60프레임 = 약 1초   
+      bloodPools.push({
+  x: e.x,
+  y: e.y,
+  size: 10 + Math.random()*6,
+  life: 600  // 10초 (60fps 기준)
+});
+
+      slowMotion = 6;
+    }
+  }
+});
+
+if(hitSomeone){
+  hitSound();
+}
+
+      shake = 15;
+    }
+
+    player.ultiCount++;
+  }
+
+  // 5번 반복 후 종료
+  // 5번 반복 후 종료
+if(player.ultiCount >= 5){
+
+  enemies = enemies.filter(e => e.hp > 0);  // ← 여기 추가
+
+  player.ultiActive = false;
+}
+
+  return; // 궁극기 중엔 일반 행동 중지
+}
+  if(slowMotion > 0){
+  slowMotion--;
+  return;   // 🔥 모든 업데이트 일시정지
+}
+ player.x+=joyDX*player.speed*0.5;
+ player.y+=joyDY*player.speed*0.5;
+// 🔥 넉백 적용
+player.x += player.knockbackX;
+player.y += player.knockbackY;
+
+// 서서히 감속
+player.knockbackX *= 0.85;
+player.knockbackY *= 0.85;
+ if(player.invul>0) player.invul--;
+
+ enemies.forEach(e=>{
+  let dx=player.x-e.x;
+  let dy=player.y-e.y;
+  let dist=Math.hypot(dx,dy);
+
+  if(e.stun>0){ e.stun--; return; }
+
+  if(circleCollide(player,e)){
+   let overlap = player.radius + e.radius - dist;
+   let nx=dx/dist;
+   let ny=dy/dist;
+   e.x-=nx*overlap*0.5;
+   e.y-=ny*overlap*0.5;
+  }
+
+  if(dist<45 && e.attackFrame===0){
+  e.attackFrame = 25;
+
+  let dx = player.x - e.x;
+
+  // 🔥 플레이어가 왼쪽이면 -1, 오른쪽이면 1
+  e.swingDir = dx < 0 ? -1 : 1;
+}
+
+  if(e.attackFrame > 0){
+  e.attackFrame--;
+
+  if(e.attackFrame === 5 && player.invul === 0){
+
+    let dx = player.x - e.x;
+    let dy = player.y - e.y;
+    let dist = Math.hypot(dx, dy);
+
+    if(dist > 0){
+
+      let nx = dx / dist;
+      let ny = dy / dist;
+
+      // 🔥 적의 공격 방향 벡터 (플레이어 쪽)
+      // 공격은 플레이어가 있는 방향이면 항상 허용
+      let dot = nx*dx + ny*dy;
+
+      if(dot > 0){
+
+  player.hp -= (e.damage || 10);
+  player.invul = 30;
+  shake = 10;
+
+  // 🔥 넉백 방향 (적 → 플레이어 반대 방향)
+  let pushPower = 8;
+
+  player.knockbackX = nx * pushPower;
+  player.knockbackY = ny * pushPower;
+}
+    }
+  }
+  return;
+}
+
+  if(e.type === "archer"){
+
+  let preferredDistance = 200;
+
+  if(dist < preferredDistance - 20){
+    e.x -= dx/dist * e.speed;
+    e.y -= dy/dist * e.speed;
+  }
+  else if(dist > preferredDistance + 20){
+    e.x += dx/dist * e.speed;
+    e.y += dy/dist * e.speed;
+  }
+
+}
+else if(e.type === "mage"){
+
+  let preferredDistance = 140;
+
+  if(dist < preferredDistance - 20){
+    e.x -= dx/dist * e.speed;
+    e.y -= dy/dist * e.speed;
+  }
+  else if(dist > preferredDistance + 20){
+    e.x += dx/dist * e.speed;
+    e.y += dy/dist * e.speed;
+  }
+
+  e.castCooldown--;
+
+  if(e.castCooldown <= 0){
+    fireZones.push({
+      x: player.x,
+      y: player.y,
+      radius: 20,
+      life: 120
+    });
+
+    e.castCooldown = 180;
+  }
+
+}
+else{
+
+  if(dist > 1){
+    let sp = e.speed || 0.8;
+    e.x += dx/dist * sp;
+    e.y += dy/dist * sp;
+  }
+
+}
+   // 🔥 아처 화살 발사
+if(e.type === "archer"){
+
+  e.shootCooldown--;
+
+  if(e.shootCooldown <= 0){
+
+    let len = dist || 1;
+    let nx = dx / len;
+    let ny = dy / len;
+
+    arrows.push({
+      x: e.x,
+      y: e.y,
+      vx: nx * 5,
+      vy: ny * 5,
+      life: 120,
+      damage: e.damage
+    });
+
+    e.shootCooldown = 90; // 1.5초 간격
+  }
+}
+ });
+// ===== 몬스터끼리 충돌 처리 =====
+// ===== 화면 삭제 폭발 =====
+if(explosionActive){
+
+  let radius = 220;
+
+  enemies.forEach(e=>{
+
+    let dx = e.x - player.x;
+    let dy = e.y - player.y;
+
+    // 🔥 멀면 계산 안 함 (최적화 핵심)
+    if(Math.abs(dx) > radius || Math.abs(dy) > radius) return;
+
+    let dist = Math.hypot(dx,dy);
+
+    if(dist < radius){
+
+  e.hp = 0;
+  killCount++;
+  checkLevelUp();
+
+  player.hp += 5;
+  if(player.hp > player.maxHp){
+    player.hp = player.maxHp;
+  }
+
+  // 🔥 20% 확률 충전
+if(Math.random() < 0.2){
+  if(player.kiOrbs < player.maxOrbs){
+    player.kiOrbs++;
+  }
+}
+
+  bloodPools.push({
+    x: e.x,
+    y: e.y,
+    size: 10 + Math.random()*6,
+    life: 600
+  });
+}
+
+  });
+
+  enemies = enemies.filter(e=>e.hp>0);
+
+  explosionActive = false;
+  shake = 35;
+}
+  for(let i=0;i<enemies.length;i++){
+  for(let j=i+1;j<enemies.length;j++){
+
+    let a = enemies[i];
+    let b = enemies[j];
+
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    let dist = Math.hypot(dx,dy);
+
+    let minDist = a.radius + b.radius;
+
+    if(dist < minDist && dist > 0){
+
+      let overlap = minDist - dist;
+      let nx = dx / dist;
+      let ny = dy / dist;
+
+      // 서로 반씩 밀어냄
+      a.x -= nx * overlap * 0.5;
+      a.y -= ny * overlap * 0.5;
+
+      b.x += nx * overlap * 0.5;
+      b.y += ny * overlap * 0.5;
+    }
+  }
+}
+ if(attacking){
+  attackFrame++;
+  if(attackFrame===3)checkHit();
+  if(attackFrame>8)attacking=false;
+ }
+
+ particles.forEach(p=>{
+  p.x+=p.vx;
+  p.y+=p.vy;
+  p.life--;
+ });
+ particles=particles.filter(p=>p.life>0);
+ updateBlood();
+  // 🩸 피 웅덩이 감소
+bloodPools.forEach(b=>{
+  b.life--;
+});
+
+bloodPools = bloodPools.filter(b=>b.life > 0);
+  levelParticles.forEach(p=>{
+  p.x += p.vx;
+  p.y += p.vy;
+  p.life--;
+});
+
+levelParticles = levelParticles.filter(p=>p.life > 0);
+ if(shake>0)shake--;
+
+  // ===== 화살 업데이트 =====
+  arrows.forEach(a=>{
+
+    a.x += a.vx;
+    a.y += a.vy;
+    a.life--;
+
+    // 플레이어 충돌
+    let dx = player.x - a.x;
+    let dy = player.y - a.y;
+    let dist = Math.hypot(dx,dy);
+
+    if(dist < player.radius && player.invul === 0){
+      player.hp -= a.damage;
+      player.invul = 20;
+      shake = 8;
+      a.life = 0;
+    }
+
+  });
+
+arrows = arrows.filter(a=>a.life > 0);
+  // ===== 화염 장판 =====
+fireZones.forEach(f=>{
+  f.life--;
+
+  let dx = player.x - f.x;
+  let dy = player.y - f.y;
+  let dist = Math.hypot(dx,dy);
+
+ if(dist < f.radius && player.invul === 0){
+  if(frameCount % 12 === 0){
+player.hp -= 1.5 + killCount*0.02;
+  }
+}
+});
+
+fireZones = fireZones.filter(f=>f.life > 0);
+if(player.levelGlow > 0){
+  player.levelGlow--;
+}
+    }
+
+  function levelUpSound(){
+
+  let o = audioCtx.createOscillator();
+  let g = audioCtx.createGain();
+
+  o.type = "triangle";
+  o.frequency.setValueAtTime(400, audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.3);
+
+  g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+  o.connect(g);
+  g.connect(audioCtx.destination);
+
+  o.start();
+  o.stop(audioCtx.currentTime + 0.3);
+}
+  function checkLevelUp(){
+
+  if(killCount - killsAtLevelStart >= killsForNextLevel){
+
+    level++;
+
+    killsAtLevelStart = killCount;
+
+    // 🔥 다음 레벨은 더 많이 필요
+    killsForNextLevel += 5;
+
+    // 능력 상승
+    player.maxHp += 10;
+    player.hp = player.maxHp;
+
+    baseDamage += 5;
+    ultiDamage += 5;
+player.levelGlow = 60; // 60프레임 = 약 1초
+    for(let i=0;i<60;i++){
+      levelParticles.push({
+        x: player.x + (Math.random()-0.5)*40,
+        y: player.y - 40,
+        vx: (Math.random()-0.5)*2,
+        vy: Math.random()*3 + 2,
+        life: 60
+      });
+    }
+
+    levelUpSound();
+  }
+}
+/* ===== 공격 ===== */
+function checkHit(){
+  
+  let range = 45;
+
+  enemies.forEach(e => {
+
+    let dx = e.x - player.x;
+    let dy = e.y - player.y;
+    let dist = Math.hypot(dx, dy);
+
+    // 🔥 기존 거리 체크 유지
+    if(dist > range + e.radius) return;
+
+    // 🔥 방향 제한 추가
+    if(player.dir === "up" && dy >= 0) return;
+    if(player.dir === "down" && dy <= 0) return;
+    if(player.dir === "right" && dx <= 0) return;
+    if(player.dir === "left" && dx >= 0) return;
+
+    // ===== 여기 도달하면 공격 성공 =====
+
+    e.hp -= baseDamage;
+    e.stun = 15;
+
+    let len = dist || 1;
+    let nx = dx / len;
+    let ny = dy / len;
+
+    e.x += nx * 18;
+    e.y += ny * 18;
+
+    hitSound();
+    shake = 12;
+
+    for(let i=0;i<20;i++){
+      particles.push({
+        x:e.x,
+        y:e.y,
+        vx:nx*4 + (Math.random()-0.5)*4,
+        vy:ny*4 + (Math.random()-0.5)*4,
+        life:30
+      });
+    }
+
+if(e.hp <= 0){
+
+  killCount++;
+  checkLevelUp();
+
+  // 🔥 킬당 체력 5 회복
+  player.hp += 5;
+  if(player.hp > player.maxHp){
+    player.hp = player.maxHp;
+  }
+
+  bloodPools.push({
+  x: e.x,
+  y: e.y,
+  size: 10 + Math.random()*6,
+  life: 600  // 10초 (60fps 기준)
+});
+
+  slowMotion = 6;
+
+  // 🟢 기 구슬 증가
+if(player.kiOrbs < player.maxOrbs){
+  player.kiOrbs++;
+}
+}
+  });
+
+  enemies = enemies.filter(e => e.hp > 0);
+}
+function createBlood(x, y){
+  for(let i = 0; i < 30; i++){
+    bloodParticles.push({
+      x: x,
+      y: y,
+      vx: (Math.random()-0.5) * 10,
+      vy: (Math.random()-0.5) * 10,
+      size: Math.random()*4 + 2,
+      life: 30
+    });
+  }
+}
+
+function updateBlood(){
+  bloodParticles.forEach(p=>{
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.25; // 중력
+    p.life--;
+  });
+
+  bloodParticles = bloodParticles.filter(p=>p.life > 0);
+if(bloodParticles.length > 300){
+  bloodParticles.splice(0, 50);
+}
+}
+
+function drawBlood(){
+
+  ctx.save();
+
+  bloodParticles.forEach(p=>{
+    ctx.save();   // 🔥 이 줄 추가
+
+    ctx.globalAlpha = p.life / 30;
+    ctx.fillStyle = "#8b0000";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();   // 🔥 이 줄 추가
+  });
+
+  ctx.restore();
+}
+/* ===== 렌더 ===== */
+function draw(){
+ctx.setTransform(1,0,0,1,0,0);
+ctx.globalAlpha = 1;
+ctx.shadowBlur = 0;
+ctx.shadowColor = "transparent";
+ctx.filter = "none";
+ ctx.fillStyle="#111";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ let camX=player.x-canvas.width/2;
+ let camY=player.y-canvas.height/2;
+ let sx=shake?(Math.random()-0.5)*12:0;
+ let sy=shake?(Math.random()-0.5)*12:0;
+
+ ctx.save();
+ ctx.translate(-camX+sx,-camY+sy);
+
+ let size=40;
+ for(let x=-1000;x<1000;x+=size){
+  for(let y=-1000;y<1000;y+=size){
+   ctx.fillStyle=((x+y)/size)%2==0?"#1a1a1a":"#222";
+   ctx.fillRect(x,y,size,size);
+  }
+ }
+
+ bloodPools.forEach(b=>{
+  ctx.save();
+  ctx.globalAlpha = b.life / 600;
+  ctx.fillStyle="#550000";
+  ctx.beginPath();
+  ctx.arc(b.x,b.y,b.size,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+});
+fireZones.forEach(f=>{
+
+  ctx.save();
+
+  // 🔥 위로 올라가는 불꽃만 남김
+  for(let i=0;i<6;i++){
+
+    let flameHeight = 10 + Math.sin(frameCount*0.2 + i)*6;
+
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = "orange";
+
+    ctx.beginPath();
+    ctx.moveTo(f.x - 6 + i*2, f.y);
+    ctx.lineTo(f.x - 3 + i*2, f.y - flameHeight);
+    ctx.lineTo(f.x + i*2, f.y);
+    ctx.fill();
+  }
+  ctx.restore();
+});
+ particles.forEach(p=>{
+  ctx.fillStyle="red";
+  ctx.fillRect(p.x,p.y,3,3);
+ });
+  drawBlood();
+
+ enemies.forEach(e=>drawEnemy(e));
+levelParticles.forEach(p=>{
+  ctx.fillStyle = "gold";
+  ctx.fillRect(p.x, p.y, 4, 4);
+});
+  // ===== 화살 그리기 =====
+arrows.forEach(a=>{
+  ctx.fillStyle = "white";
+  ctx.fillRect(a.x-2, a.y-2, 4, 4);
+});
+ ctx.restore();
+  // === UI는 카메라 영향 안 받게 ===
+ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+drawPlayer(canvas.width/2,canvas.height/2);
+drawUI();
+  ctx.globalAlpha = 1;
+ctx.shadowBlur = 0;
+ctx.shadowColor = "transparent";
+}
+
+/* ===== 플레이어 ===== */
+function drawPlayer(x,y){
+if(player.levelGlow > 0){
+  ctx.shadowColor = "gold";
+  ctx.shadowBlur = player.levelGlow * 0.5;
+}
+ ctx.fillStyle="#880000";
+ ctx.fillRect(x-10,y-12,20,22);
+
+ ctx.fillStyle="#aa0000";
+ ctx.fillRect(x-7,y-20,14,8);
+
+ ctx.fillStyle="#ffffcc";
+ ctx.fillRect(x-8,y-26,4,8);
+ ctx.fillRect(x+4,y-26,4,8);
+
+// 기본 흰 눈
+ctx.fillStyle = "#fff";
+ctx.fillRect(x-3,y-14,2,2);
+ctx.fillRect(x+1,y-14,2,2);
+
+ctx.shadowBlur = 0;
+// 🔥 궁극기 발광 오버레이
+if(player.ultiActive){
+
+  ctx.save();
+
+  ctx.shadowColor = "#ff6600";
+  ctx.shadowBlur = 25;
+
+  ctx.fillStyle = "#ffaa00";
+
+  ctx.fillRect(x-3,y-14,2,2);
+  ctx.fillRect(x+1,y-14,2,2);
+
+  ctx.restore();
+}
+
+ drawSword(x,y);
+}
+
+/* ===== 🔥 최종 고정 칼 모션 ===== */
+function drawSword(x, y) {
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  var offsetX = 0;
+  var offsetY = 0;
+  var angle = 0;
+  var t = attackFrame / 8;
+
+  // ▶ RIGHT (베기)
+  if (player.dir === "right") {
+    offsetX = 18;
+    if (attacking) angle = 1.5 * t;
+  }
+
+  // ◀ LEFT (베기)
+  else if (player.dir === "left") {
+    offsetX = -18;
+    if (attacking) angle = -1.5 * t;
+  }
+
+  // ▲ UP (찌르기)
+  else if (player.dir === "up") {
+    offsetY = -18;
+    if (attacking) offsetY -= 25 * t;
+  }
+
+  // ▼ DOWN (눈 아래 시작 찌르기)
+  else if (player.dir === "down") {
+    offsetY = 6;          // 🔥 눈 아래 시작
+    angle = Math.PI;
+    if (attacking) offsetY += 25 * t;
+  }
+
+  ctx.translate(offsetX, offsetY);
+  ctx.rotate(angle);
+
+drawSwordShape(ctx);
+
+  ctx.restore();
+}
+ function drawSwordShape(ctx){
+
+  // 손잡이
+  ctx.fillStyle = "#552200";
+  ctx.fillRect(-2, 6, 4, 8);
+
+  // 가드
+  ctx.fillStyle = "#bbbbbb";
+  ctx.fillRect(-8, 6, 16, 3);
+
+  // 칼날
+  ctx.fillStyle = "#dddddd";
+  ctx.fillRect(-2, -20, 4, 26);
+
+  ctx.beginPath();
+  ctx.moveTo(-2, -20);
+  ctx.lineTo(0, -32);
+  ctx.lineTo(2, -20);
+  ctx.fill();
+} 
+/* ===== 몬스터 ===== */
+function drawEnemy(e){
+if(e.type === "archer"){
+  ctx.fillStyle = "#cccccc";
+}
+else if(e.type === "mage"){
+  ctx.fillStyle = "#550088";
+}
+else{
+  ctx.fillStyle = "#006600";
+}
+  // 몸통
+  
+  ctx.fillRect(e.x-10,e.y-12,20,22);
+
+  // 머리
+  if(e.type === "archer"){
+  ctx.fillStyle = "#dddddd";
+}else{
+  ctx.fillStyle = "#00aa00";
+}
+  ctx.fillRect(e.x-7,e.y-20,14,8);
+
+  // 눈
+  ctx.fillStyle="red";
+  ctx.fillRect(e.x-4,e.y-14,3,3);
+  ctx.fillRect(e.x+1,e.y-14,3,3);
+
+  if(e.attackFrame > 0){
+
+    let t = (25 - e.attackFrame) / 25;
+    let swingRange = 1.4;
+
+    // 🔥 좌우 완전 대칭 회전
+    let angle = (t - 0.5) * 2 * swingRange * e.swingDir;
+
+    ctx.save();
+ctx.translate(e.x, e.y-5);
+ctx.rotate(angle);
+
+if(e.type === "archer"){
+  ctx.fillStyle = "#dddddd";
+}else{
+  ctx.fillStyle = "#006600";
+}
+
+ctx.fillRect(-20,-3,40,6);
+
+ctx.restore();
+  }
+}
+
+/* ===== UI ===== */
+
+function drawUI(){
+  drawTextUI();
+  drawOrbUI();
+  drawHpOrb();
+}
+
+/* ===== 체력바 ===== */
+
+
+/* ===== 레벨 + 킬 텍스트 ===== */
+function drawTextUI(){
+
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.font = "bold 18px Arial";
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 4;
+
+  ctx.strokeText("Level: " + level, 20, 55);
+  ctx.fillText("Level: " + level, 20, 55);
+
+  ctx.strokeText("KILLS: " + killCount, 20, 80);
+  ctx.fillText("KILLS: " + killCount, 20, 80);
+
+  ctx.restore();
+}
+
+/* ===== 기 구슬 UI ===== */
+function drawOrbUI(){
+
+  ctx.save();   // 🔥 1️⃣ 여기 추가
+
+  let centerX = canvas.width / 2;
+  let baseY = canvas.height - 70;
+
+  for(let i = 0; i < player.maxOrbs; i++){
+
+    let x = centerX - 60 + i * 30;
+
+    ctx.beginPath();
+    ctx.arc(x, baseY, 10, 0, Math.PI * 2);
+
+    if(orbFlash > 0){
+      ctx.fillStyle = "#00ff88";
+      ctx.shadowColor = "#00ff88";
+      ctx.shadowBlur = 35;
+    }
+    else if(i < player.kiOrbs){
+      ctx.fillStyle = "#00ff55";
+      ctx.shadowColor = "#00ff55";
+      ctx.shadowBlur = 15;
+    }
+    else{
+      ctx.fillStyle = "#002211";
+    }
+
+    ctx.fill();
+  }
+
+  ctx.restore();   // 🔥 2️⃣ 여기 추가
+}
+  function drawHpOrb(){
+ctx.save();
+  let radius = 25;
+  let x = canvas.width - 50;
+  let y = 50;
+
+  hpWaveOffset += 0.07;
+
+  let hpPercent = player.hp / player.maxHp;
+  let liquidHeight = radius * 2 * hpPercent;
+  let topY = y + radius - liquidHeight;
+
+  // ===== 고딕 외곽 메탈 링 =====
+  let metal = ctx.createRadialGradient(x, y, radius-10, x, y, radius+12);
+  metal.addColorStop(0, "#2a0000");
+  metal.addColorStop(0.5, "#550000");
+  metal.addColorStop(1, "#110000");
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius+10, 0, Math.PI*2);
+  ctx.fillStyle = metal;
+  ctx.fill();
+
+  // 어두운 외곽 라인
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#000";
+  ctx.stroke();
+// 붉은 얇은 내부 링
+ctx.beginPath();
+ctx.arc(x, y, radius+6, 0, Math.PI*2);
+ctx.strokeStyle = "#aa0000";
+ctx.lineWidth = 2;
+ctx.stroke();
+  // ===== 내부 클리핑 =====
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI*2);
+  ctx.clip();
+
+  // 내부 어둠 (깊이감)
+  let innerShadow = ctx.createRadialGradient(x, y+15, 10, x, y, radius);
+  innerShadow.addColorStop(0, "#330000");
+  innerShadow.addColorStop(1, "#000000");
+
+  ctx.fillStyle = innerShadow;
+  ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+
+  // ===== 액체 =====
+  ctx.beginPath();
+  ctx.moveTo(x-radius, y+radius);
+
+  for(let i=0;i<=radius*2;i++){
+    let wave = Math.sin(i*0.12 + hpWaveOffset) * 4;
+    ctx.lineTo(x-radius+i, topY + wave);
+  }
+
+  ctx.lineTo(x+radius, y+radius);
+  ctx.closePath();
+
+  let blood = ctx.createLinearGradient(0, topY, 0, y+radius);
+  blood.addColorStop(0, "#ff2a2a");
+  blood.addColorStop(1, "#8b0000");
+
+  ctx.fillStyle = blood;
+  ctx.fill();
+
+  // ===== 유리 반사광 =====
+  ctx.beginPath();
+  ctx.arc(x-15, y-20, 18, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fill();
+// 유리 전체 광택
+let glass = ctx.createRadialGradient(x-10, y-15, 5, x, y, radius);
+glass.addColorStop(0, "rgba(255,255,255,0.25)");
+glass.addColorStop(1, "rgba(255,255,255,0)");
+ctx.fillStyle = glass;
+ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+  // ===== 저체력 깜빡임 =====
+  if(hpPercent < 0.3){
+    if(Math.floor(Date.now()/200)%2===0){
+      ctx.beginPath();
+      ctx.arc(x, y, radius+14, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,0,0,0.25)";
+      ctx.fill();
+    }
+  }
+      // ===== 체력 숫자 =====
+  ctx.fillStyle = "white";
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(Math.floor(player.hp), x, y+6);
+  ctx.restore();
+}
+
+function loop(){
+  if(!gameOver){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  } else {
+    drawGameOver();
+  
+  }
+}
+  function resetGame(){
+if(bgmOsc){
+  bgmOsc.stop();
+  bgmOsc = null;
+}
+  // 플레이어 초기화
+  player.x = 0;
+  player.y = 0;
+  player.hp = player.maxHp;
+  player.invul = 0;
+  player.knockbackX = 0;
+  player.knockbackY = 0;
+  player.kiOrbs = 0;
+  player.ultiActive = false;
+  player.ultiCount = 0;
+  player.ultiTimer = 0;
+  player.levelGlow = 0;
+ wave = 1;
+waveActive = false;
+waveCooldown = 0;
+enemiesToSpawn = 0;
+  killCount = 0;
+level = 1;
+baseDamage = 20;
+ultiDamage = 40;
+
+player.maxHp = 100;
+player.hp = 100;
+  particles = [];
+  bloodPools = [];
+  shake = 0;
+  slowMotion = 0;
+bloodParticles = [];
+arrows = [];
+levelParticles = [];
+enemies = [];
+
+spawnTimer = 0;
+spawnInterval = 120;
+
+bgmOsc = startBGM();
+  gameOver = false;
+    document.getElementById("ui").style.display = "flex";
+// 첫 웨이브 바로 시작
+waveActive = true;
+enemiesToSpawn = 30;
+  }
+ 
+  function drawGameOver(){
+
+  ctx.fillStyle = "black";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle = "red";
+  ctx.font = "bold 60px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("YOU DIE", canvas.width/2, canvas.height/2);
+
+  ctx.font = "20px Arial";
+  ctx.fillStyle = "white";
+  ctx.fillText("Final Kills: " + killCount, canvas.width/2, canvas.height/2 + 50);
+  ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 90);
+}
+  canvas.addEventListener("touchstart", function(){
+
+  if(!bgmOsc){
+    bgmOsc = startBGM();  // 첫 터치에 음악 시작
+  }
+
+  if(gameOver){
+    resetGame();
+    loop();
+  }
+
+});
+
+const iconCanvas = document.getElementById("attackIcon");
+const iconCtx = iconCanvas.getContext("2d");
+
+iconCtx.save();
+iconCtx.translate(30,30);
+iconCtx.rotate(-Math.PI/2);
+drawSwordShape(iconCtx);
+iconCtx.restore();
+  loop();
+</script>
+</body>
+</html>
+ 
