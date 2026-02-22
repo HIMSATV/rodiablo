@@ -286,8 +286,10 @@ enemies.push({
          type==="archer" ? 0.5 : 0.8,
 
   damage: type==="mage" ? 8 + killCount*0.04 :
-          type==="archer" ? 15 + killCount*0.06 :
-          10 * (1 + killCount*0.005),
+          type==="archer" ? let scale = Math.min(killCount, 200);
+
+damage: 12 + scale*0.035 :
+          10 * (1 + killCount*0.006),
 
   shootCooldown: 0,
   castCooldown: 120
