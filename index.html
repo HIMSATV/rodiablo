@@ -593,9 +593,27 @@ if(explosionActive){
     let dist = Math.hypot(dx,dy);
 
     if(dist < radius){
-      e.hp = 0;
-      killCount++;
-    }
+
+  e.hp = 0;
+  killCount++;
+  checkLevelUp();
+
+  player.hp += 5;
+  if(player.hp > player.maxHp){
+    player.hp = player.maxHp;
+  }
+
+  if(player.kiOrbs < player.maxOrbs){
+    player.kiOrbs++;
+  }
+
+  bloodPools.push({
+    x: e.x,
+    y: e.y,
+    size: 10 + Math.random()*6,
+    life: 600
+  });
+}
 
   });
 
