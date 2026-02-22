@@ -279,29 +279,48 @@ function spawnEnemy(){
   // 🔥 여기서 scale 미리 계산
   let scale = Math.min(killCount, 200);
 
-  enemies.push({
-    x: ex,
-    y: ey,
-    radius: 14,
-    stun: 0,
-    attackFrame: 0,
-    swingDir: 1,
-    type: type,
+ let enemy = {
+  x: ex,
+  y: ey,
+  radius: 14,
+  stun: 0,
+  attackFrame: 0,
+  swingDir: 1,
+  type: type,
 
-    hp: type==="mage" ? 35 + killCount*0.15 :
-        type==="archer" ? 20 + killCount*0.1 :
-        40 + killCount*0.2,
+  hp: type==="mage" ? 35 + killCount*0.15 :
+      type==="archer" ? 20 + killCount*0.1 :
+      40 + killCount*0.2,
 
-    speed: type==="mage" ? 0.4 :
-           type==="archer" ? 0.5 : 0.8,
+  speed: type==="mage" ? 0.4 :
+         type==="archer" ? 0.5 : 0.8,
 
-    damage: type==="mage" ? 8 + killCount*0.04 :
-            type==="archer" ? 12 + scale*0.035 :
-            10 * (1 + killCount*0.006),
+  damage: type==="mage" ? 8 + killCount*0.04 :
+          type==="archer" ? 12 + scale*0.035 :
+          10 * (1 + killCount*0.006),
 
-    shootCooldown: 0,
-    castCooldown: 120
-  });
+  shootCooldown: 0,
+  castCooldown: 120
+};
+
+// 🔥 ===== 엘리트 추가 =====
+if(Math.random() < 0.1){
+
+  enemy.isElite = true;
+
+  // 색상 랜덤
+  if(Math.random() < 0.5){
+    enemy.eliteColor = "yellow";
+  }else{
+    enemy.eliteColor = "blue";
+  }
+
+  enemy.speed *= 1.6;      // 더 빠름
+  enemy.damage *= 2;       // 더 아픔
+  enemy.radius *= 1.2;     // 약간 큼
+}
+
+enemies.push(enemy);
 }
 /* ===== 업데이트 ===== */
 function update(){
@@ -1066,7 +1085,16 @@ function drawSwordShape(c){
 }
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
-if(e.type === "archer"){
+if(e.isElite){
+
+  if(e.eliteColor === "yellow"){
+    ctx.fillStyle = "#ffcc00";
+  }else{
+    ctx.fillStyle = "#00aaff";
+  }
+
+}
+else if(e.type === "archer"){
   ctx.fillStyle = "#cccccc";
 }
 else if(e.type === "mage"){
