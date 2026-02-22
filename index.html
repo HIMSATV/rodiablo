@@ -145,6 +145,7 @@ let player={
  knockbackY:0,
  kiOrbs: 0,
 maxOrbs: 5,
+  levelGlow: 0,
 
 ultiActive:false,
 ultiCount:0,
@@ -393,7 +394,7 @@ enemies.forEach(e=>{
       
 killCount++;
 checkLevelUp();
-      
+   player.levelGlow = 60; // 60프레임 = 약 1초   
       bloodPools.push({
   x: e.x,
   y: e.y,
@@ -752,7 +753,7 @@ fireZones = fireZones.filter(f=>f.life > 0);
 
     baseDamage += 5;
     ultiDamage += 5;
-
+player.levelGlow = 60; // 60프레임 = 약 1초
     for(let i=0;i<60;i++){
       levelParticles.push({
         x: player.x + (Math.random()-0.5)*40,
@@ -969,7 +970,10 @@ ctx.shadowColor = "transparent";
 
 /* ===== 플레이어 ===== */
 function drawPlayer(x,y){
-
+if(player.levelGlow > 0){
+  ctx.shadowColor = "gold";
+  ctx.shadowBlur = player.levelGlow * 0.5;
+}
  ctx.fillStyle="#880000";
  ctx.fillRect(x-10,y-12,20,22);
 
@@ -985,6 +989,7 @@ ctx.fillStyle = "#fff";
 ctx.fillRect(x-3,y-14,2,2);
 ctx.fillRect(x+1,y-14,2,2);
 
+ctx.shadowBlur = 0;
 // 🔥 궁극기 발광 오버레이
 if(player.ultiActive){
 
