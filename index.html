@@ -296,8 +296,9 @@ let bossSpawned = false;
 let bossTimer = 0;
 let bossInterval = 45 * 60;
 /* ===== 맵핑(POE 스타일) 전역 ===== */
+/* ===== 맵 티어(POE 스타일) ===== */
 let mapTier = 1;
-
+let mapSeed = 0; // 맵 바뀔 때마다 바뀌는 랜덤 시드 느낌용(선택)
 let mapRun = {
   tier: 1,
   seed: 0,
@@ -425,6 +426,155 @@ attackBtn.addEventListener("touchend", ()=>{
 },{passive:true});
 
 /* ===== 유틸 ===== */
+/* ===== POE 맵핑: 티어 스케일/맵 생성 ===== */
+
+// 티어 기반 스케일(너가 원하는 밸런스로 수치만 조절하면 됨)
+function tierScale(t){
+  // 초반은 완만, 뒤로 갈수록 좀 더 강해지는 곡선
+  const hpMul  = 1 + (t-1) * 0.22;     // 티어당 HP +22%
+  const dmgMul = 1 + (t-1) * 0.16;     // 티어당 데미지 +16%
+  const spdMul = 1 + Math.min(0.25, (t-1) * 0.02); // 속도는 최대 +25%까지만
+  const eliteChance = clamp(0.06 + (t-1) * 0.008, 0.06, 0.22); // 티어 기반 엘리트 확률
+  const eliteHpMul = 2.4;   // 엘리트 체력 배수
+  const eliteDmgMul = 1.9;  // 엘리트 딜 배수
+  return { hpMul, dmgMul, spdMul, eliteChance, eliteHpMul, eliteDmgMul };
+}
+
+function makeEnemyStatsByTier(type, t){
+  const s = tierScale(t);
+
+  // “기본값” (티어 1 기준). 여기만 잡아두면 전체 밸런스가 쉬움.
+  let baseHp, baseDmg, baseSpd;
+
+  if(type === "mage"){
+    baseHp  = 42;
+    baseDmg = 9;
+    baseSpd = 0.48;
+  }else if(type === "archer"){
+    baseHp  = 30;
+    baseDmg = 14;
+    baseSpd = 0.55;
+  }else{ // melee
+    baseHp  = 55;
+    baseDmg = 11;
+    baseSpd = 0.85;
+  }
+
+  return {
+    hp:  baseHp  * s.hpMul,
+    dmg: baseDmg * s.dmgMul,
+    spd: baseSpd * s.spdMul,
+    eliteChance: s.eliteChance,
+    eliteHpMul: s.eliteHpMul,
+    eliteDmgMul: s.eliteDmgMul
+  };
+}
+
+function makeBossStatsByTier(t){
+  const s = tierScale(t);
+
+  // 티어1 기준 보스 스탯
+  const baseHp  = 900;
+  const baseDmg = 26;
+  const baseSpd = 0.62;
+
+  // 보스는 티어 곡선을 조금 더 묵직하게(원하면 조절)
+  const bossHp  = baseHp  * (1 + (t-1)*0.28);
+  const bossDmg = baseDmg * (1 + (t-1)*0.18);
+  const bossSpd = baseSpd * (1 + Math.min(0.18, (t-1)*0.015));
+
+  return { bossHp, bossDmg, bossSpd };
+}
+
+// 랜덤 맵 생성: 바깥 테두리는 벽(1), 내부는 바닥(0) + 랜덤 장애물(1)
+// 통로가 막힐 수 있지만, 네 게임은 “벽 충돌만” 중요하니까 간단 랜덤으로 시작
+function generateRandomMap(t){
+  mapSeed = (Date.now() % 1000000) ^ (t * 1337);
+
+  // 장애물 밀도: 티어가 올라갈수록 약간 증가 (원하면 고정도 가능)
+  const density = clamp(0.06 + (t-1)*0.005, 0.06, 0.16);
+
+  map = [];
+  for(let y=0; y<mapSize; y++){
+    let row = [];
+    for(let x=0; x<mapSize; x++){
+      // 테두리는 무조건 벽
+      if(x===0 || y===0 || x===mapSize-1 || y===mapSize-1){
+        row.push(1);
+        continue;
+      }
+      // 중앙 스폰 구역은 바닥 확보 (플레이어가 벽에 갇히는 걸 방지)
+      const cx = Math.floor(mapSize/2);
+      const cy = Math.floor(mapSize/2);
+      if(Math.abs(x-cx) <= 2 && Math.abs(y-cy) <= 2){
+        row.push(0);
+        continue;
+      }
+      // 랜덤 장애물
+      row.push(Math.random() < density ? 1 : 0);
+    }
+    map.push(row);
+  }
+
+  // 플레이어 중앙 배치
+  player.x = mapSize * tileSize / 2;
+  player.y = mapSize * tileSize / 2;
+}
+
+// “다음 맵” 이동: 티어 증가 + 맵 재생성 + 스폰 리셋 + 보스 소환
+function nextMap(){
+  mapTier++;
+
+  // (선택) 맵 넘어갈 때 플레이어 보상/회복
+  player.hp = player.maxHp;
+
+  // 맵 재생성
+  generateRandomMap(mapTier);
+
+  // 엔티티/이펙트 정리
+  enemies = [];
+  packs = [];
+  arrows = [];
+  fireZones = [];
+  particles = [];
+  bloodParticles = [];
+  bloodPools = [];
+  levelParticles = [];
+
+  // 스폰 타이머 리셋
+  spawnTimer = 0;
+  spawnInterval = 120;
+  bossTimer = 0;
+
+  // 새 맵 시작: 주변 팩 몇 개 + 랜덤 팩들 + 보스 1마리
+  for(let i=0;i<2;i++){
+    let angle = Math.random()*Math.PI*2;
+    let dist = 260 + Math.random()*180;
+    let px = player.x + Math.cos(angle)*dist;
+    let py = player.y + Math.sin(angle)*dist;
+
+    let tx = clamp(Math.floor(px/tileSize), 1, mapSize-2);
+    let ty = clamp(Math.floor(py/tileSize), 1, mapSize-2);
+
+    createPack(tx*tileSize + tileSize/2, ty*tileSize + tileSize/2, 18 + Math.floor(Math.random()*10));
+  }
+
+  for(let i=0;i<10;i++){
+    let tileX, tileY;
+    while(true){
+      tileX = Math.floor(Math.random()*mapSize);
+      tileY = Math.floor(Math.random()*mapSize);
+      if(map[tileY][tileX] === 0) break;
+    }
+    createPack(tileX*tileSize + tileSize/2, tileY*tileSize + tileSize/2, 18 + Math.floor(Math.random()*12));
+  }
+
+  spawnRandomBoss();
+
+  // 연출
+  shake = Math.max(shake, 18);
+  slowMotion = 0;
+}
 function dist2(ax, ay, bx, by){
   const dx = ax - bx;
   const dy = ay - by;
@@ -927,7 +1077,8 @@ function spawnEnemy(){
   else type = "melee";
 
   let scale = Math.min(killCount, 200);
-  const sc = tierScale(mapTier);
+  const st = makeEnemyStatsByTier(type, mapTier);
+
   let enemy = {
     x: ex, y: ey,
     radius: 14,
@@ -937,34 +1088,22 @@ function spawnEnemy(){
     swingDir: 1,
     type,
 
-    hp: type==="mage" ? 35 + killCount*0.15 :
-        type==="archer" ? 20 + killCount*0.1 :
-        40 + killCount*0.2,
-
-    speed: type==="mage" ? 0.4 :
-           type==="archer" ? 0.5 : 0.8,
-
-    damage: type==="mage" ? 5 + killCount*0.04 :
-            type==="archer" ? 12 + scale*0.04 :
-            10 * (1 + killCount*0.0035),
+    hp: st.hp,
+    speed: st.spd,
+    damage: st.dmg,
 
     shootCooldown: 0,
     castCooldown: 120
   };
 
-    enemy.hp *= sc.hpMul;
-  enemy.damage *= sc.dmgMul;
-  enemy.speed *= sc.spdMul;
-
-  // 엘리트 확률도 티어에 따라 소폭 증가
-  let eliteChance = (0.06 + Math.min(0.14, killCount * 0.001)) + sc.eliteBonus;
-  if(Math.random() < eliteChance){
+  // ✅ 엘리트 확률도 티어만 따라가게
+  if(Math.random() < st.eliteChance){
     enemy.isElite = true;
     enemy.eliteColor = Math.random() < 0.5 ? "yellow" : "blue";
-    enemy.speed *= 1.6;
-    enemy.damage *= 2;
+    enemy.speed *= 1.5;
+    enemy.damage *= st.eliteDmgMul;
     enemy.radius *= 1.2;
-    enemy.hp *= 2.5;
+    enemy.hp *= st.eliteHpMul;
   }
 
   enemies.push(enemy);
@@ -981,22 +1120,7 @@ function spawnEnemyAt(ex, ey, pack){
   let rand = Math.random();
   let type = rand < 0.2 ? "mage" : rand < 0.5 ? "archer" : "melee";
 
-  let enemy = {
-    x: ex, y: ey,
-    radius: 14,
-    stun: 0,
-    invul: 0,
-    attackFrame: 0,
-    swingDir: 1,
-    type,
-    hp: 40,
-    speed: type==="melee"?0.8:0.5,
-    damage: 10,
-    shootCooldown: 0,
-    castCooldown: 120,
-    pack
-  };
-
+  
   if(!canSpawnEnemyAt(enemy, ex, ey)) return;
 
   enemies.push(enemy);
@@ -1008,7 +1132,6 @@ function spawnRandomBoss(){
 const sc = tierScale(mapTier);
   let bx = player.x + 300;
   let by = player.y;
-  const scale = 1 + level * 0.15;
   const tempBoss = { radius: 30 };
   let found = false;
 
@@ -1069,29 +1192,27 @@ const sc = tierScale(mapTier);
 
   if(!canEnemyMoveTo(tempBoss, bx, by)) return;
 
-const baseScale = 1 + level * 0.15;
+  const bst = makeBossStatsByTier(mapTier);
 
-enemies.push({
-  x: bx,
-  y: by,
-  radius: 30,
-  type: "boss",
+  enemies.push({
+    x: bx, y: by,
+    radius: 30,
+    type: "boss",
 
-  maxHp: 800 * baseScale * sc.hpMul,
-  hp: 800 * baseScale * sc.hpMul,
+    maxHp: bst.bossHp,
+    hp: bst.bossHp,
+    speed: bst.bossSpd,
+    damage: bst.bossDmg,
 
-  speed: (0.6 + level * 0.02) * sc.spdMul,
-  damage: 25 * baseScale * sc.dmgMul,
-
-  stun: 0,
-  attackFrame: 0,
-  swordPulled: false,
-  phase2Used: false,
-  dashCooldown: 120,
-  cleaveCooldown: 160,
-  invul: 0,
-  phaseLock: 0
-});
+    stun: 0,
+    attackFrame: 0,
+    swordPulled: false,
+    phase2Used: false,
+    dashCooldown: 120,
+    cleaveCooldown: 160,
+    invul: 0,
+    phaseLock: 0
+  });
 }
 
 function createPack(cx, cy, count){
@@ -1473,6 +1594,13 @@ function updateSingleEnemy(e){
   // ✅ 보스 사망 연출 중이면 움직임/공격 안 하고 타이머만 감소
   if(e.type === "boss" && e.dead){
     e.deathTimer--;
+        // ✅ 연출 끝나면 다음 맵으로
+    if(e.deathTimer <= 0){
+      // 보스가 더 이상 enemies에 없어도 되도록
+      // (필터가 제거하기 전에 즉시 맵 전환)
+      nextMap();
+      return;
+    }
         // ✅ 죽음 연출 끝나는 순간 포탈 생성(1회)
     if(e.deathTimer === 0 && !mapRun.bossDefeated){
       mapRun.bossDefeated = true;
@@ -2198,6 +2326,8 @@ function drawMiniMap(){
   ctx.restore();
 }
 function drawTextUI(){
+  ctx.strokeText("TIER: " + mapTier, 20, 30);
+ctx.fillText("TIER: " + mapTier, 20, 30);
     ctx.strokeText("TIER: " + mapTier, 20, 105);
   ctx.fillText("TIER: " + mapTier, 20, 105);
 
@@ -2471,6 +2601,8 @@ function loop(){
 
 /* ===== 리셋 ===== */
 function resetGame(){
+    mapTier = 1;
+  generateRandomMap(mapTier);
   if(audioUnlocked && !bgmOsc){
     bgmOsc = startBGM();
   }
