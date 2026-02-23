@@ -82,17 +82,15 @@ const ui = document.getElementById("ui");
 let uiHeight = 120;
 
 function resize(){
-  uiHeight = ui.getBoundingClientRect().height || 120; // ✅ 전역 갱신
+  uiHeight = ui.getBoundingClientRect().height || 120;
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight - uiHeight;
 }
+
 resize();
-window.addEventListener("resize", resize);
+window.addEventListener("resize", ()=>requestAnimationFrame(resize));
 requestAnimationFrame(resize);
-resize();
-window.addEventListener("resize", resize);
-// iOS에서 주소창 변화/회전 시 높이 튀는 거 방지용(한 번 더)
-requestAnimationFrame(resize);
+
 
 /* ===== 사운드 ===== */
 const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -561,11 +559,11 @@ function nextMap(){
 
   for(let i=0;i<10;i++){
     let tileX, tileY;
-    while(true){
-      tileX = Math.floor(Math.random()*mapSize);
-      tileY = Math.floor(Math.random()*mapSize);
-      if(map[tileY][tileX] === 0) break;
-    }
+   while(true){
+  tileX = Math.floor(Math.random() * mapSize);
+  tileY = Math.floor(Math.random() * mapSize);
+  if( ... 조건 ... ) break;
+}
     createPack(tileX*tileSize + tileSize/2, tileY*tileSize + tileSize/2, 18 + Math.floor(Math.random()*12));
   }
 
@@ -1732,35 +1730,6 @@ function updateInvulnerability(){
 function updateEnvironmentSystem(){ updateShake(); }
 function updateShake(){ if(shake > 0) shake--; }
 
-function updateSpawnSystem(){
-  spawnTimer++;
-  if(spawnTimer >= spawnInterval){
-    spawnTimer = 0;
-
-    let angle = Math.random() * Math.PI * 2;
-    let distance = 700;
-
-    let px = player.x + Math.cos(angle) * distance;
-    let py = player.y + Math.sin(angle) * distance;
-
-    let margin = 200;
-
-    if(px > margin && py > margin && px < mapSize * tileSize - margin && py < mapSize * tileSize - margin){
-      createPack(px, py, 18 + Math.floor(Math.random()*10));
-    }
-
-    if(spawnInterval > 40) spawnInterval -= 1;
-  }
-
-  bossTimer++;
-  bossInterval = Math.max(25*60, 45*60 - level*3*60);
-
-  if(bossTimer >= bossInterval){
-    bossTimer = 0;
-    if(!enemies.some(e => e.type === "boss")) spawnRandomBoss();
-  }
-}
-
 function updateArrows(){
   for(let i = arrows.length - 1; i >= 0; i--){
     const a = arrows[i];
@@ -2336,9 +2305,8 @@ function drawMiniMap(){
   ctx.restore();
 }
 function drawTextUI(){
-  ctx.strokeText("TIER: " + mapTier, 20, 30);
-ctx.fillText("TIER: " + mapTier, 20, 30);
-    ctx.strokeText("TIER: " + mapTier, 20, 105);
+
+  ctx.strokeText("TIER: " + mapTier, 20, 105);
   ctx.fillText("TIER: " + mapTier, 20, 105);
 
   const need = mapRun.packsToClear;
