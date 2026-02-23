@@ -1,10 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Oni Samurai</title>
 <style>
+:root{
+  /* ✅ 기기별 UI 자동 스케일 (아이폰12미니 포함) */
+  --uiH: clamp(84px, 16vh, 120px);
+  --pad: clamp(66px, 12.5vw, 90px);
+  --stick: clamp(28px, 5.6vw, 40px);
+  --btn: clamp(70px, 13vw, 90px);
+}
+
 body{
   margin:0;
   background:black;
@@ -12,22 +20,39 @@ body{
   touch-action:none;
 }
 canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
+
 #ui{
- position:fixed;bottom:0;width:100%;height:120px;
+ position:fixed;bottom:0;width:100%;height:var(--uiH);
  background:#111;border-top:3px solid #550000;
  display:flex;align-items:center;justify-content:space-between;
- padding:0 25px;box-sizing:border-box;
+ padding:0 clamp(10px, 4vw, 25px);box-sizing:border-box;
 }
-#movePad{position:relative;width:90px;height:90px;border-radius:50%;background:#222;}
-#stick{position:absolute;width:40px;height:40px;border-radius:50%;background:#666;left:25px;top:25px;}
+
+#movePad{
+  position:relative;
+  width:var(--pad);height:var(--pad);
+  border-radius:50%;
+  background:#222;
+}
+#stick{
+  position:absolute;
+  width:var(--stick);height:var(--stick);
+  border-radius:50%;
+  background:#666;
+  left:calc(50% - var(--stick)/2);
+  top:calc(50% - var(--stick)/2);
+}
+
 #attackBtn{
- position:relative;  /* 🔥 이 줄 추가 */
- width:90px;height:90px;border-radius:50%;
+ position:relative;
+ width:var(--btn);height:var(--btn);
+ border-radius:50%;
  background:#990000;border:3px solid #ff4444;
  display:flex;align-items:center;justify-content:center;
  font-size:26px;color:white;
 }
 #attackBtn.active{background:red;transform:scale(.85);}
+
 #attackIcon{
   position:absolute;
   top:50%;
@@ -41,42 +66,43 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
 <canvas id="game"></canvas>
 
 <div id="ui">
- <div id="movePad"><div id="stick"></div></div>
- <div id="attackBtn">
-  <canvas id="attackIcon" width="60" height="60"></canvas>
- </div>
+  <div id="movePad"><div id="stick"></div></div>
+  <div id="attackBtn">
+    <canvas id="attackIcon" width="60" height="60"></canvas>
+  </div>
 </div>
+
 <script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
-const uiHeight=120;
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const ui = document.getElementById("ui");
 
 function resize(){
- canvas.width=window.innerWidth;
- canvas.height=window.innerHeight-uiHeight;
+  const uiH = ui.getBoundingClientRect().height || 120;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - uiH;
 }
 resize();
-window.addEventListener("resize",resize);
+window.addEventListener("resize", resize);
+// iOS에서 주소창 변화/회전 시 높이 튀는 거 방지용(한 번 더)
+requestAnimationFrame(resize);
 
 /* ===== 사운드 ===== */
-  const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-  let audioUnlocked = false;
+const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+let audioUnlocked = false;
 
 function unlockAudio(){
   if(audioUnlocked) return;
   audioUnlocked = true;
-
   audioCtx.resume().then(()=>{
     if(!bgmOsc) bgmOsc = startBGM();
   });
 }
-
 window.addEventListener("touchstart", unlockAudio, { once:true });
 window.addEventListener("mousedown", unlockAudio, { once:true });
 window.addEventListener("keydown", unlockAudio, { once:true });
-  
-function startBGM(){
 
+function startBGM(){
   let isPlaying = true;
 
   function getTempo(){
@@ -86,7 +112,6 @@ function startBGM(){
   }
 
   function playBeat(){
-
     if(!isPlaying) return;
 
     let tempo = getTempo();
@@ -96,33 +121,25 @@ function startBGM(){
     // 킥
     let kick = audioCtx.createOscillator();
     let kickGain = audioCtx.createGain();
-
     kick.type = "triangle";
     kick.frequency.setValueAtTime(90, now);
     kick.frequency.exponentialRampToValueAtTime(50, now + 0.12);
-
     kickGain.gain.setValueAtTime(0.18, now);
     kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
     kick.connect(kickGain);
     kickGain.connect(audioCtx.destination);
-
     kick.start(now);
     kick.stop(now + 0.15);
 
     // 하이톤
     let tone = audioCtx.createOscillator();
     let toneGain = audioCtx.createGain();
-
     tone.type = "square";
     tone.frequency.value = 220;
-
     toneGain.gain.setValueAtTime(0.06, now + beatTime/2);
     toneGain.gain.exponentialRampToValueAtTime(0.001, now + beatTime/2 + 0.1);
-
     tone.connect(toneGain);
     toneGain.connect(audioCtx.destination);
-
     tone.start(now + beatTime/2);
     tone.stop(now + beatTime/2 + 0.1);
 
@@ -130,94 +147,72 @@ function startBGM(){
   }
 
   playBeat();
-
-  return {
-    stop: () => isPlaying = false
-  };
+  return { stop: () => isPlaying = false };
 }
 
 let bgmOsc;
-  function swingSound(){
- let o=audioCtx.createOscillator();
- let g=audioCtx.createGain();
- o.type="sawtooth";
- o.frequency.setValueAtTime(700,audioCtx.currentTime);
- o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+0.12);
- g.gain.value=0.15;
- o.connect(g); g.connect(audioCtx.destination);
- o.start(); o.stop(audioCtx.currentTime+0.12);
+
+function swingSound(){
+  let o=audioCtx.createOscillator();
+  let g=audioCtx.createGain();
+  o.type="sawtooth";
+  o.frequency.setValueAtTime(700,audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+0.12);
+  g.gain.value=0.15;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime+0.12);
 }
 function bossUnsheatheSound(){
   let now = audioCtx.currentTime;
 
-  // 저음 상승 효과
   let o1 = audioCtx.createOscillator();
   let g1 = audioCtx.createGain();
-
   o1.type = "sawtooth";
   o1.frequency.setValueAtTime(120, now);
   o1.frequency.exponentialRampToValueAtTime(600, now + 0.6);
-
   g1.gain.setValueAtTime(0.4, now);
   g1.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-
   o1.connect(g1);
   g1.connect(audioCtx.destination);
-
   o1.start(now);
   o1.stop(now + 0.6);
 
-  // 금속음
   let o2 = audioCtx.createOscillator();
   let g2 = audioCtx.createGain();
-
   o2.type = "triangle";
   o2.frequency.setValueAtTime(900, now);
   o2.frequency.exponentialRampToValueAtTime(200, now + 0.4);
-
   g2.gain.setValueAtTime(0.3, now);
   g2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-
   o2.connect(g2);
   g2.connect(audioCtx.destination);
-
   o2.start(now);
   o2.stop(now + 0.4);
 }
 function thudSound(){
   let now = audioCtx.currentTime;
 
-  // 저음 "둥" + 살짝 노이즈 느낌
   let o = audioCtx.createOscillator();
   let g = audioCtx.createGain();
-
   o.type = "sine";
   o.frequency.setValueAtTime(120, now);
   o.frequency.exponentialRampToValueAtTime(55, now + 0.14);
-
   g.gain.setValueAtTime(0.32, now);
   g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
   o.connect(g);
   g.connect(audioCtx.destination);
-
   o.start(now);
   o.stop(now + 0.18);
 
-  // 살짝 "쿵" 질감용 짧은 클릭(선택)
   let o2 = audioCtx.createOscillator();
   let g2 = audioCtx.createGain();
-
   o2.type = "triangle";
   o2.frequency.setValueAtTime(220, now);
   o2.frequency.exponentialRampToValueAtTime(90, now + 0.08);
-
   g2.gain.setValueAtTime(0.12, now);
   g2.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
   o2.connect(g2);
   g2.connect(audioCtx.destination);
-
   o2.start(now);
   o2.stop(now + 0.09);
 }
@@ -230,48 +225,45 @@ function hitSound(){
   o.connect(g); g.connect(audioCtx.destination);
   o.start(); o.stop(audioCtx.currentTime+0.08);
 }
+
 /* ===== 플레이어 ===== */
 let player={
- x:0,y:0,
- dir:"left",
- speed:5,
- radius:14,
- hp:100,maxHp:100,
- invul:0,
- knockbackX:0,
- knockbackY:0,
- kiOrbs: 0,
-maxOrbs: 5,
-  levelGlow: 0,
+  x:0,y:0,
+  dir:"left",
+  speed:5,
+  radius:14,
+  hp:100,maxHp:100,
+  invul:0,
+  knockbackX:0,
+  knockbackY:0,
+  kiOrbs:0,
+  maxOrbs:5,
+  levelGlow:0,
+  ultiActive:false,
+  ultiCount:0,
+  ultiTimer:0,
+};
 
-ultiActive:false,
-ultiCount:0,
-ultiTimer:0,
-}; 
-  let map = [];
-let mapSize = 30;   // 🔥 50x50
-let tileSize = 48;   // 추천 48 또는 50
+let map = [];
+let mapSize = 30;
+let tileSize = 48;
+
 for(let y=0; y<mapSize; y++){
   let row = [];
-
   for(let x=0; x<mapSize; x++){
-
-    if(x===0 || y===0 || x===mapSize-1 || y===mapSize-1){
-      row.push(1); // 외곽 벽
-    }else{
-      row.push(0); // 바닥
-    }
-
+    if(x===0 || y===0 || x===mapSize-1 || y===mapSize-1) row.push(1);
+    else row.push(0);
   }
-
   map.push(row);
 }
- player.x = mapSize * tileSize / 2;
-player.y = mapSize * tileSize / 2; 
+
+player.x = mapSize * tileSize / 2;
+player.y = mapSize * tileSize / 2;
+
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
-let spawnInterval = 90; // 처음엔 2초마다
+let spawnInterval = 90;
 let enemies=[];
 let packs = [];
 let particles=[];
@@ -293,91 +285,103 @@ let fireZones = [];
 let frameCount = 0;
 let explosionActive = false;
 let bossSpawned = false;
-let bossTimer = 0;            // 보스 주기
-let bossInterval = 45 * 60;   // 45초(60fps 기준), 난이도에 따라 줄어듦
+let bossTimer = 0;
+let bossInterval = 45 * 60;
 
 /* ===== 입력 ===== */
-let joyDX=0,joyDY=0;
+let joyDX=0, joyDY=0;
 let attacking=false;
 let attackFrame=0;
 let keys = {};
 
-window.addEventListener("keydown", e=>{
-  keys[e.key] = true;
-});
+window.addEventListener("keydown", e=>{ keys[e.key] = true; });
+window.addEventListener("keyup", e=>{ keys[e.key] = false; });
 
-window.addEventListener("keyup", e=>{
-  keys[e.key] = false;
-});
-const pad=document.getElementById("movePad");
-const stick=document.getElementById("stick");
-const attackBtn=document.getElementById("attackBtn");
+const pad = document.getElementById("movePad");
+const stick = document.getElementById("stick");
+const attackBtn = document.getElementById("attackBtn");
 let joyActive=false;
 
-pad.addEventListener("touchstart",()=>joyActive=true);
-pad.addEventListener("touchmove",e=>{
- if(!joyActive)return;
- let r=pad.getBoundingClientRect();
- let x=e.touches[0].clientX-r.left-45;
- let y=e.touches[0].clientY-r.top-45;
- let d=Math.hypot(x,y);
- let max=30;
- if(d>max){x*=max/d;y*=max/d;}
- stick.style.left=(x+25)+"px";
- stick.style.top=(y+25)+"px";
- joyDX=x/max; joyDY=y/max;
+function setStickByVector(vx, vy){
+  const r = pad.getBoundingClientRect();
+  const max = Math.min(r.width, r.height) * 0.33; // ✅ 패드 크기 기반
+  let d = Math.hypot(vx, vy) || 1;
+  if(d > max){ vx *= max/d; vy *= max/d; }
 
- if(Math.abs(x)>Math.abs(y))
-  player.dir=x>0?"right":"left";
- else
-  player.dir=y>0?"down":"up";
-});
-pad.addEventListener("touchend",()=>{
- joyActive=false;joyDX=joyDY=0;
- stick.style.left="25px";stick.style.top="25px";
-});
+  const sw = stick.offsetWidth || 40;
+  const sh = stick.offsetHeight || 40;
 
-attackBtn.addEventListener("touchstart",()=>{
+  stick.style.left = (r.width/2 - sw/2 + vx) + "px";
+  stick.style.top  = (r.height/2 - sh/2 + vy) + "px";
 
-  // 🔥 궁극기 발동
-if(player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive){
+  joyDX = vx / max;
+  joyDY = vy / max;
 
-  player.kiOrbs = 0;   // 🔥 즉시 구슬 제거
-  orbFlash = 0;
-
-  explosionActive = true;
-
-  player.ultiActive = true;
-  player.ultiCount = 0;
-  player.ultiTimer = 0;
-
-  return;
+  if(Math.abs(vx) > Math.abs(vy))
+    player.dir = vx > 0 ? "right" : "left";
+  else
+    player.dir = vy > 0 ? "down" : "up";
 }
 
+function handlePadMove(clientX, clientY){
+  const r = pad.getBoundingClientRect();
+  const cx = r.left + r.width/2;
+  const cy = r.top + r.height/2;
+  const vx = clientX - cx;
+  const vy = clientY - cy;
+  setStickByVector(vx, vy);
+}
+
+pad.addEventListener("touchstart", (e)=>{
+  joyActive = true;
+  handlePadMove(e.touches[0].clientX, e.touches[0].clientY);
+},{passive:false});
+
+pad.addEventListener("touchmove", (e)=>{
+  if(!joyActive) return;
+  handlePadMove(e.touches[0].clientX, e.touches[0].clientY);
+},{passive:false});
+
+pad.addEventListener("touchend", ()=>{
+  joyActive=false; joyDX=joyDY=0;
+  const r = pad.getBoundingClientRect();
+  const sw = stick.offsetWidth || 40;
+  const sh = stick.offsetHeight || 40;
+  stick.style.left = (r.width/2 - sw/2) + "px";
+  stick.style.top  = (r.height/2 - sh/2) + "px";
+});
+
+attackBtn.addEventListener("touchstart", ()=>{
+  // 궁극기 발동
+  if(player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive){
+    player.kiOrbs = 0;
+    orbFlash = 0;
+    explosionActive = true;
+    player.ultiActive = true;
+    player.ultiCount = 0;
+    player.ultiTimer = 0;
+    return;
+  }
   // 일반 공격
   attacking = true;
   attackFrame = 0;
   swingSound();
   attackBtn.classList.add("active");
-});
+},{passive:true});
 
-attackBtn.addEventListener("touchend",()=>{
- attackBtn.classList.remove("active");
-});
+attackBtn.addEventListener("touchend", ()=>{
+  attackBtn.classList.remove("active");
+},{passive:true});
 
-/* ===== 충돌 ===== */
-function circleCollide(a,b){
- return Math.hypot(a.x-b.x,a.y-b.y) < a.radius + b.radius;
-}
-// ===== 유틸 =====
-  function dist2(ax, ay, bx, by){
+/* ===== 유틸 ===== */
+function dist2(ax, ay, bx, by){
   const dx = ax - bx;
   const dy = ay - by;
   return dx*dx + dy*dy;
 }
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
 function spawnHitBlood(x, y, amount=10){
-  // ✅ 상한선 (맵핑 최적화)
   if(bloodParticles.length > 320) return;
 
   for(let i=0;i<amount;i++){
@@ -391,7 +395,6 @@ function spawnHitBlood(x, y, amount=10){
     });
   }
 
-  // ✅ 피 웅덩이도 상한
   if(bloodPools.length < 140){
     bloodPools.push({
       x: x + (Math.random()-0.5)*8,
@@ -401,73 +404,91 @@ function spawnHitBlood(x, y, amount=10){
     });
   }
 }
-function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
-// ===== 플레이어 피격 처리 =====
+/* ===== 충돌/이동 가능 ===== */
+function canMoveTo(x,y){
+  let left = Math.floor((x - player.radius) / tileSize);
+  let right = Math.floor((x + player.radius) / tileSize);
+  let top = Math.floor((y - player.radius) / tileSize);
+  let bottom = Math.floor((y + player.radius) / tileSize);
+
+  return (
+    map[top] && map[top][left] === 0 &&
+    map[top] && map[top][right] === 0 &&
+    map[bottom] && map[bottom][left] === 0 &&
+    map[bottom] && map[bottom][right] === 0
+  );
+}
+function canEnemyMoveTo(enemy, x, y){
+  let left = Math.floor((x - enemy.radius) / tileSize);
+  let right = Math.floor((x + enemy.radius) / tileSize);
+  let top = Math.floor((y - enemy.radius) / tileSize);
+  let bottom = Math.floor((y + enemy.radius) / tileSize);
+
+  return (
+    map[top] && map[top][left] === 0 &&
+    map[top] && map[top][right] === 0 &&
+    map[bottom] && map[bottom][left] === 0 &&
+    map[bottom] && map[bottom][right] === 0
+  );
+}
+function isFloorTile(tx, ty){ return !!(map[ty] && map[ty][tx] === 0); }
+function canSpawnEnemyAt(enemy, x, y){ return canEnemyMoveTo(enemy, x, y); }
+
+/* ===== 플레이어 피격 처리 ===== */
 function damagePlayer(dmg, knockX, knockY){
   if(player.invul > 0 || gameOver) return;
 
   player.hp -= dmg;
-  player.invul = 25;         // 약 0.4초 무적(60fps 기준)
+  player.invul = 25;
   shake = Math.max(shake, 10);
 
-   // 넉백(벽 체크)
   let nx = player.x + knockX;
   let ny = player.y + knockY;
 
   if(canMoveTo(nx, player.y)) player.x = nx;
   if(canMoveTo(player.x, ny)) player.y = ny;
 
-  if(player.hp <= 0){
-    handleGameOver();
-  }
+  if(player.hp <= 0) handleGameOver();
 }
 
-// ===== 적 근접 공격 =====
- function enemyTryMeleeAttack(e){
+/* ===== 적 근접 공격 ===== */
+function enemyTryMeleeAttack(e){
   const dx = player.x - e.x;
   const dy = player.y - e.y;
   const dist = Math.hypot(dx, dy);
-
   const reach = e.type === "boss" ? 70 : 42;
 
-  // 너무 멀면 공격 리셋
   if(dist > reach){
     e.attackFrame = 0;
     return;
   }
 
-  // ✅ 공격 시작 프레임: swingDir 확정(좌우 휘두름 방향)
   if(e.attackFrame === 0){
-    e.swingDir = dx < 0 ? -1 : 1;  // 🔥 예전 버전 핵심
+    e.swingDir = dx < 0 ? -1 : 1;
   }
 
-  // 공격 진행
   e.attackFrame++;
 
-  // 타격 프레임 (중간쯤)
   if(e.attackFrame === 12){
     const len = dist || 1;
     const nx = dx / len;
     const ny = dy / len;
-
     const kb = e.type === "boss" ? 30 : 18;
     damagePlayer(e.damage, nx*kb, ny*kb);
     hitSound();
   }
 
-  // 공격 종료
   if(e.attackFrame >= 25){
     e.attackFrame = 0;
   }
 }
 
-// ===== 아처 화살 발사 =====
+/* ===== 아처 화살 발사 ===== */
 function spawnArrow(fromX, fromY, toX, toY, damage){
   const dx = toX - fromX;
   const dy = toY - fromY;
   const dist = Math.hypot(dx, dy) || 1;
-
   const speed = 7.5;
 
   arrows.push({
@@ -475,42 +496,31 @@ function spawnArrow(fromX, fromY, toX, toY, damage){
     y: fromY,
     dx: dx/dist * speed,
     dy: dy/dist * speed,
-    damage: damage,
-    life: 240  // 4초 정도
+    damage,
+    life: 240
   });
 }
 
-// ===== 메이지 장판 생성 =====
+/* ===== 메이지 장판 생성 ===== */
 function spawnFireZone(x, y, damage){
-  fireZones.push({
-    x, y,
-    radius: 55,
-    life: 180,     // 3초
-    tick: 0,
-    damage: damage
-  });
+  fireZones.push({ x, y, radius:55, life:180, tick:0, damage });
 }
-function spawnEnemy(){
 
+/* ===== 스폰 ===== */
+function spawnEnemy(){
   if(enemies.length >= 300) return;
 
   let tileX, tileY;
-
-  // 🔥 바닥 타일 나올 때까지 반복
   while(true){
-
     tileX = Math.floor(Math.random() * mapSize);
     tileY = Math.floor(Math.random() * mapSize);
-
-if(
-  map[tileY][tileX] === 0 &&
-  map[tileY-1]?.[tileX] === 0 &&
-  map[tileY+1]?.[tileX] === 0 &&
-  map[tileY]?.[tileX-1] === 0 &&
-  map[tileY]?.[tileX+1] === 0
-){
-  break;
-}
+    if(
+      map[tileY][tileX] === 0 &&
+      map[tileY-1]?.[tileX] === 0 &&
+      map[tileY+1]?.[tileX] === 0 &&
+      map[tileY]?.[tileX-1] === 0 &&
+      map[tileY]?.[tileX+1] === 0
+    ) break;
   }
 
   let ex = tileX * tileSize + tileSize/2;
@@ -518,7 +528,6 @@ if(
 
   let rand = Math.random();
   let type;
-
   if(rand < 0.2) type = "mage";
   else if(rand < 0.5) type = "archer";
   else type = "melee";
@@ -526,14 +535,13 @@ if(
   let scale = Math.min(killCount, 200);
 
   let enemy = {
-    x: ex,
-    y: ey,
+    x: ex, y: ey,
     radius: 14,
     stun: 0,
     invul: 0,
     attackFrame: 0,
     swingDir: 1,
-    type: type,
+    type,
 
     hp: type==="mage" ? 35 + killCount*0.15 :
         type==="archer" ? 20 + killCount*0.1 :
@@ -550,18 +558,10 @@ if(
     castCooldown: 120
   };
 
-  // 🔥 엘리트 유지
-  let eliteChance = 0.06 + Math.min(0.14, killCount * 0.001); // 6%~20%
-if(Math.random() < eliteChance){
-
+  let eliteChance = 0.06 + Math.min(0.14, killCount * 0.001);
+  if(Math.random() < eliteChance){
     enemy.isElite = true;
-
-    if(Math.random() < 0.5){
-      enemy.eliteColor = "yellow";
-    }else{
-      enemy.eliteColor = "blue";
-    }
-
+    enemy.eliteColor = Math.random() < 0.5 ? "yellow" : "blue";
     enemy.speed *= 1.6;
     enemy.damage *= 2;
     enemy.radius *= 1.2;
@@ -570,117 +570,80 @@ if(Math.random() < eliteChance){
 
   enemies.push(enemy);
 }
-// ✅ 붙여넣기 패치: spawnEnemyAt() 통째로 교체 (스폰 충돌 안전)
-function spawnEnemyAt(ex, ey, pack){
 
+function spawnEnemyAt(ex, ey, pack){
   let tileX = Math.floor(ex / tileSize);
   let tileY = Math.floor(ey / tileSize);
 
-  // 바닥 타일 아니면 스폰 금지
   if(!isFloorTile(tileX, tileY)) return;
-
-  // 반지름 고려해서 주변도 바닥인지 대충 필터(가벼운 1차)
-  // (적이 벽 바로 옆에서 끼는 것 방지)
-  if(
-    !isFloorTile(tileX-1, tileY) ||
-    !isFloorTile(tileX+1, tileY) ||
-    !isFloorTile(tileX, tileY-1) ||
-    !isFloorTile(tileX, tileY+1)
-  ){
-    return;
-  }
-
+  if(!isFloorTile(tileX-1, tileY) || !isFloorTile(tileX+1, tileY) || !isFloorTile(tileX, tileY-1) || !isFloorTile(tileX, tileY+1)) return;
   if(enemies.length >= 200) return;
 
   let rand = Math.random();
-  let type = rand < 0.2 ? "mage" :
-             rand < 0.5 ? "archer" : "melee";
+  let type = rand < 0.2 ? "mage" : rand < 0.5 ? "archer" : "melee";
 
-  // ✅ 먼저 enemy 만든 뒤, canEnemyMoveTo로 최종 스폰 가능 여부 체크
   let enemy = {
-    x: ex,
-    y: ey,
+    x: ex, y: ey,
     radius: 14,
     stun: 0,
     invul: 0,
     attackFrame: 0,
     swingDir: 1,
-    type: type,
+    type,
     hp: 40,
     speed: type==="melee"?0.8:0.5,
     damage: 10,
     shootCooldown: 0,
     castCooldown: 120,
-    pack: pack
+    pack
   };
 
-  // 최종 스폰 가능 체크(반지름 포함)
   if(!canSpawnEnemyAt(enemy, ex, ey)) return;
 
   enemies.push(enemy);
   pack.enemies.push(enemy);
 }
 
-// ✅ 붙여넣기 패치: spawnRandomBoss() 통째로 교체 (스폰 재시도 버전)
 function spawnRandomBoss(){
   if(enemies.some(e => e.type === "boss")) return;
 
   let bx = player.x + 300;
   let by = player.y;
-
   const scale = 1 + level * 0.15;
-
-  // ✅ 반지름 포함 안전 체크용 임시 보스
   const tempBoss = { radius: 30 };
-
-  // 1) 먼저 "랜덤 바닥 타일"에서 플레이어와 300 이상 떨어진 곳 찾기
   let found = false;
 
   for(let i=0;i<160;i++){
     let tileX = Math.floor(Math.random() * mapSize);
     let tileY = Math.floor(Math.random() * mapSize);
-
     if(!map[tileY] || map[tileY][tileX] !== 0) continue;
 
     let tx = tileX * tileSize + tileSize/2;
     let ty = tileY * tileSize + tileSize/2;
 
-    // 플레이어랑 너무 가까우면 패스
     const dx = tx - player.x;
     const dy = ty - player.y;
     if(dx*dx + dy*dy < 300*300) continue;
-
-    // 반지름까지 고려해서 진짜로 설 수 있는지
     if(!canEnemyMoveTo(tempBoss, tx, ty)) continue;
 
-    bx = tx; by = ty;
-    found = true;
-    break;
+    bx = tx; by = ty; found = true; break;
   }
 
-  // 2) 못 찾았으면: 플레이어 주변 링(원형)으로 위치 잡고, 거기서 근처 타일을 확장 탐색
   if(!found){
-
-    // 플레이어 기준 임시 목표점(원형 링)
     let angle = Math.random() * Math.PI * 2;
-    let dist = 340 + Math.random() * 260; // 340~600
+    let dist = 340 + Math.random() * 260;
     let cx = player.x + Math.cos(angle) * dist;
     let cy = player.y + Math.sin(angle) * dist;
-
     let baseTX = Math.floor(cx / tileSize);
     let baseTY = Math.floor(cy / tileSize);
 
-    // ✅ 근처 확장 탐색(반경 1~6 타일)
     outer:
     for(let r=1; r<=6; r++){
       for(let oy=-r; oy<=r; oy++){
         for(let ox=-r; ox<=r; ox++){
-          // 테두리만 훑기(가볍게)
           if(Math.abs(ox)!==r && Math.abs(oy)!==r) continue;
-
           let txi = baseTX + ox;
           let tyi = baseTY + oy;
-
           if(!map[tyi] || map[tyi][txi] !== 0) continue;
 
           let tx = txi * tileSize + tileSize/2;
@@ -688,39 +651,27 @@ function spawnRandomBoss(){
 
           const dx = tx - player.x;
           const dy = ty - player.y;
-          if(dx*dx + dy*dy < 280*280) continue; // 최소거리 약간 완화
-
+          if(dx*dx + dy*dy < 280*280) continue;
           if(!canEnemyMoveTo(tempBoss, tx, ty)) continue;
 
-          bx = tx; by = ty;
-          found = true;
-          break outer;
+          bx = tx; by = ty; found = true; break outer;
         }
       }
     }
   }
 
-  // 3) 그래도 못 찾았으면: "완전 취소" 대신, 현재 bx/by라도 한 번 더 안전 보정 시도
   if(!found){
-    // bx/by가 벽이면 근처 몇 번만 흔들어서 시도
     for(let k=0;k<40;k++){
       let tx = bx + (Math.random()-0.5) * tileSize * 3;
       let ty = by + (Math.random()-0.5) * tileSize * 3;
-
-      if(canEnemyMoveTo(tempBoss, tx, ty)){
-        bx = tx; by = ty;
-        found = true;
-        break;
-      }
+      if(canEnemyMoveTo(tempBoss, tx, ty)){ bx = tx; by = ty; found = true; break; }
     }
   }
 
-  // 4) 최종: 정말로 불가능하면(거의 없음) 그때만 스폰 취소
   if(!canEnemyMoveTo(tempBoss, bx, by)) return;
 
   enemies.push({
-    x: bx,
-    y: by,
+    x: bx, y: by,
     radius: 30,
     type: "boss",
     maxHp: 800 * scale,
@@ -731,7 +682,6 @@ function spawnRandomBoss(){
     attackFrame: 0,
     swordPulled: false,
     phase2Used: false,
-
     dashCooldown: 120,
     cleaveCooldown: 160,
     invul: 0,
@@ -740,175 +690,115 @@ function spawnRandomBoss(){
 }
 
 function createPack(cx, cy, count){
-
-  let pack = {
-    x: cx,
-    y: cy,
-    enemies: [],
-    activated: false
-  };
-
+  let pack = { x: cx, y: cy, enemies: [], activated: false };
   for(let i=0;i<count;i++){
-
     let angle = Math.random()*Math.PI*2;
     let radius = Math.random()*140;
-
     let ex = cx + Math.cos(angle)*radius;
     let ey = cy + Math.sin(angle)*radius;
-
     spawnEnemyAt(ex, ey, pack);
   }
-
   packs.push(pack);
 }
-  function teleportTo(target){
 
-  // ✅ 이동 전 피폭발(가벼운 버전)
+/* ===== 궁극기 ===== */
+function teleportTo(target){
   spawnHitBlood(player.x, player.y, 18);
   if(particles.length < 220){
     for(let i=0;i<10;i++){
-      particles.push({
-        x: player.x,
-        y: player.y,
-        vx: (Math.random()-0.5)*10,
-        vy: (Math.random()-0.5)*10,
-        life: 22
-      });
+      particles.push({ x: player.x, y: player.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 22 });
     }
   }
 
-  // 목표로 가되, 못 가면 이동 안 함
   if(canMoveTo(target.x, target.y)){
     player.x = target.x;
     player.y = target.y;
   }
 
-  // ✅ 이동 후 피폭발
   spawnHitBlood(player.x, player.y, 22);
   if(particles.length < 220){
     for(let i=0;i<12;i++){
-      particles.push({
-        x: player.x,
-        y: player.y,
-        vx: (Math.random()-0.5)*10,
-        vy: (Math.random()-0.5)*10,
-        life: 26
-      });
+      particles.push({ x: player.x, y: player.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 26 });
     }
   }
 
   shake = Math.max(shake, 10);
 }
-function dealUltimateDamage(){
 
+function dealUltimateDamage(){
   const radius = 160;
   const r2 = radius * radius;
-
   let killedAny = false;
 
   for(let i=0; i<enemies.length; i++){
     const e = enemies[i];
-
     const dx = e.x - player.x;
     const dy = e.y - player.y;
-
     if(dx*dx + dy*dy > r2) continue;
 
     const wasAlive = (e.hp > 0);
 
-    // 🔥 보스 처리 (즉사 금지 + 큰 데미지)
     if(e.type === "boss"){
-
       if(e.invul <= 0){
-        e.hp -= ultiDamage * 2.5;   // ← 여기서 보스 데미지 배율 조절
+        e.hp -= ultiDamage * 2.5;
         e.stun = 25;
         spawnHitBlood(e.x, e.y, 14);
         shake = Math.max(shake, 20);
       }
-
-      continue;   // 보스는 즉사 루트로 안 감
+      continue;
     }
 
-    // 🔥 일반 몹은 즉사
     e.hp = 0;
     e.stun = 30;
-
     spawnHitBlood(e.x, e.y, 18);
 
     if(particles.length < 240){
       for(let k=0;k<12;k++){
-        particles.push({
-          x: e.x,
-          y: e.y,
-          vx: (Math.random()-0.5)*10,
-          vy: (Math.random()-0.5)*10,
-          life: 40
-        });
+        particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 40 });
       }
     }
 
-    // 🔥 킬 처리
     if(wasAlive){
       killCount++;
       checkLevelUp();
-
       player.hp = Math.min(player.maxHp, player.hp + 1);
-      slowMotion = 6;  // 궁극기 킬도 멈칫
-
-      if(player.kiOrbs < player.maxOrbs){
-        player.kiOrbs++;
-      }
-
+      slowMotion = 6;
+      if(player.kiOrbs < player.maxOrbs) player.kiOrbs++;
       killedAny = true;
     }
   }
 
-  if(killedAny){
-    hitSound();
-  }
-
+  if(killedAny) hitSound();
   shake = Math.max(shake, 35);
 }
-function bossEnterPhase2(boss){
 
+/* ===== 보스 스킬 ===== */
+function bossEnterPhase2(boss){
   boss.swordPulled = true;
   boss.phase2Used = true;
-
   boss.speed *= 1.25;
   boss.damage *= 1.2;
 
-  // 🔥 2초 무적
   boss.invul = 120;
-
-  // 🔥 연출 동안 보스만 멈춤 (0.6초)
   boss.phaseLock = 36;
 
   shake = 30;
   bossUnsheatheSound();
 
-  // 폭발 파티클
   for(let i=0;i<80;i++){
-    particles.push({
-      x: boss.x,
-      y: boss.y,
-      vx: (Math.random()-0.5)*10,
-      vy: (Math.random()-0.5)*10,
-      life: 50
-    });
+    particles.push({ x: boss.x, y: boss.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 50 });
   }
 }
+
 function bossDash(boss){
-  // 플레이어 방향으로 짧은 돌진(벽 충돌 고려)
   const dx = player.x - boss.x;
   const dy = player.y - boss.y;
   const dist = Math.hypot(dx, dy) || 1;
   const nx = dx / dist;
   const ny = dy / dist;
 
-  // 돌진 거리/스텝
   const dashDist = 220;
   const steps = 18;
-
   let hit = false;
 
   for(let i=0;i<steps;i++){
@@ -916,13 +806,9 @@ function bossDash(boss){
     let py = boss.y + ny * (dashDist/steps);
 
     if(canEnemyMoveTo(boss, px, py)){
-      boss.x = px;
-      boss.y = py;
-    }else{
-      break; // 벽이면 중단
-    }
+      boss.x = px; boss.y = py;
+    }else break;
 
-    // 돌진 중 충돌 판정 (한 번만)
     if(!hit){
       const d = Math.hypot(player.x - boss.x, player.y - boss.y);
       if(d < boss.radius + player.radius + 10){
@@ -931,15 +817,12 @@ function bossDash(boss){
       }
     }
   }
-
   shake = Math.max(shake, 16);
 }
 
 function bossCleave(boss){
-  // 광역 원형 베기(시각: 파티클, 판정: 원형)
   const radius = 140;
 
-  // 연출
   for(let i=0;i<70;i++){
     const a = Math.random()*Math.PI*2;
     const r = Math.random()*radius;
@@ -959,15 +842,14 @@ function bossCleave(boss){
     const len = Math.hypot(dx, dy) || 1;
     damagePlayer(boss.damage*1.6, (dx/len)*42, (dy/len)*42);
   }
-
   shake = Math.max(shake, 22);
 }
+
 /* ===== 업데이트 ===== */
- function update(){
+function update(){
   frameCount++;
   if(gameOver) return;
 
-  // ✅ 킬 슬로우모션 (6프레임 멈칫)
   if(slowMotion > 0){
     slowMotion--;
     return;
@@ -982,118 +864,85 @@ function bossCleave(boss){
   updateEnvironmentSystem();
   updateSpawnSystem();
 }
-  function updatePlayerState(){
 
-  if(player.hp <= 0){
-    handleGameOver();
-    return;
-  }
-
+function updatePlayerState(){
+  if(player.hp <= 0){ handleGameOver(); return; }
   updateMovement();
   updateInvulnerability();
   updateLevelGlow();
 }
-  function handleGameOver(){
+function handleGameOver(){
   gameOver = true;
   document.getElementById("ui").style.display = "none";
 }
-
 function updateLevelGlow(){
-  if(player.levelGlow > 0){
-    player.levelGlow--;
-  }
+  if(player.levelGlow > 0) player.levelGlow--;
 }
-  function updateUltimateSystem(){
 
+function updateUltimateSystem(){
   if(!player.ultiActive) return;
 
   player.ultiTimer++;
-
-  if(player.ultiTimer % 10 === 0){
-    performUltimateStrike();
-  }
-
-  if(player.ultiCount >= 5){
-    endUltimate();
-  }
+  if(player.ultiTimer % 10 === 0) performUltimateStrike();
+  if(player.ultiCount >= 5) endUltimate();
 }
-  function performUltimateStrike(){
-
+function performUltimateStrike(){
   if(enemies.length === 0) return;
-
   let target = enemies[Math.floor(Math.random()*enemies.length)];
-
   teleportTo(target);
   dealUltimateDamage();
   player.ultiCount++;
 }
 function endUltimate(){
-
   enemies = enemies.filter(e=>e.hp>0);
-
   player.ultiActive = false;
-  player.kiOrbs = 0;   // 🔥 기 초기화
+  player.kiOrbs = 0;
   explosionActive = false;
 }
-function updateEnemySystem(){
 
+function updateEnemySystem(){
   packs.forEach(pack=>{
     let dx = player.x - pack.x;
     let dy = player.y - pack.y;
-    if(dx*dx + dy*dy < 600*600){
-      pack.activated = true;
-    }
+    if(dx*dx + dy*dy < 600*600) pack.activated = true;
   });
 
   enemies.forEach(e=>{
-
     if(e.pack && !e.pack.activated) return;
-
     updateSingleEnemy(e);
   });
 }
-    function updateLevelParticles(){
+
+function updateLevelParticles(){
   for(let i = levelParticles.length - 1; i >= 0; i--){
     const p = levelParticles[i];
-
     p.ox += p.vx;
-    p.oy -= p.vy;       // 🔥 위로 떠오르게
-    p.vy *= 0.97;       // 점점 느려지게(선택)
+    p.oy -= p.vy;
+    p.vy *= 0.97;
     p.life--;
-
     if(p.life <= 0) levelParticles.splice(i,1);
   }
-
-  // 너무 많으면 컷(선택)
   if(levelParticles.length > 200){
     levelParticles.splice(0, levelParticles.length - 200);
   }
 }
-  // ✅ 붙여넣기 패치: updateParticles() 통째로 교체 (filter 제거)
-function updateParticles(){
 
+function updateParticles(){
   for(let i = particles.length - 1; i >= 0; i--){
     const p = particles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.life--;
-
-    if(p.life <= 0){
-      particles.splice(i,1);
-    }
+    p.x += p.vx; p.y += p.vy; p.life--;
+    if(p.life <= 0) particles.splice(i,1);
   }
-
-  // 안전 상한
   if(particles.length > 260){
     particles.splice(0, particles.length - 260);
   }
 }
+
 function updateMelee(e){
   const dx = player.x - e.x;
   const dy = player.y - e.y;
   const dist = Math.hypot(dx, dy);
 
-  // 이동(벽 충돌 포함)
   if(dist > 0){
     let moveX = dx / dist * e.speed;
     let moveY = dy / dist * e.speed;
@@ -1105,7 +954,6 @@ function updateMelee(e){
     if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
   }
 
-  // 근접 공격 시도
   enemyTryMeleeAttack(e);
 }
 
@@ -1114,10 +962,8 @@ function updateArcher(e){
   const dy = player.y - e.y;
   const dist = Math.hypot(dx, dy);
 
-  // 일정 거리 유지(너무 가까우면 도망, 멀면 접근)
   const desired = 240;
   if(dist < desired - 40){
-    // 도망
     const len = dist || 1;
     const nx = dx / len;
     const ny = dy / len;
@@ -1128,15 +974,13 @@ function updateArcher(e){
     if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
     if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
   }else if(dist > desired + 80){
-    // 접근
-    updateMelee(e); // 이동+근접 시도 (근접은 거의 안 닿음)
+    updateMelee(e);
   }
 
-  // 사격
   e.shootCooldown--;
   if(e.shootCooldown <= 0 && dist < 520){
     spawnArrow(e.x, e.y, player.x, player.y, e.damage);
-    e.shootCooldown = 80 + Math.floor(Math.random()*40); // 1.3~2초
+    e.shootCooldown = 80 + Math.floor(Math.random()*40);
   }
 }
 
@@ -1145,7 +989,6 @@ function updateMage(e){
   const dy = player.y - e.y;
   const dist = Math.hypot(dx, dy);
 
-  // 너무 붙으면 살짝 뒤로
   if(dist < 180){
     const len = dist || 1;
     const nx = dx / len;
@@ -1157,54 +1000,40 @@ function updateMage(e){
     if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
     if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
   }else{
-    // 적당히 접근
     updateMelee(e);
   }
 
-  // 시전(장판)
   e.castCooldown--;
   if(e.castCooldown <= 0 && dist < 520){
-    spawnFireZone(player.x, player.y, e.damage); // 플레이어 위치에 깔기
-    e.castCooldown = 140 + Math.floor(Math.random()*50); // 2.3~3.1초
+    spawnFireZone(player.x, player.y, e.damage);
+    e.castCooldown = 140 + Math.floor(Math.random()*50);
   }
 }
 
 function updateBoss(e){
-
-  // 2페이즈 진입 조건: HP 50% 이하
-  if(!e.phase2Used && e.hp <= e.maxHp * 0.5){
-    bossEnterPhase2(e);
-  }
-
-  // 기본 추적 + 근접 공격
+  if(!e.phase2Used && e.hp <= e.maxHp * 0.5) bossEnterPhase2(e);
   updateMelee(e);
 
-  // 2페이즈 스킬
   if(e.swordPulled){
-
     e.dashCooldown--;
     e.cleaveCooldown--;
 
     const dist = Math.hypot(player.x - e.x, player.y - e.y);
 
-    // 돌진: 중거리에서
     if(e.dashCooldown <= 0 && dist > 160 && dist < 520){
       bossDash(e);
       e.dashCooldown = 160 + Math.floor(Math.random()*70);
     }
-
-    // 광역베기: 근거리에서
     if(e.cleaveCooldown <= 0 && dist < 220){
       bossCleave(e);
       e.cleaveCooldown = 200 + Math.floor(Math.random()*80);
     }
   }
 }
-function updateSingleEnemy(e){
 
+function updateSingleEnemy(e){
   if(e.invul > 0) e.invul--;
 
-  // 🔥 2페이즈 연출: 보스만 정지
   if(e.phaseLock > 0){
     e.phaseLock--;
     return;
@@ -1222,45 +1051,42 @@ function updateSingleEnemy(e){
     default: updateMelee(e);
   }
 }
+
 function updateProjectileSystem(){
   updateArrows();
-  updateFireZones(); // ✅ 이거 켜기
+  updateFireZones();
 }
-  function updateFireZones(){
 
+function updateFireZones(){
   for(let i = fireZones.length - 1; i >= 0; i--){
     const f = fireZones[i];
     f.life--;
     f.tick++;
 
-    // 10프레임마다 데미지 체크(약 0.16초)
     if(f.tick % 10 === 0){
-  const dx = player.x - f.x;
-const dy = player.y - f.y;
-if(dx*dx + dy*dy < f.radius*f.radius){
-  damagePlayer(Math.max(1, f.damage*0.6), 0, 0);
-}
+      const dx = player.x - f.x;
+      const dy = player.y - f.y;
+      if(dx*dx + dy*dy < f.radius*f.radius){
+        damagePlayer(Math.max(1, f.damage*0.6), 0, 0);
+      }
     }
 
-    if(f.life <= 0){
-      fireZones.splice(i,1);
-    }
+    if(f.life <= 0) fireZones.splice(i,1);
   }
 }
+
 function updateEffectSystem(){
   updateParticles();
   updateBlood();
   updateLevelParticles();
 
-  // ✅ 피 웅덩이 수명 감소
   for(let i=bloodPools.length-1;i>=0;i--){
     bloodPools[i].life--;
     if(bloodPools[i].life <= 0) bloodPools.splice(i,1);
   }
-
-  // (선택) 너무 많으면 컷
   if(bloodPools.length > 120) bloodPools.splice(0, bloodPools.length-120);
 }
+
 function updateCombatSystem(){
   if(attacking){
     attackFrame++;
@@ -1272,23 +1098,18 @@ function updateCombatSystem(){
   }
 }
 
-// ✅ 붙여넣기 패치: updateMovement() 통째로 교체
 function updateMovement(){
-
   let dx = 0;
   let dy = 0;
 
-  // 키 입력
   if(keys["ArrowLeft"] || keys["a"]) dx -= player.speed;
   if(keys["ArrowRight"] || keys["d"]) dx += player.speed;
   if(keys["ArrowUp"] || keys["w"]) dy -= player.speed;
   if(keys["ArrowDown"] || keys["s"]) dy += player.speed;
 
-  // 조이스틱 입력
   dx += joyDX * player.speed;
   dy += joyDY * player.speed;
 
-  // ✅ 방향(dir) 갱신은 dx/dy 계산 "후"에!
   if(Math.abs(dx) > Math.abs(dy)){
     if(dx > 0) player.dir = "right";
     else if(dx < 0) player.dir = "left";
@@ -1300,73 +1121,20 @@ function updateMovement(){
   let newX = player.x + dx;
   let newY = player.y + dy;
 
-  // 🔥 X축 먼저
-  if(canMoveTo(newX, player.y)){
-    player.x = newX;
-  }
-
-  // 🔥 Y축 따로
-  if(canMoveTo(player.x, newY)){
-    player.y = newY;
-  }
-}
-  function canMoveTo(x,y){
-
-  let left = Math.floor((x - player.radius) / tileSize);
-  let right = Math.floor((x + player.radius) / tileSize);
-  let top = Math.floor((y - player.radius) / tileSize);
-  let bottom = Math.floor((y + player.radius) / tileSize);
-
-  return (
-    map[top] && map[top][left] === 0 &&
-    map[top] && map[top][right] === 0 &&
-    map[bottom] && map[bottom][left] === 0 &&
-    map[bottom] && map[bottom][right] === 0
-  );
-}
-  function canEnemyMoveTo(enemy, x, y){
-
-  let left = Math.floor((x - enemy.radius) / tileSize);
-  let right = Math.floor((x + enemy.radius) / tileSize);
-  let top = Math.floor((y - enemy.radius) / tileSize);
-  let bottom = Math.floor((y + enemy.radius) / tileSize);
-
-  return (
-    map[top] && map[top][left] === 0 &&
-    map[top] && map[top][right] === 0 &&
-    map[bottom] && map[bottom][left] === 0 &&
-    map[bottom] && map[bottom][right] === 0
-  );
-}
-  // ===== 스폰 안전 유틸 (복붙) =====
-function isFloorTile(tx, ty){
-  return !!(map[ty] && map[ty][tx] === 0);
+  if(canMoveTo(newX, player.y)) player.x = newX;
+  if(canMoveTo(player.x, newY)) player.y = newY;
 }
 
-// 반지름까지 고려해서 해당 위치가 "진짜로" 설 수 있는지 체크
-function canSpawnEnemyAt(enemy, x, y){
-  return canEnemyMoveTo(enemy, x, y);
+function updateInvulnerability(){
+  if(player.invul > 0) player.invul--;
 }
-  function updateInvulnerability(){
-  if(player.invul > 0){
-    player.invul--;
-  }
-}
-  function updateEnvironmentSystem(){
-  updateShake();
-}
-function updateShake(){
-  if(shake > 0){
-    shake--;
-  }
-}
+
+function updateEnvironmentSystem(){ updateShake(); }
+function updateShake(){ if(shake > 0) shake--; }
+
 function updateSpawnSystem(){
-
-  // ===== 팩 스폰 =====
   spawnTimer++;
-
   if(spawnTimer >= spawnInterval){
-
     spawnTimer = 0;
 
     let angle = Math.random() * Math.PI * 2;
@@ -1377,45 +1145,29 @@ function updateSpawnSystem(){
 
     let margin = 200;
 
-    if(
-      px > margin &&
-      py > margin &&
-      px < mapSize * tileSize - margin &&
-      py < mapSize * tileSize - margin
-    ){
+    if(px > margin && py > margin && px < mapSize * tileSize - margin && py < mapSize * tileSize - margin){
       createPack(px, py, 18 + Math.floor(Math.random()*10));
     }
 
-    // 점점 빨라지게 (최소 40)
-    if(spawnInterval > 40){
-      spawnInterval -= 1;
-    }
+    if(spawnInterval > 40) spawnInterval -= 1;
   }
 
-  // ===== 보스 주기 =====
   bossTimer++;
-
   bossInterval = Math.max(25*60, 45*60 - level*3*60);
 
   if(bossTimer >= bossInterval){
     bossTimer = 0;
-
-    if(!enemies.some(e => e.type === "boss")){
-      spawnRandomBoss();
-    }
+    if(!enemies.some(e => e.type === "boss")) spawnRandomBoss();
   }
 }
+
 function updateArrows(){
-
   for(let i = arrows.length - 1; i >= 0; i--){
-
     const a = arrows[i];
-
     a.x += a.dx;
     a.y += a.dy;
     a.life--;
 
-    // 타일 충돌(벽에 닿으면 제거)
     const tx = Math.floor(a.x / tileSize);
     const ty = Math.floor(a.y / tileSize);
     if(!map[ty] || map[ty][tx] === 1){
@@ -1423,33 +1175,28 @@ function updateArrows(){
       continue;
     }
 
-    // 플레이어 충돌
     const px = player.x, py = player.y;
- const dxp = a.x - px;
-const dyp = a.y - py;
-const rr = (player.radius + 4);
-if(dxp*dxp + dyp*dyp < rr*rr){
-  // 넉백 방향은 노멀라이즈가 필요해서 여기서만 hypot 사용
-  const dx = px - a.x;
-  const dy = py - a.y;
-  const len = Math.hypot(dx, dy) || 1;
-  damagePlayer(a.damage, (dx/len)*14, (dy/len)*14);
+    const dxp = a.x - px;
+    const dyp = a.y - py;
+    const rr = (player.radius + 4);
+    if(dxp*dxp + dyp*dyp < rr*rr){
+      const dx = px - a.x;
+      const dy = py - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      damagePlayer(a.damage, (dx/len)*14, (dy/len)*14);
+      arrows.splice(i,1);
+      continue;
+    }
 
-  arrows.splice(i,1);
-  continue;
-}
-
-    // 수명 끝
     if(a.life <= 0){
       arrows.splice(i,1);
       continue;
     }
   }
 }
-  
 
-  function levelUpSound(){
-
+/* ===== 레벨업 ===== */
+function levelUpSound(){
   let o = audioCtx.createOscillator();
   let g = audioCtx.createGain();
 
@@ -1466,42 +1213,38 @@ if(dxp*dxp + dyp*dyp < rr*rr){
   o.start();
   o.stop(audioCtx.currentTime + 0.3);
 }
-  function checkLevelUp(){
 
+function checkLevelUp(){
   if(killCount - killsAtLevelStart >= killsForNextLevel){
-
     level++;
-
     killsAtLevelStart = killCount;
-
-    // 🔥 다음 레벨은 더 많이 필요
     killsForNextLevel += 5;
 
-    // 능력 상승
     player.maxHp += 10;
     player.hp = player.maxHp;
 
     baseDamage *= 1 + level * 0.01;
     ultiDamage *= 1 + level * 0.015;
-    player.levelGlow = 60; // 60프레임 = 약 1초
-   for(let i=0;i<60;i++){
-  levelParticles.push({
-    ox: (Math.random()-0.5)*40,   // ✅ 플레이어 기준 오프셋
-    oy: -40 + (Math.random()-0.5)*10,
-    vx: (Math.random()-0.5)*2,
-    vy: Math.random()*3 + 2,
-    life: 60
-  });
-}
+    player.levelGlow = 60;
+
+    for(let i=0;i<60;i++){
+      levelParticles.push({
+        ox: (Math.random()-0.5)*40,
+        oy: -40 + (Math.random()-0.5)*10,
+        vx: (Math.random()-0.5)*2,
+        vy: Math.random()*3 + 2,
+        life: 60
+      });
+    }
 
     levelUpSound();
   }
 }
+
 /* ===== 공격 ===== */
 function checkHit(){
-
   const range = 45;
-  const hitLimit = 12;  // ✅ 한 번 공격에 최대 12명만 처리(최적화)
+  const hitLimit = 12;
   let hitDone = 0;
 
   for(let i=0;i<enemies.length;i++){
@@ -1513,69 +1256,57 @@ function checkHit(){
     const r = range + e.radius;
     if(dx*dx + dy*dy > r*r) continue;
 
-    // 🔥 방향 제한
     if(player.dir === "up" && dy >= 0) continue;
     if(player.dir === "down" && dy <= 0) continue;
     if(player.dir === "right" && dx <= 0) continue;
     if(player.dir === "left" && dx >= 0) continue;
 
-    // 히트 수 제한
     hitDone++;
     if(hitDone > hitLimit) break;
 
-    // ✅ 노멀라이즈(한 번만 hypot)
     const len = Math.hypot(dx, dy) || 1;
     const nx = dx / len;
     const ny = dy / len;
 
     let dealt = baseDamage;
-
     const bossInvul = (e.type === "boss" && e.invul > 0);
 
-    // 데미지(무적이면 안 닳음)
     if(e.invul <= 0){
       e.hp -= dealt;
     }
 
-    // 흡혈
     const heal = dealt * 0.05;
     player.hp = Math.min(player.maxHp, player.hp + heal);
 
-    // 기 오브 20%
     if(Math.random() < 0.2 && player.kiOrbs < player.maxOrbs){
       player.kiOrbs++;
     }
 
-    // 스턴/넉백: 보스 무적 중 면역
     if(bossInvul){
       spawnHitBlood(e.x, e.y, 14);
     }else{
       e.stun = 15;
       let ex = e.x + nx*18;
-let ey = e.y + ny*18;
-if(canEnemyMoveTo(e, ex, e.y)) e.x = ex;
-if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
+      let ey = e.y + ny*18;
+      if(canEnemyMoveTo(e, ex, e.y)) e.x = ex;
+      if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
     }
 
-    // 타격감 사운드
     if(bossInvul) thudSound();
     else hitSound();
 
     shake = 12;
 
-    // 파티클(상한선 권장)
     if(particles.length < 220){
       particles.push({
-        x: e.x,
-        y: e.y,
+        x: e.x, y: e.y,
         vx: nx*4 + (Math.random()-0.5)*4,
         vy: ny*4 + (Math.random()-0.5)*4,
         life: 30
       });
     }
 
-    // 킬 처리
-   if(e.hp <= 0){
+    if(e.hp <= 0){
       killCount++;
       checkLevelUp();
 
@@ -1583,8 +1314,7 @@ if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
 
       if(bloodPools.length < 140){
         bloodPools.push({
-          x: e.x,
-          y: e.y,
+          x: e.x, y: e.y,
           size: 10 + Math.random()*6,
           life: 600
         });
@@ -1598,222 +1328,169 @@ if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
     }
   }
 
-  // 죽은 적 정리
   enemies = enemies.filter(e => e.hp > 0);
   packs.forEach(pack=>{
     pack.enemies = pack.enemies.filter(e=>e.hp>0);
   });
 }
 
-function createBlood(x, y){
-  for(let i = 0; i < 30; i++){
-    bloodParticles.push({
-      x: x,
-      y: y,
-      vx: (Math.random()-0.5) * 10,
-      vy: (Math.random()-0.5) * 10,
-      size: Math.random()*4 + 2,
-      life: 30
-    });
-  }
-}
-
-// ✅ 붙여넣기 패치: updateBlood() 통째로 교체 (filter 제거)
 function updateBlood(){
-
   for(let i = bloodParticles.length - 1; i >= 0; i--){
     const p = bloodParticles[i];
     p.x += p.vx;
     p.y += p.vy;
     p.vy += 0.25;
     p.life--;
-
-    if(p.life <= 0){
-      bloodParticles.splice(i,1);
-    }
+    if(p.life <= 0) bloodParticles.splice(i,1);
   }
-
-  // 상한선
   if(bloodParticles.length > 260){
     bloodParticles.splice(0, bloodParticles.length - 260);
   }
 }
 
-// ✅ 붙여넣기 패치: drawBlood() 통째로 교체 (가벼운 버전)
 function drawBlood(){
-
   if(bloodParticles.length === 0) return;
 
   ctx.save();
   ctx.fillStyle = "#8b0000";
-
-  // 여러 개를 한 path로 묶어서 fill 1번만
   ctx.beginPath();
 
   for(let i=0;i<bloodParticles.length;i++){
     const p = bloodParticles[i];
-
-    // alpha는 입자마다 다르지만, alpha까지 다 적용하려면 fill이 여러번 필요함.
-    // 대신 "구간별로" alpha를 뭉치면 가벼워짐.
-    // 여기서는 아주 가볍게: life 기반으로 3단계만.
     const a = p.life / 30;
     if(a > 0.66) ctx.globalAlpha = 0.9;
     else if(a > 0.33) ctx.globalAlpha = 0.6;
     else ctx.globalAlpha = 0.35;
 
-    // arc 대신 작은 원을 사각형으로 그리면 훨씬 가벼움(픽셀 느낌도 살아남)
-    // 원 유지하고 싶으면 아래 fillRect 대신 arc로 바꾸면 됨.
     ctx.fillRect(p.x - p.size*0.5, p.y - p.size*0.5, p.size, p.size);
   }
-
-  // fillRect는 beginPath가 필요 없지만, 구조 맞추려고 둠
   ctx.restore();
 }
+
 /* ===== 렌더 ===== */
 function draw(){
-  
-ctx.setTransform(1,0,0,1,0,0);
-ctx.globalAlpha = 1;
-ctx.shadowBlur = 0;
-ctx.shadowColor = "transparent";
-ctx.filter = "none";
- ctx.fillStyle="#111";
- ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+  ctx.filter = "none";
 
- let camX=player.x-canvas.width/2;
- let camY=player.y-canvas.height/2;
- let sx=shake?(Math.random()-0.5)*12:0;
- let sy=shake?(Math.random()-0.5)*12:0;
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
- ctx.save();
- ctx.translate(-camX+sx,-camY+sy);
-for(let y = 0; y < map.length; y++){
-  for(let x = 0; x < map[y].length; x++){
-
-    let tile = map[y][x];
-
-    if(tile === 0) ctx.fillStyle = "#222";
-    if(tile === 1) ctx.fillStyle = "#555";
-    if(tile === 2) ctx.fillStyle = "blue";
-    if(tile === 3) ctx.fillStyle = "red";
-
-    ctx.fillRect(
-      x * tileSize,
-      y * tileSize,
-      tileSize,
-      tileSize
-    );
-  }
-}
- 
-
-// ✅ bloodPools 최적화: save/restore 제거 + 너무 작은 건 스킵
-ctx.fillStyle = "#550000";
-for(let i=0;i<bloodPools.length;i++){
-  const b = bloodPools[i];
-  const a = b.life / 600;
-  if(a <= 0.05) continue; // 거의 안 보이면 스킵
-  ctx.globalAlpha = a;
-
-  // arc 유지(웅덩이는 적어서 OK)
-  ctx.beginPath();
-  ctx.arc(b.x, b.y, b.size, 0, Math.PI*2);
-  ctx.fill();
-}
-ctx.globalAlpha = 1;
-fireZones.forEach(f=>{
+  let camX = player.x - canvas.width/2;
+  let camY = player.y - canvas.height/2;
+  let sx = shake ? (Math.random()-0.5)*12 : 0;
+  let sy = shake ? (Math.random()-0.5)*12 : 0;
 
   ctx.save();
+  ctx.translate(-camX+sx, -camY+sy);
 
-  // 🔥 위로 올라가는 불꽃만 남김
-  for(let i=0;i<6;i++){
+  for(let y = 0; y < map.length; y++){
+    for(let x = 0; x < map[y].length; x++){
+      let tile = map[y][x];
+      if(tile === 0) ctx.fillStyle = "#222";
+      if(tile === 1) ctx.fillStyle = "#555";
+      if(tile === 2) ctx.fillStyle = "blue";
+      if(tile === 3) ctx.fillStyle = "red";
+      ctx.fillRect(x*tileSize, y*tileSize, tileSize, tileSize);
+    }
+  }
 
-    let flameHeight = 10 + Math.sin(frameCount*0.2 + i)*6;
-
-    ctx.globalAlpha = 0.6;
-    ctx.fillStyle = "orange";
-
+  ctx.fillStyle = "#550000";
+  for(let i=0;i<bloodPools.length;i++){
+    const b = bloodPools[i];
+    const a = b.life / 600;
+    if(a <= 0.05) continue;
+    ctx.globalAlpha = a;
     ctx.beginPath();
-    ctx.moveTo(f.x - 6 + i*2, f.y);
-    ctx.lineTo(f.x - 3 + i*2, f.y - flameHeight);
-    ctx.lineTo(f.x + i*2, f.y);
+    ctx.arc(b.x, b.y, b.size, 0, Math.PI*2);
     ctx.fill();
   }
-  ctx.restore();
-});
-// ✅ particles 렌더 최적화: fillStyle 1번만
-ctx.fillStyle = "red";
-for(let i=0;i<particles.length;i++){
-  const p = particles[i];
-  ctx.fillRect(p.x, p.y, 3, 3);
-}
-  drawBlood();
-
- enemies.forEach(e=>drawEnemy(e));
-levelParticles.forEach(p=>{
-  ctx.fillStyle = "gold";
-  ctx.fillRect(player.x + p.ox, player.y + p.oy, 4, 4);
-});
-  // ===== 화살 그리기 =====
-arrows.forEach(a=>{
-  ctx.fillStyle = "white";
-  ctx.fillRect(a.x-2, a.y-2, 4, 4);
-});
- ctx.restore();
-  // === UI는 카메라 영향 안 받게 ===
-ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-drawPlayer(canvas.width/2,canvas.height/2);
-drawUI();
   ctx.globalAlpha = 1;
-ctx.shadowBlur = 0;
-ctx.shadowColor = "transparent";
+
+  fireZones.forEach(f=>{
+    ctx.save();
+    for(let i=0;i<6;i++){
+      let flameHeight = 10 + Math.sin(frameCount*0.2 + i)*6;
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = "orange";
+      ctx.beginPath();
+      ctx.moveTo(f.x - 6 + i*2, f.y);
+      ctx.lineTo(f.x - 3 + i*2, f.y - flameHeight);
+      ctx.lineTo(f.x + i*2, f.y);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  ctx.fillStyle = "red";
+  for(let i=0;i<particles.length;i++){
+    const p = particles[i];
+    ctx.fillRect(p.x, p.y, 3, 3);
+  }
+
+  drawBlood();
+  enemies.forEach(e=>drawEnemy(e));
+
+  levelParticles.forEach(p=>{
+    ctx.fillStyle = "gold";
+    ctx.fillRect(player.x + p.ox, player.y + p.oy, 4, 4);
+  });
+
+  arrows.forEach(a=>{
+    ctx.fillStyle = "white";
+    ctx.fillRect(a.x-2, a.y-2, 4, 4);
+  });
+
+  ctx.restore();
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawPlayer(canvas.width/2, canvas.height/2);
+  drawUI();
+
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
 }
 
 /* ===== 플레이어 ===== */
 function drawPlayer(x,y){
-if(player.levelGlow > 0){
-  ctx.shadowColor = "gold";
-  ctx.shadowBlur = player.levelGlow * 0.5;
-}
- ctx.fillStyle="#880000";
- ctx.fillRect(x-10,y-12,20,22);
+  if(player.levelGlow > 0){
+    ctx.shadowColor = "gold";
+    ctx.shadowBlur = player.levelGlow * 0.5;
+  }
 
- ctx.fillStyle="#aa0000";
- ctx.fillRect(x-7,y-20,14,8);
+  ctx.fillStyle="#880000";
+  ctx.fillRect(x-10,y-12,20,22);
 
- ctx.fillStyle="#ffffcc";
- ctx.fillRect(x-8,y-26,4,8);
- ctx.fillRect(x+4,y-26,4,8);
+  ctx.fillStyle="#aa0000";
+  ctx.fillRect(x-7,y-20,14,8);
 
-// 기본 흰 눈
-ctx.fillStyle = "#fff";
-ctx.fillRect(x-3,y-14,2,2);
-ctx.fillRect(x+1,y-14,2,2);
+  ctx.fillStyle="#ffffcc";
+  ctx.fillRect(x-8,y-26,4,8);
+  ctx.fillRect(x+4,y-26,4,8);
 
-ctx.shadowBlur = 0;
-// 🔥 궁극기 발광 오버레이
-if(player.ultiActive){
-
-  ctx.save();
-
-  ctx.shadowColor = "#ff6600";
-  ctx.shadowBlur = 25;
-
-  ctx.fillStyle = "#ffaa00";
-
+  ctx.fillStyle = "#fff";
   ctx.fillRect(x-3,y-14,2,2);
   ctx.fillRect(x+1,y-14,2,2);
 
-  ctx.restore();
+  ctx.shadowBlur = 0;
+
+  if(player.ultiActive){
+    ctx.save();
+    ctx.shadowColor = "#ff6600";
+    ctx.shadowBlur = 25;
+    ctx.fillStyle = "#ffaa00";
+    ctx.fillRect(x-3,y-14,2,2);
+    ctx.fillRect(x+1,y-14,2,2);
+    ctx.restore();
+  }
+
+  drawSword(x,y);
 }
 
- drawSword(x,y);
-}
-
-/* ===== 🔥 최종 고정 칼 모션 ===== */
-function drawSword(x, y) {
-
+function drawSword(x, y){
   ctx.save();
   ctx.translate(x, y);
 
@@ -1822,38 +1499,17 @@ function drawSword(x, y) {
   var angle = 0;
   var t = attackFrame / 8;
 
-  // ▶ RIGHT (베기)
-  if (player.dir === "right") {
-    offsetX = 18;
-    if (attacking) angle = 1.5 * t;
-  }
-
-  // ◀ LEFT (베기)
-  else if (player.dir === "left") {
-    offsetX = -18;
-    if (attacking) angle = -1.5 * t;
-  }
-
-  // ▲ UP (찌르기)
-  else if (player.dir === "up") {
-    offsetY = -18;
-    if (attacking) offsetY -= 25 * t;
-  }
-
-  // ▼ DOWN (눈 아래 시작 찌르기)
-  else if (player.dir === "down") {
-    offsetY = 6;          // 🔥 눈 아래 시작
-    angle = Math.PI;
-    if (attacking) offsetY += 25 * t;
-  }
+  if (player.dir === "right") { offsetX = 18; if (attacking) angle = 1.5 * t; }
+  else if (player.dir === "left") { offsetX = -18; if (attacking) angle = -1.5 * t; }
+  else if (player.dir === "up") { offsetY = -18; if (attacking) offsetY -= 25 * t; }
+  else if (player.dir === "down") { offsetY = 6; angle = Math.PI; if (attacking) offsetY += 25 * t; }
 
   ctx.translate(offsetX, offsetY);
   ctx.rotate(angle);
-
-drawSwordShape(ctx);
-
+  drawSwordShape(ctx);
   ctx.restore();
 }
+
 function drawSwordShape(c){
   c.fillStyle = "#552200";
   c.fillRect(-2, 6, 4, 8);
@@ -1870,165 +1526,119 @@ function drawSwordShape(c){
   c.lineTo(2, -20);
   c.fill();
 }
+
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
   if(e.type === "boss"){
-// 무적 중 붉은 오라
-if(e.invul > 0){
-  ctx.save();
-  ctx.globalAlpha = 0.4;
-  ctx.fillStyle = "red";
-  ctx.beginPath();
-  ctx.arc(e.x, e.y, e.radius + 10, 0, Math.PI*2);
-  ctx.fill();
-  ctx.restore();
-}
-  ctx.fillStyle = "#777777";
-  ctx.fillRect(e.x-20, e.y-25, 40, 50);
+    if(e.invul > 0){
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = "red";
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius + 10, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
 
-  ctx.fillStyle = "#999999";
-  ctx.fillRect(e.x-15, e.y-35, 30, 15);
+    ctx.fillStyle = "#777777";
+    ctx.fillRect(e.x-20, e.y-25, 40, 50);
 
-  // 눈
-  ctx.fillStyle = "red";
-  ctx.fillRect(e.x-6, e.y-15, 4,4);
-  ctx.fillRect(e.x+2, e.y-15, 4,4);
+    ctx.fillStyle = "#999999";
+    ctx.fillRect(e.x-15, e.y-35, 30, 15);
 
-  // 🔥 1페이즈 - 몸에 박힌 칼
-  if(!e.swordPulled){
-    ctx.save();
-    ctx.translate(e.x+5, e.y-5);
-    ctx.rotate(0.7);
-    drawSwordShape(ctx);
-    ctx.restore();
-  }
-  else{
-    // 🔥 2페이즈 - 손에 칼
-    ctx.save();
-    ctx.translate(e.x+28, e.y);
-    ctx.rotate(0.2);
-    drawSwordShape(ctx);
-    ctx.restore();
+    ctx.fillStyle = "red";
+    ctx.fillRect(e.x-6, e.y-15, 4,4);
+    ctx.fillRect(e.x+2, e.y-15, 4,4);
+
+    if(!e.swordPulled){
+      ctx.save();
+      ctx.translate(e.x+5, e.y-5);
+      ctx.rotate(0.7);
+      drawSwordShape(ctx);
+      ctx.restore();
+    }else{
+      ctx.save();
+      ctx.translate(e.x+28, e.y);
+      ctx.rotate(0.2);
+      drawSwordShape(ctx);
+      ctx.restore();
+    }
+    return;
   }
 
-  return;
-}
-if(e.isElite){
-
-  if(e.eliteColor === "yellow"){
-    ctx.fillStyle = "#ffcc00";
+  if(e.isElite){
+    ctx.fillStyle = (e.eliteColor === "yellow") ? "#ffcc00" : "#00aaff";
+  }else if(e.type === "archer"){
+    ctx.fillStyle = "#cccccc";
+  }else if(e.type === "mage"){
+    ctx.fillStyle = "#550088";
   }else{
-    ctx.fillStyle = "#00aaff";
+    ctx.fillStyle = "#006600";
   }
 
-}
-else if(e.type === "archer"){
-  ctx.fillStyle = "#cccccc";
-}
-else if(e.type === "mage"){
-  ctx.fillStyle = "#550088";
-}
-else{
-  ctx.fillStyle = "#006600";
-}
-  // 몸통
-  
   ctx.fillRect(e.x-10,e.y-12,20,22);
 
-  // ===== 머리 색상 =====
-if(e.type === "archer"){
-  ctx.fillStyle = "#dddddd";
-}
-else if(e.type === "mage"){
-  ctx.fillStyle = "#550088";   // 🔥 마법사 머리도 보라
-}
-else{
-  ctx.fillStyle = "#00aa00";   // 근접만 초록
-}
+  if(e.type === "archer") ctx.fillStyle = "#dddddd";
+  else if(e.type === "mage") ctx.fillStyle = "#550088";
+  else ctx.fillStyle = "#00aa00";
+  ctx.fillRect(e.x-7,e.y-20,14,8);
 
-ctx.fillRect(e.x-7,e.y-20,14,8);
-
-  // 눈
   ctx.fillStyle="red";
   ctx.fillRect(e.x-4,e.y-14,3,3);
   ctx.fillRect(e.x+1,e.y-14,3,3);
 
   if(e.attackFrame > 0){
-
     let t = (25 - e.attackFrame) / 25;
     let swingRange = 1.4;
-
-    // 🔥 좌우 완전 대칭 회전
     let angle = (t - 0.5) * 2 * swingRange * e.swingDir;
 
     ctx.save();
-ctx.translate(e.x, e.y-5);
-ctx.rotate(angle);
+    ctx.translate(e.x, e.y-5);
+    ctx.rotate(angle);
 
-if(e.type === "archer"){
-  ctx.fillStyle = "#dddddd";
-}else{
-  ctx.fillStyle = "#006600";
-}
+    if(e.type === "archer") ctx.fillStyle = "#dddddd";
+    else ctx.fillStyle = "#006600";
 
-ctx.fillRect(-20,-3,40,6);
-
-ctx.restore();
+    ctx.fillRect(-20,-3,40,6);
+    ctx.restore();
   }
 }
 
 /* ===== UI ===== */
-
 function drawUI(){
   drawTextUI();
   drawOrbUI();
   drawHpOrb();
-  drawBossHpBar(); // 🔥 여기 추가
+  drawBossHpBar();
   drawMiniMap();
 }
 
-/* ===== 체력바 ===== */
-
-
 function drawMiniMap(){
-  // 미니맵 크기/위치
-  const w = 150;
-  const h = 150;
+  const w = 150, h = 150;
   const x0 = canvas.width - w - 20;
   const y0 = canvas.height - h - 20;
 
   ctx.save();
-
-  // 배경
   ctx.globalAlpha = 0.85;
   ctx.fillStyle = "#000";
   ctx.fillRect(x0, y0, w, h);
 
-  // 스케일(맵 전체를 미니맵에)
   const mapW = mapSize * tileSize;
   const mapH = mapSize * tileSize;
   const sx = w / mapW;
   const sy = h / mapH;
 
-  // 벽(외곽만 있어도 테두리 느낌)
   ctx.globalAlpha = 0.9;
   ctx.strokeStyle = "#555";
   ctx.lineWidth = 2;
   ctx.strokeRect(x0+1, y0+1, w-2, h-2);
 
-  // 플레이어
   ctx.fillStyle = "#ff4444";
-  ctx.fillRect(
-    x0 + player.x * sx - 2,
-    y0 + player.y * sy - 2,
-    4, 4
-  );
+  ctx.fillRect(x0 + player.x * sx - 2, y0 + player.y * sy - 2, 4, 4);
 
-  // 적들(너무 많으면 일부만)
   let drawCount = 0;
   for(let i=0;i<enemies.length;i++){
     if(drawCount > 200) break;
-
     const e = enemies[i];
     if(e.type === "boss"){
       ctx.fillStyle = "#ffffff";
@@ -2042,13 +1652,10 @@ function drawMiniMap(){
     }
     drawCount++;
   }
-
   ctx.restore();
 }
 
-/* ===== 레벨 + 킬 텍스트 ===== */
 function drawTextUI(){
-
   ctx.save();
   ctx.textAlign = "left";
   ctx.font = "bold 18px Arial";
@@ -2065,18 +1672,14 @@ function drawTextUI(){
   ctx.restore();
 }
 
-/* ===== 기 구슬 UI ===== */
 function drawOrbUI(){
-
-  ctx.save();   // 🔥 1️⃣ 여기 추가
+  ctx.save();
 
   let centerX = canvas.width / 2;
   let baseY = canvas.height - 70;
 
   for(let i = 0; i < player.maxOrbs; i++){
-
     let x = centerX - 60 + i * 30;
-
     ctx.beginPath();
     ctx.arc(x, baseY, 10, 0, Math.PI * 2);
 
@@ -2084,23 +1687,21 @@ function drawOrbUI(){
       ctx.fillStyle = "#00ff88";
       ctx.shadowColor = "#00ff88";
       ctx.shadowBlur = 35;
-    }
-    else if(i < player.kiOrbs){
+    }else if(i < player.kiOrbs){
       ctx.fillStyle = "#00ff55";
       ctx.shadowColor = "#00ff55";
       ctx.shadowBlur = 15;
-    }
-    else{
+    }else{
       ctx.fillStyle = "#002211";
     }
-
     ctx.fill();
   }
 
-  ctx.restore();   // 🔥 2️⃣ 여기 추가
+  ctx.restore();
 }
-  function drawHpOrb(){
-ctx.save();
+
+function drawHpOrb(){
+  ctx.save();
   let radius = 25;
   let x = canvas.width - 50;
   let y = 50;
@@ -2111,7 +1712,6 @@ ctx.save();
   let liquidHeight = radius * 2 * hpPercent;
   let topY = y + radius - liquidHeight;
 
-  // ===== 고딕 외곽 메탈 링 =====
   let metal = ctx.createRadialGradient(x, y, radius-10, x, y, radius+12);
   metal.addColorStop(0, "#2a0000");
   metal.addColorStop(0.5, "#550000");
@@ -2122,39 +1722,33 @@ ctx.save();
   ctx.fillStyle = metal;
   ctx.fill();
 
-  // 어두운 외곽 라인
   ctx.lineWidth = 4;
   ctx.strokeStyle = "#000";
   ctx.stroke();
-// 붉은 얇은 내부 링
-ctx.beginPath();
-ctx.arc(x, y, radius+6, 0, Math.PI*2);
-ctx.strokeStyle = "#aa0000";
-ctx.lineWidth = 2;
-ctx.stroke();
-  // ===== 내부 클리핑 =====
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius+6, 0, Math.PI*2);
+  ctx.strokeStyle = "#aa0000";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
   ctx.save();
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI*2);
   ctx.clip();
 
-  // 내부 어둠 (깊이감)
   let innerShadow = ctx.createRadialGradient(x, y+15, 10, x, y, radius);
   innerShadow.addColorStop(0, "#330000");
   innerShadow.addColorStop(1, "#000000");
-
   ctx.fillStyle = innerShadow;
   ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
 
-  // ===== 액체 =====
   ctx.beginPath();
   ctx.moveTo(x-radius, y+radius);
-
   for(let i=0;i<=radius*2;i++){
     let wave = Math.sin(i*0.12 + hpWaveOffset) * 4;
     ctx.lineTo(x-radius+i, topY + wave);
   }
-
   ctx.lineTo(x+radius, y+radius);
   ctx.closePath();
 
@@ -2165,18 +1759,17 @@ ctx.stroke();
   ctx.fillStyle = blood;
   ctx.fill();
 
-  // ===== 유리 반사광 =====
   ctx.beginPath();
   ctx.arc(x-15, y-20, 18, 0, Math.PI*2);
   ctx.fillStyle = "rgba(255,255,255,0.25)";
   ctx.fill();
-// 유리 전체 광택
-let glass = ctx.createRadialGradient(x-10, y-15, 5, x, y, radius);
-glass.addColorStop(0, "rgba(255,255,255,0.25)");
-glass.addColorStop(1, "rgba(255,255,255,0)");
-ctx.fillStyle = glass;
-ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
-  // ===== 저체력 깜빡임 =====
+
+  let glass = ctx.createRadialGradient(x-10, y-15, 5, x, y, radius);
+  glass.addColorStop(0, "rgba(255,255,255,0.25)");
+  glass.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glass;
+  ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+
   if(hpPercent < 0.3){
     if(Math.floor(Date.now()/200)%2===0){
       ctx.beginPath();
@@ -2185,16 +1778,17 @@ ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
       ctx.fill();
     }
   }
-      // ===== 체력 숫자 =====
+
   ctx.fillStyle = "white";
   ctx.font = "bold 16px Arial";
   ctx.textAlign = "center";
   ctx.fillText(Math.floor(player.hp), x, y+6);
+
+  ctx.restore();
   ctx.restore();
 }
-function drawBossHpBar(){
 
-  // 보스 찾기
+function drawBossHpBar(){
   let boss = enemies.find(e => e.type === "boss");
   if(!boss) return;
 
@@ -2207,33 +1801,27 @@ function drawBossHpBar(){
   if(percent < 0) percent = 0;
 
   ctx.save();
-
-  // 배경
   ctx.fillStyle = "#220000";
   ctx.fillRect(x, y, barWidth, barHeight);
 
-  // 체력
   let grad = ctx.createLinearGradient(x, y, x, y + barHeight);
   grad.addColorStop(0, "#ff3333");
   grad.addColorStop(1, "#880000");
-
   ctx.fillStyle = grad;
   ctx.fillRect(x, y, barWidth * percent, barHeight);
 
-  // 테두리
   ctx.lineWidth = 3;
   ctx.strokeStyle = "#550000";
   ctx.strokeRect(x, y, barWidth, barHeight);
 
-  // 텍스트
   ctx.fillStyle = "white";
   ctx.font = "bold 16px Arial";
   ctx.textAlign = "center";
   ctx.fillText("HILLOCK", canvas.width/2, y - 5);
-
   ctx.restore();
 }
-  function drawGameOver(){
+
+function drawGameOver(){
   ctx.setTransform(1,0,0,1,0,0);
   ctx.fillStyle="rgba(0,0,0,0.6)";
   ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -2246,25 +1834,25 @@ function drawBossHpBar(){
   ctx.font="bold 18px Arial";
   ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 40);
 }
+
 canvas.addEventListener("touchstart", ()=>{ if(gameOver) resetGame(); });
 canvas.addEventListener("mousedown", ()=>{ if(gameOver) resetGame(); });
+
 function loop(){
   if(!gameOver){
     update();
     draw();
-  } else {
+  }else{
     drawGameOver();
   }
-  requestAnimationFrame(loop); // ✅ 게임오버여도 계속 루프 유지
+  requestAnimationFrame(loop);
 }
-  // 🔥 맵 랜덤 위치에 보스 소환
 
+/* ===== 리셋 ===== */
 function resetGame(){
-
- // ✅ 리셋 후에도 BGM 다시 시작 (오디오가 이미 언락된 경우)
-if(audioUnlocked && !bgmOsc){
-  bgmOsc = startBGM();
-}
+  if(audioUnlocked && !bgmOsc){
+    bgmOsc = startBGM();
+  }
 
   player.x = mapSize * tileSize / 2;
   player.y = mapSize * tileSize / 2;
@@ -2283,9 +1871,10 @@ if(audioUnlocked && !bgmOsc){
   killsForNextLevel = 20;
   baseDamage = 20;
   ultiDamage = 40;
- 
- bossTimer = 0;
- bossInterval = 45 * 60;
+
+  bossTimer = 0;
+  bossInterval = 45 * 60;
+
   enemies = [];
   packs = [];
   particles = [];
@@ -2293,6 +1882,7 @@ if(audioUnlocked && !bgmOsc){
   bloodParticles = [];
   arrows = [];
   levelParticles = [];
+  fireZones = [];
 
   spawnTimer = 0;
   spawnInterval = 120;
@@ -2303,68 +1893,55 @@ if(audioUnlocked && !bgmOsc){
   gameOver = false;
   document.getElementById("ui").style.display = "flex";
 
-  // 🔥 팩 생성: 시작 주변 2개 보장 + 랜덤 12개
-// 1) 주변 보장
-for(let i=0;i<2;i++){
-  let angle = Math.random()*Math.PI*2;
-  let dist = 260 + Math.random()*180;
-  let px = player.x + Math.cos(angle)*dist;
-  let py = player.y + Math.sin(angle)*dist;
+  // 시작 주변 2개 + 랜덤 12개
+  for(let i=0;i<2;i++){
+    let angle = Math.random()*Math.PI*2;
+    let dist = 260 + Math.random()*180;
+    let px = player.x + Math.cos(angle)*dist;
+    let py = player.y + Math.sin(angle)*dist;
 
-  // 타일 보정
-  let tx = clamp(Math.floor(px/tileSize), 1, mapSize-2);
-  let ty = clamp(Math.floor(py/tileSize), 1, mapSize-2);
+    let tx = clamp(Math.floor(px/tileSize), 1, mapSize-2);
+    let ty = clamp(Math.floor(py/tileSize), 1, mapSize-2);
 
-  if(map[ty][tx] !== 0){
-    // 근처 바닥 찾기
-    for(let k=0;k<50;k++){
-      let rx = clamp(tx + (Math.floor(Math.random()*7)-3), 1, mapSize-2);
-      let ry = clamp(ty + (Math.floor(Math.random()*7)-3), 1, mapSize-2);
-      if(map[ry][rx] === 0){ tx=rx; ty=ry; break; }
+    if(map[ty][tx] !== 0){
+      for(let k=0;k<50;k++){
+        let rx = clamp(tx + (Math.floor(Math.random()*7)-3), 1, mapSize-2);
+        let ry = clamp(ty + (Math.floor(Math.random()*7)-3), 1, mapSize-2);
+        if(map[ry][rx] === 0){ tx=rx; ty=ry; break; }
+      }
     }
+
+    createPack(tx*tileSize + tileSize/2, ty*tileSize + tileSize/2, 18 + Math.floor(Math.random()*10));
   }
 
-  createPack(tx*tileSize + tileSize/2, ty*tileSize + tileSize/2, 18 + Math.floor(Math.random()*10));
-}
-
-// 2) 나머지 랜덤
-for(let i=0;i<12;i++){
-
-  let tileX, tileY;
-
-  while(true){
-    tileX = Math.floor(Math.random()*mapSize);
-    tileY = Math.floor(Math.random()*mapSize);
-    if(map[tileY][tileX] === 0) break;
+  for(let i=0;i<12;i++){
+    let tileX, tileY;
+    while(true){
+      tileX = Math.floor(Math.random()*mapSize);
+      tileY = Math.floor(Math.random()*mapSize);
+      if(map[tileY][tileX] === 0) break;
+    }
+    let px = tileX * tileSize + tileSize/2;
+    let py = tileY * tileSize + tileSize/2;
+    createPack(px, py, 18 + Math.floor(Math.random()*12));
   }
 
-  let px = tileX * tileSize + tileSize/2;
-  let py = tileY * tileSize + tileSize/2;
-
-  createPack(px, py, 18 + Math.floor(Math.random()*12));
-}
-  // 🔥 보스 한 마리
   spawnRandomBoss();
-
-  //bgmOsc = startBGM();
+  resize(); // ✅ 리셋 시 캔버스도 한 번 더 맞춤
 }
 
-
-
-// ===== 공격 아이콘 그리기 =====
+/* ===== 공격 아이콘 ===== */
 const iconCanvas = document.getElementById("attackIcon");
 const iconCtx = iconCanvas.getContext("2d");
-
 iconCtx.clearRect(0, 0, 60, 60);
 iconCtx.save();
 iconCtx.translate(30, 34);
 iconCtx.scale(1.4, 1.4);
 drawSwordShape(iconCtx);
 iconCtx.restore();
-  
+
 resetGame();
 loop();
 </script>
 </body>
 </html>
- 
