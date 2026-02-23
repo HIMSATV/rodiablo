@@ -424,7 +424,7 @@ function damagePlayer(dmg, knockX, knockY){
 }
 
 // ===== 적 근접 공격 =====
-function enemyTryMeleeAttack(e){
+ function enemyTryMeleeAttack(e){
   const dx = player.x - e.x;
   const dy = player.y - e.y;
   const dist = Math.hypot(dx, dy);
@@ -435,6 +435,11 @@ function enemyTryMeleeAttack(e){
   if(dist > reach){
     e.attackFrame = 0;
     return;
+  }
+
+  // ✅ 공격 시작 프레임: swingDir 확정(좌우 휘두름 방향)
+  if(e.attackFrame === 0){
+    e.swingDir = dx < 0 ? -1 : 1;  // 🔥 예전 버전 핵심
   }
 
   // 공격 진행
@@ -757,20 +762,49 @@ function createPack(cx, cy, count){
   packs.push(pack);
 }
   function teleportTo(target){
+
+  // ✅ 이동 전 피폭발(가벼운 버전)
+  spawnHitBlood(player.x, player.y, 18);
+  if(particles.length < 220){
+    for(let i=0;i<10;i++){
+      particles.push({
+        x: player.x,
+        y: player.y,
+        vx: (Math.random()-0.5)*10,
+        vy: (Math.random()-0.5)*10,
+        life: 22
+      });
+    }
+  }
+
   // 목표로 가되, 못 가면 이동 안 함
   if(canMoveTo(target.x, target.y)){
     player.x = target.x;
     player.y = target.y;
   }
+
+  // ✅ 이동 후 피폭발
+  spawnHitBlood(player.x, player.y, 22);
+  if(particles.length < 220){
+    for(let i=0;i<12;i++){
+      particles.push({
+        x: player.x,
+        y: player.y,
+        vx: (Math.random()-0.5)*10,
+        vy: (Math.random()-0.5)*10,
+        life: 26
+      });
+    }
+  }
+
+  shake = Math.max(shake, 10);
 }
 function dealUltimateDamage(){
 
   const radius = 200;
   const r2 = radius * radius;
 
-  // ✅ 궁극기 연출은 “최대한 가볍게”
-  // - hypot 금지(제곱거리)
-  // - 파티클/피 상한 강제
+  let killedAny = false;
 
   for(let i=0; i<enemies.length; i++){
     const e = enemies[i];
@@ -782,19 +816,25 @@ function dealUltimateDamage(){
     // 보스 무적이면 스킵(원하면 지워)
     if(e.type === "boss" && e.invul > 0) continue;
 
-    // 즉사
-    if(e.invul <= 0){
+    // ✅ 이번 타격으로 "살아있던 적"이 죽으면 킬 처리
+    const wasAlive = (e.hp > 0);
+
+    // 즉사(보스도 맞긴 맞게 하고 싶으면 여기서 조건 조절)
+    if(e.type !== "boss"){
       e.hp = 0;
+    }else{
+      // 보스는 궁극기에서 "큰 데미지" 정도로만 (원하면 즉사로 바꿔)
+      if(e.invul <= 0) e.hp -= ultiDamage * 2.2;
     }
+
     e.stun = 30;
 
-    // 피(가벼운 버전)
+    // 피 연출
     spawnHitBlood(e.x, e.y, 18);
 
     // 폭발 파티클(상한)
     if(particles.length < 240){
-      const spawnCount = 12; // 20 -> 12로 줄여도 충분히 화려함
-      for(let k=0;k<spawnCount;k++){
+      for(let k=0;k<12;k++){
         particles.push({
           x: e.x,
           y: e.y,
@@ -804,6 +844,25 @@ function dealUltimateDamage(){
         });
       }
     }
+
+    // ✅ 킬 카운트/레벨업/체감(슬로모)
+    if(wasAlive && e.hp <= 0 && e.type !== "boss"){
+      killCount++;
+      checkLevelUp();
+
+      player.hp = Math.min(player.maxHp, player.hp + 1);
+      slowMotion = 6;          // 🔥 궁극기 킬에도 슬로모
+
+      if(player.kiOrbs < player.maxOrbs){
+        player.kiOrbs++;
+      }
+
+      killedAny = true;
+    }
+  }
+
+  if(killedAny){
+    hitSound();
   }
 
   shake = Math.max(shake, 35);
@@ -902,9 +961,15 @@ function bossCleave(boss){
   shake = Math.max(shake, 22);
 }
 /* ===== 업데이트 ===== */
-function update(){
+ function update(){
   frameCount++;
   if(gameOver) return;
+
+  // ✅ 킬 슬로우모션 (6프레임 멈칫)
+  if(slowMotion > 0){
+    slowMotion--;
+    return;
+  }
 
   updatePlayerState();
   updateUltimateSystem();
