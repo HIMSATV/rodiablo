@@ -1113,26 +1113,30 @@ function updateCombatSystem(){
   }
 }
 
+// ✅ 붙여넣기 패치: updateMovement() 통째로 교체
 function updateMovement(){
 
   let dx = 0;
   let dy = 0;
-  
-  if(Math.abs(dx) > Math.abs(dy)){
-  if(dx > 0) player.dir = "right";
-  else if(dx < 0) player.dir = "left";
-}else{
-  if(dy > 0) player.dir = "down";
-  else if(dy < 0) player.dir = "up";
-}
 
+  // 키 입력
   if(keys["ArrowLeft"] || keys["a"]) dx -= player.speed;
   if(keys["ArrowRight"] || keys["d"]) dx += player.speed;
   if(keys["ArrowUp"] || keys["w"]) dy -= player.speed;
   if(keys["ArrowDown"] || keys["s"]) dy += player.speed;
 
+  // 조이스틱 입력
   dx += joyDX * player.speed;
   dy += joyDY * player.speed;
+
+  // ✅ 방향(dir) 갱신은 dx/dy 계산 "후"에!
+  if(Math.abs(dx) > Math.abs(dy)){
+    if(dx > 0) player.dir = "right";
+    else if(dx < 0) player.dir = "left";
+  }else{
+    if(dy > 0) player.dir = "down";
+    else if(dy < 0) player.dir = "up";
+  }
 
   let newX = player.x + dx;
   let newY = player.y + dy;
@@ -1402,7 +1406,7 @@ if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
     }
 
     // 킬 처리
-
+   if(e.hp <= 0){
       killCount++;
       checkLevelUp();
 
@@ -1789,23 +1793,7 @@ function drawUI(){
 }
 
 /* ===== 체력바 ===== */
-function drawScoreUI(){
-  ctx.save();
-  ctx.textAlign = "left";
-  ctx.font = "bold 16px Arial";
-  ctx.fillStyle = "white";
-  ctx.strokeStyle = "black";
-  ctx.lineWidth = 4;
 
-  ctx.strokeText("SCORE: " + score, 20, 105);
-  ctx.fillText("SCORE: " + score, 20, 105);
-
-  ctx.font = "bold 13px Arial";
-  ctx.strokeText("BEST: " + bestScore, 20, 125);
-  ctx.fillText("BEST: " + bestScore, 20, 125);
-
-  ctx.restore();
-}
 
 function drawMiniMap(){
   // 미니맵 크기/위치
