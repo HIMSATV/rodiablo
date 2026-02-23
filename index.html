@@ -427,6 +427,26 @@ attackBtn.addEventListener("touchend", ()=>{
 },{passive:true});
 
 /* ===== 유틸 ===== */
+  function pruneDeadEnemies(){
+  // 일반 적: hp > 0만 유지
+  // 보스: dead 연출 중이면 deathTimer 남아있을 때만 유지
+  enemies = enemies.filter(e =>
+    (e.hp > 0) ||
+    (e.type === "boss" && e.dead && e.deathTimer > 0)
+  );
+
+  // 팩 배열도 같이 정리
+  for(const p of packs){
+    p.enemies = p.enemies.filter(e => e.hp > 0 || (e.type==="boss" && e.dead && e.deathTimer > 0));
+  }
+}
+
+function getRandomAliveEnemy(){
+  // 살아있는 적만 대상으로 (보스 dead 제외)
+  const alive = enemies.filter(e => e.hp > 0 && !(e.type === "boss" && e.dead));
+  if(alive.length === 0) return null;
+  return alive[(Math.random() * alive.length) | 0];
+}
 function getLevelPenalty(playerLv, monsterLv){
   const diff = monsterLv - playerLv;
 
@@ -1500,10 +1520,15 @@ function updateUltimateSystem(){
   if(player.ultiCount >= 5) endUltimate();
 }
 function performUltimateStrike(){
-  if(enemies.length === 0) return;
-  let target = enemies[Math.floor(Math.random()*enemies.length)];
+  const target = getRandomAliveEnemy();
+  if(!target) { endUltimate(); return; }
+
   teleportTo(target);
   dealUltimateDamage();
+
+  // ✅ 궁극기 한 번 칠 때마다 즉시 정리 (멈춤 방지 핵심)
+  pruneDeadEnemies();
+
   player.ultiCount++;
 }
 function dealUltimateDamage(){
@@ -1555,14 +1580,13 @@ function dealUltimateDamage(){
 
   if(killedAny) hitSound();
   shake = Math.max(shake, 35);
+    // ✅ 궁극기 광역 처치 후 죽은 몹 즉시 정리
+  pruneDeadEnemies();
 }
 
 function updateEnemySystem(){
-
-  // 🔥 시야 기반 팩 활성화
   packs.forEach(pack=>{
     if(pack.activated) return;
-
     for(let i=0;i<pack.enemies.length;i++){
       if(isEnemyOnScreen(pack.enemies[i])){
         pack.activated = true;
@@ -1575,6 +1599,9 @@ function updateEnemySystem(){
     if(e.pack && !e.pack.activated) return;
     updateSingleEnemy(e);
   });
+
+  // ✅ 매 프레임 한 번 더 청소(연속 궁극기/대량 처치 대비)
+  pruneDeadEnemies();
 }
 
 function updateLevelParticles(){
