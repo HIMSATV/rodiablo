@@ -295,7 +295,26 @@ let explosionActive = false;
 let bossSpawned = false;
 let bossTimer = 0;
 let bossInterval = 45 * 60;
+/* ===== 맵핑(POE 스타일) 전역 ===== */
+let mapTier = 1;
 
+let mapRun = {
+  tier: 1,
+  seed: 0,
+  packsToClear: 10,     // 보스 열리는 기준 팩 수
+  clearedPacks: 0,
+  bossSpawned: false,
+  bossDefeated: false,
+};
+
+let portal = {
+  active: false,
+  x: 0,
+  y: 0,
+  r: 32,
+  hold: 0,           // 포탈 진입 대기(자동 진입 방지용)
+  holdNeed: 25       // 25프레임 정도 서있으면 진입
+};
 /* ===== 입력 ===== */
 let joyDX=0, joyDY=0;
 let attacking=false;
@@ -410,6 +429,312 @@ function dist2(ax, ay, bx, by){
   const dx = ax - bx;
   const dy = ay - by;
   return dx*dx + dy*dy;
+}
+/* ===== 유틸/맵핑(POE) ===== */
+
+// 간단 시드 랜덤 (맵 재현 가능하게 하고 싶으면 seed 고정)
+function srand(seed){
+  let s = seed >>> 0;
+  return function(){
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+// 플레이어 시작지점(맵 중앙) 주변은 비워두기
+function clearSpawnArea(cx, cy, radiusTiles=3){
+  const tx = Math.floor(cx / tileSize);
+  const ty = Math.floor(cy / tileSize);
+  for(let y=ty-radiusTiles; y<=ty+radiusTiles; y++){
+    for(let x=tx-radiusTiles; x<=tx+radiusTiles; x++){
+      if(x<=0||y<=0||x>=mapSize-1||y>=mapSize-1) continue;
+      map[y][x] = 0;
+    }
+  }
+}
+
+function buildEmptyMap(){
+  map = [];
+  for(let y=0; y<mapSize; y++){
+    let row = [];
+    for(let x=0; x<mapSize; x++){
+      if(x===0 || y===0 || x===mapSize-1 || y===mapSize-1) row.push(1);
+      else row.push(0);
+    }
+    map.push(row);
+  }
+}
+
+// 랜덤 직사각형 장애물(벽) 배치
+function placeRandomWalls(rng, wallCount){
+  for(let i=0;i<wallCount;i++){
+    const w = 2 + Math.floor(rng()*5);
+    const h = 2 + Math.floor(rng()*5);
+    const x0 = 1 + Math.floor(rng()*(mapSize-2-w));
+    const y0 = 1 + Math.floor(rng()*(mapSize-2-h));
+
+    // 너무 중앙(스폰 근처)에는 깔지 말기
+    const cx = Math.floor(mapSize/2);
+    const cy = Math.floor(mapSize/2);
+    if(Math.abs((x0 + (w>>1)) - cx) < 4 && Math.abs((y0 + (h>>1)) - cy) < 4){
+      continue;
+    }
+
+    for(let y=y0; y<y0+h; y++){
+      for(let x=x0; x<x0+w; x++){
+        if(x<=0||y<=0||x>=mapSize-1||y>=mapSize-1) continue;
+        map[y][x] = 1;
+      }
+    }
+  }
+}
+
+// 연결성 체크(스폰에서 도달 가능한 바닥 비율이 너무 낮으면 다시)
+function floodFillReachableFromPlayer(){
+  const startX = Math.floor(player.x / tileSize);
+  const startY = Math.floor(player.y / tileSize);
+  if(!map[startY] || map[startY][startX] !== 0) return 0;
+
+  const vis = Array.from({length: mapSize}, ()=>Array(mapSize).fill(false));
+  const q = [[startX,startY]];
+  vis[startY][startX] = true;
+  let count = 0;
+
+  while(q.length){
+    const [x,y] = q.pop();
+    count++;
+
+    const nb = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+    for(const [nx,ny] of nb){
+      if(nx<=0||ny<=0||nx>=mapSize-1||ny>=mapSize-1) continue;
+      if(vis[ny][nx]) continue;
+      if(map[ny][nx] !== 0) continue;
+      vis[ny][nx] = true;
+      q.push([nx,ny]);
+    }
+  }
+  return count;
+}
+
+function generateRandomMapForTier(tier){
+  // 티어가 오를수록 장애물 좀 늘려서 “지형 느낌” 강화
+  const seed = (Date.now() ^ (tier*987654321)) >>> 0;
+  const rng = srand(seed);
+
+  // 여러 번 재시도해서 “막힌 맵” 피하기
+  for(let attempt=0; attempt<8; attempt++){
+    buildEmptyMap();
+
+    // 장애물 수: 티어 영향 + 랜덤
+    const wallCount = 22 + Math.floor(tier*2.2) + Math.floor(rng()*10);
+    placeRandomWalls(rng, wallCount);
+
+    clearSpawnArea(player.x, player.y, 3);
+
+    const reachable = floodFillReachableFromPlayer();
+    const totalFloor = (mapSize-2)*(mapSize-2);
+    // 도달가능 바닥 비율 55% 이상이면 OK
+    if(reachable / totalFloor >= 0.55){
+      return seed;
+    }
+  }
+  // 최후: 그냥 빈 맵
+  buildEmptyMap();
+  clearSpawnArea(player.x, player.y, 4);
+  return seed;
+}
+
+// 티어 스케일 함수(여기 숫자만 조절하면 밸런스 전체가 변함)
+function tierScale(tier){
+  return {
+    hpMul:  1 + tier * 0.25,
+    dmgMul: 1 + tier * 0.18,
+    spdMul: 1 + tier * 0.03,
+    eliteBonus: tier * 0.004
+  };
+}
+
+// 맵 시작(= 한 판 시작)
+function startNewMap(nextTier){
+  mapTier = nextTier;
+  mapRun.tier = nextTier;
+  mapRun.clearedPacks = 0;
+  mapRun.bossSpawned = false;
+  mapRun.bossDefeated = false;
+
+  // 목표 팩 수: 티어가 오를수록 더 많이
+  mapRun.packsToClear = 8 + Math.floor(nextTier * 1.5);
+
+  // 포탈 리셋
+  portal.active = false;
+  portal.hold = 0;
+
+  // 기존 엔티티 전부 리셋
+  enemies = [];
+  packs = [];
+  particles = [];
+  bloodPools = [];
+  bloodParticles = [];
+  arrows = [];
+  levelParticles = [];
+  fireZones = [];
+
+  // 스폰/보스 타이머 기반 시스템은 맵핑에선 사실상 끔
+  spawnTimer = 0;
+  spawnInterval = 999999;
+  bossTimer = 0;
+
+  // 플레이어 위치/상태는 “런 계속” 느낌으로 갈 거면 유지해도 되는데
+  // 지금은 일단 안전하게 중앙으로 이동
+  player.x = mapSize * tileSize / 2;
+  player.y = mapSize * tileSize / 2;
+
+  // 랜덤 지형 생성
+  mapRun.seed = generateRandomMapForTier(nextTier);
+
+  // 팩 생성(맵 전체에 배치)
+  spawnMapPacks(nextTier);
+
+  // UI 맞춤
+  resize();
+}
+
+// 팩들을 맵에 랜덤하게 뿌림(= PoE 맵 몹 분포)
+function spawnMapPacks(tier){
+  const rng = srand(mapRun.seed ^ 0xA53C9E1B);
+
+  const packCount = mapRun.packsToClear + 4 + Math.floor(tier*0.6);
+  for(let i=0;i<packCount;i++){
+    let placed = false;
+
+    for(let tries=0; tries<120; tries++){
+      const tx = 1 + Math.floor(rng()*(mapSize-2));
+      const ty = 1 + Math.floor(rng()*(mapSize-2));
+      if(map[ty][tx] !== 0) continue;
+
+      const px = tx*tileSize + tileSize/2;
+      const py = ty*tileSize + tileSize/2;
+
+      // 스폰 근처는 피하기
+      const dx = px - player.x, dy = py - player.y;
+      if(dx*dx + dy*dy < 260*260) continue;
+
+      const count = 14 + Math.floor(rng()*10) + Math.floor(tier*0.4);
+      createPack(px, py, count);
+      placed = true;
+      break;
+    }
+
+    if(!placed){
+      // 못 놓으면 그냥 스킵
+    }
+  }
+
+  // 팩에 cleared 플래그 추가
+  for(const p of packs){
+    p.cleared = false;
+  }
+}
+
+// 팩 클리어 체크 + 진행도 업데이트
+function updateMapProgress(){
+  for(const p of packs){
+    if(!p.activated) continue;
+    if(p.cleared) continue;
+
+    // pack.enemies 배열이 이미 유지되고 있으니 0이면 클리어
+    if(p.enemies.length === 0){
+      p.cleared = true;
+      mapRun.clearedPacks++;
+
+      // 살짝 연출
+      shake = Math.max(shake, 10);
+      slowMotion = Math.max(slowMotion, 2);
+    }
+  }
+
+  // 목표 달성하면 보스 스폰(한 번만)
+  if(!mapRun.bossSpawned && mapRun.clearedPacks >= mapRun.packsToClear){
+    mapRun.bossSpawned = true;
+    spawnRandomBoss(); // 기존 함수 재사용
+  }
+}
+
+// 보스 처치 후 포탈 생성
+function spawnPortal(x, y){
+  portal.active = true;
+  portal.x = x;
+  portal.y = y;
+  portal.hold = 0;
+
+  // 포탈 등장 연출(파티클)
+  for(let i=0;i<90;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = 1 + Math.random()*5;
+    particles.push({
+      x: x + (Math.random()-0.5)*10,
+      y: y + (Math.random()-0.5)*10,
+      vx: Math.cos(a)*sp,
+      vy: Math.sin(a)*sp,
+      life: 30 + Math.floor(Math.random()*25)
+    });
+  }
+}
+
+// 포탈 진입 처리(가까이 서있으면 자동 이동)
+function updatePortal(){
+  if(!portal.active) return;
+
+  const dx = player.x - portal.x;
+  const dy = player.y - portal.y;
+  const rr = (portal.r + player.radius + 8);
+  if(dx*dx + dy*dy < rr*rr){
+    portal.hold++;
+    if(portal.hold >= portal.holdNeed){
+      // 다음 맵(티어+1)
+      startNewMap(mapTier + 1);
+      return;
+    }
+  }else{
+    portal.hold = 0;
+  }
+}
+
+// 포탈 그리기(월드좌표)
+function drawPortal(){
+  if(!portal.active) return;
+
+  // 살짝 회전하는 링 느낌(단순)
+  const pulse = 0.6 + 0.4*Math.sin(frameCount*0.15);
+  const r = portal.r + pulse*6;
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+
+  // 바깥 링
+  ctx.strokeStyle = "rgba(120,180,255,0.85)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(portal.x, portal.y, r, 0, Math.PI*2);
+  ctx.stroke();
+
+  // 안쪽 글로우
+  ctx.fillStyle = "rgba(80,140,255,0.18)";
+  ctx.beginPath();
+  ctx.arc(portal.x, portal.y, r-6, 0, Math.PI*2);
+  ctx.fill();
+
+  // 진입 게이지(서있는 시간)
+  if(portal.hold > 0){
+    const t = clamp(portal.hold / portal.holdNeed, 0, 1);
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(portal.x, portal.y, r+8, -Math.PI/2, -Math.PI/2 + Math.PI*2*t);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
@@ -602,7 +927,7 @@ function spawnEnemy(){
   else type = "melee";
 
   let scale = Math.min(killCount, 200);
-
+  const sc = tierScale(mapTier);
   let enemy = {
     x: ex, y: ey,
     radius: 14,
@@ -627,7 +952,12 @@ function spawnEnemy(){
     castCooldown: 120
   };
 
-  let eliteChance = 0.06 + Math.min(0.14, killCount * 0.001);
+    enemy.hp *= sc.hpMul;
+  enemy.damage *= sc.dmgMul;
+  enemy.speed *= sc.spdMul;
+
+  // 엘리트 확률도 티어에 따라 소폭 증가
+  let eliteChance = (0.06 + Math.min(0.14, killCount * 0.001)) + sc.eliteBonus;
   if(Math.random() < eliteChance){
     enemy.isElite = true;
     enemy.eliteColor = Math.random() < 0.5 ? "yellow" : "blue";
@@ -675,7 +1005,7 @@ function spawnEnemyAt(ex, ey, pack){
 
 function spawnRandomBoss(){
   if(enemies.some(e => e.type === "boss")) return;
-
+const sc = tierScale(mapTier);
   let bx = player.x + 300;
   let by = player.y;
   const scale = 1 + level * 0.15;
@@ -739,23 +1069,29 @@ function spawnRandomBoss(){
 
   if(!canEnemyMoveTo(tempBoss, bx, by)) return;
 
-  enemies.push({
-    x: bx, y: by,
-    radius: 30,
-    type: "boss",
-    maxHp: 800 * scale,
-    hp: 800 * scale,
-    speed: 0.6 + level * 0.02,
-    damage: 25 * scale,
-    stun: 0,
-    attackFrame: 0,
-    swordPulled: false,
-    phase2Used: false,
-    dashCooldown: 120,
-    cleaveCooldown: 160,
-    invul: 0,
-    phaseLock: 0
-  });
+const baseScale = 1 + level * 0.15;
+
+enemies.push({
+  x: bx,
+  y: by,
+  radius: 30,
+  type: "boss",
+
+  maxHp: 800 * baseScale * sc.hpMul,
+  hp: 800 * baseScale * sc.hpMul,
+
+  speed: (0.6 + level * 0.02) * sc.spdMul,
+  damage: 25 * baseScale * sc.dmgMul,
+
+  stun: 0,
+  attackFrame: 0,
+  swordPulled: false,
+  phase2Used: false,
+  dashCooldown: 120,
+  cleaveCooldown: 160,
+  invul: 0,
+  phaseLock: 0
+});
 }
 
 function createPack(cx, cy, count){
@@ -953,7 +1289,11 @@ function update(){
   updateProjectileSystem();
   updateEffectSystem();
   updateEnvironmentSystem();
-  updateSpawnSystem();
+    // ✅ 맵핑 진행도(팩 클리어 → 보스 스폰)
+  updateMapProgress();
+
+  // ✅ 보스 처치 후 포탈 진입 처리
+  updatePortal();
 }
 
 function updatePlayerState(){
@@ -1133,6 +1473,11 @@ function updateSingleEnemy(e){
   // ✅ 보스 사망 연출 중이면 움직임/공격 안 하고 타이머만 감소
   if(e.type === "boss" && e.dead){
     e.deathTimer--;
+        // ✅ 죽음 연출 끝나는 순간 포탈 생성(1회)
+    if(e.deathTimer === 0 && !mapRun.bossDefeated){
+      mapRun.bossDefeated = true;
+      spawnPortal(e.x, e.y);
+    }
     // 연출 중에도 살짝 떨림 느낌
     if(e.deathTimer % 10 === 0){
       shake = Math.max(shake, 10);
@@ -1552,7 +1897,8 @@ function draw(){
     const p = particles[i];
     ctx.fillRect(p.x, p.y, 3, 3);
   }
-
+  // ✅ 포탈(월드)
+  drawPortal();
   drawBlood();
   enemies.forEach(e=>drawEnemy(e));
 
@@ -1852,6 +2198,18 @@ function drawMiniMap(){
   ctx.restore();
 }
 function drawTextUI(){
+    ctx.strokeText("TIER: " + mapTier, 20, 105);
+  ctx.fillText("TIER: " + mapTier, 20, 105);
+
+  const need = mapRun.packsToClear;
+  const got = mapRun.clearedPacks;
+  ctx.strokeText("MAP: " + got + " / " + need, 20, 130);
+  ctx.fillText("MAP: " + got + " / " + need, 20, 130);
+
+  if(portal.active){
+    ctx.strokeText("PORTAL OPEN!", 20, 155);
+    ctx.fillText("PORTAL OPEN!", 20, 155);
+  }
   ctx.save();
   ctx.textAlign = "left";
   ctx.font = "bold 18px Arial";
@@ -2191,6 +2549,7 @@ function resetGame(){
 
   spawnRandomBoss();
   resize(); // ✅ 리셋 시 캔버스도 한 번 더 맞춤
+  startNewMap(1);
 }
 
 /* ===== 공격 아이콘 ===== */
