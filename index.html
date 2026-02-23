@@ -90,6 +90,10 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   box-shadow:0 0 14px rgba(120,180,255,0.55);
   touch-action:none;
   user-select:none;
+ position:absolute;
+left:50%;
+top:-8px;
+transform:translate(-50%, -100%);
 }
 #ultiBtn.active{
   transform:scale(0.88);
@@ -103,10 +107,9 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
 
 /* 👇 여기부터 붙여넣기 */
 #rightBtns{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:12px;
+  position:relative;
+  width:var(--btn);
+  height:var(--btn);
 }
 </style>
 </head>
@@ -123,7 +126,6 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
       <canvas id="attackIcon" width="60" height="60"></canvas>
     </div>
   </div>
-</div>
 </div>
 
 <script>
