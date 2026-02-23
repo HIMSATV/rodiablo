@@ -442,8 +442,11 @@ attackBtn.addEventListener("touchend", ()=>{
 }
 
 function getRandomAliveEnemy(){
-  // 살아있는 적만 대상으로 (보스 dead 제외)
-  const alive = enemies.filter(e => e.hp > 0 && !(e.type === "boss" && e.dead));
+  const alive = enemies.filter(e =>
+    e.hp > 0 &&
+    !(e.type === "boss" && e.dead) &&
+    (!e.pack || e.pack.activated)   // ✅ 화면에 활성화된 팩만
+  );
   if(alive.length === 0) return null;
   return alive[(Math.random() * alive.length) | 0];
 }
@@ -1518,6 +1521,18 @@ function updateUltimateSystem(){
   player.ultiTimer++;
   if(player.ultiTimer % 10 === 0) performUltimateStrike();
   if(player.ultiCount >= 5) endUltimate();
+}
+function endUltimate(){
+  player.ultiActive = false;
+  player.ultiCount = 0;
+  player.ultiTimer = 0;
+
+  explosionActive = false;
+  orbFlash = 12;      // 원치 않으면 0
+
+  // 혹시 공격 상태 꼬임 방지
+  attacking = false;
+  attackFrame = 0;
 }
 function performUltimateStrike(){
   const target = getRandomAliveEnemy();
@@ -2713,14 +2728,36 @@ function drawGameOver(){
 canvas.addEventListener("touchstart", ()=>{ if(gameOver) resetGame(); });
 canvas.addEventListener("mousedown", ()=>{ if(gameOver) resetGame(); });
 
+let lastErr = null;
+
+function drawRuntimeError(e){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="rgba(0,0,0,0.75)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#fff";
+  ctx.font="bold 16px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("RUNTIME ERROR (F12 Console 확인)", canvas.width/2, canvas.height/2 - 10);
+  ctx.font="14px Arial";
+  ctx.fillText(String(e && e.message ? e.message : e), canvas.width/2, canvas.height/2 + 18);
+}
+
 function loop(){
-  if(!gameOver){
-    update();
-    draw();
-  }else{
-    drawGameOver();
+  try{
+    if(!gameOver){
+      update();
+      draw();
+    }else{
+      drawGameOver();
+    }
+    lastErr = null;
+  }catch(e){
+    console.error(e);
+    lastErr = e;
+    drawRuntimeError(e);
+  }finally{
+    requestAnimationFrame(loop);
   }
-  requestAnimationFrame(loop);
 }
 
 /* ===== 리셋 ===== */
