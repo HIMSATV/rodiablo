@@ -275,9 +275,8 @@ let packs = [];
 let particles=[];
 let bloodPools=[];
 let shake=0;
-let killCount = 0;
-let killsForNextLevel = 20;
-let killsAtLevelStart = 0;
+let xp = 0;
+let xpToNext = 120;
 let level = 1;
 let gameOver = false;
 let orbFlash = 0;
@@ -424,6 +423,13 @@ attackBtn.addEventListener("touchend", ()=>{
 },{passive:true});
 
 /* ===== 유틸 ===== */
+function getLevelPenalty(playerLv, monsterLv){
+  const diff = monsterLv - playerLv;
+
+  if(diff >= 0) return 1 + diff * 0.04;   // 높은 몬스터는 +4%씩
+  if(diff <= -6) return 0.1;              // 6 이상 낮으면 90% 감소
+  return 1 + diff * 0.12;                 // 낮으면 급격히 감소
+}
 /* ===== POE 맵핑: 티어 스케일/맵 생성 ===== */
 
 // 티어 기반 스케일(너가 원하는 밸런스로 수치만 조절하면 됨)
@@ -437,7 +443,29 @@ function tierScale(t){
   const eliteDmgMul = 1.9;  // 엘리트 딜 배수
   return { hpMul, dmgMul, spdMul, eliteChance, eliteHpMul, eliteDmgMul };
 }
+function giveXP(enemy){
 
+  let base = 0;
+
+  if(enemy.type === "mage") base = 14;
+  else if(enemy.type === "archer") base = 12;
+  else if(enemy.type === "melee") base = 10;
+  else if(enemy.type === "boss") base = 200 * mapTier;
+
+  if(enemy.isElite) base *= 3;
+
+  // 🔥 레벨 차이 패널티
+  const levelMul = getLevelPenalty(level, mapTier);
+
+  // 🔥 맵 티어 보너스
+  const mapMul = 1 + (mapTier - 1) * 0.08;
+
+  const finalXP = Math.floor(base * levelMul * mapMul);
+
+  xp += finalXP;
+
+  checkLevelUp();
+}
 function makeEnemyStatsByTier(type, t){
   const s = tierScale(t);
 
@@ -1309,8 +1337,7 @@ function dealUltimateDamage(){
     }
 
     if(wasAlive){
-      killCount++;
-      checkLevelUp();
+      giveXP(e);
       player.hp = Math.min(player.maxHp, player.hp + 1);
       slowMotion = 6;
       if(player.kiOrbs < player.maxOrbs) player.kiOrbs++;
@@ -1790,33 +1817,38 @@ function levelUpSound(){
   o.stop(audioCtx.currentTime + 0.3);
 }
 
-function checkLevelUp(){
-  if(killCount - killsAtLevelStart >= killsForNextLevel){
-    level++;
-    killsAtLevelStart = killCount;
-    killsForNextLevel += 5;
 
-    player.maxHp += 10;
+function checkLevelUp(){
+  if(xp >= xpToNext){
+
+    xp -= xpToNext;
+    level++;
+
+    // 다음 레벨 요구 XP (PoE 느낌 곡선)
+    xpToNext = Math.floor(100 + level * level * 20);
+
+    // 스탯 증가
+    player.maxHp += 12;
     player.hp = player.maxHp;
 
-    baseDamage *= 1 + level * 0.01;
-    ultiDamage *= 1 + level * 0.015;
+    baseDamage *= 1.08;
+    ultiDamage *= 1.1;
+
     player.levelGlow = 60;
 
     for(let i=0;i<60;i++){
       levelParticles.push({
-        ox: (Math.random()-0.5)*40,
-        oy: -40 + (Math.random()-0.5)*10,
-        vx: (Math.random()-0.5)*2,
-        vy: Math.random()*3 + 2,
-        life: 60
+        ox:(Math.random()-0.5)*40,
+        oy:-40+(Math.random()-0.5)*10,
+        vx:(Math.random()-0.5)*2,
+        vy:Math.random()*3+2,
+        life:60
       });
     }
 
     levelUpSound();
   }
 }
-
 /* ===== 공격 ===== */
 function checkHit(){
   const range = 45;
@@ -2215,12 +2247,40 @@ function drawEnemy(e){
 /* ===== UI ===== */
 function drawUI(){
   drawTextUI();
+  drawXPBar();   // 👈 추가
   drawOrbUI();
   drawHpOrb();
   drawBossHpBar();
   drawMiniMap();
 }
+  
+}
+function drawXPBar(){
 
+  const barW = canvas.width * 0.6;
+  const barH = 10;
+
+  const x = canvas.width/2 - barW/2;
+  const y = canvas.height - 20;
+
+  const percent = xp / xpToNext;
+
+  ctx.save();
+
+  // 배경
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(x, y, barW, barH);
+
+  // XP
+  ctx.fillStyle = "#33ccff";
+  ctx.fillRect(x, y, barW * percent, barH);
+
+  // 테두리
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.strokeRect(x, y, barW, barH);
+
+  ctx.restore();
+}
 function drawMiniMap(){
 
   const w = 60;
@@ -2322,8 +2382,7 @@ function drawTextUI(){
   ctx.strokeText("Level: " + level, 20, 55);
   ctx.fillText("Level: " + level, 20, 55);
 
-  ctx.strokeText("KILLS: " + killCount, 20, 80);
-  ctx.fillText("KILLS: " + killCount, 20, 80);
+  "XP: " + xp + " / " + xpToNext
 
   ctx.strokeText("TIER: " + mapTier, 20, 105);
   ctx.fillText("TIER: " + mapTier, 20, 105);
