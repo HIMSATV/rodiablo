@@ -1696,33 +1696,59 @@ function drawTextUI(){
 }
 
 function drawOrbUI(){
+
+  const btnRect = document.getElementById("attackBtn").getBoundingClientRect();
+
+  // 버튼 중심(화면좌표)
+  const centerScreenX = btnRect.left + btnRect.width * 0.5;
+  const centerScreenY = btnRect.top  + btnRect.height * 0.5;
+
+  // 화면좌표 -> 캔버스좌표 (캔버스는 uiHeight 위까지만)
+  let cx = centerScreenX;
+  let cy = centerScreenY - uiHeight;
+
+  // 안전 보정(캔버스 밖 방지)
+  cx = Math.max(40, Math.min(canvas.width - 40, cx));
+  cy = Math.max(40, Math.min(canvas.height - 40, cy));
+
+  const orbR = 10;          // 구슬 반지름(기존 10)
+  const ringR = 32;         // ⭐ 오각형 크기(이 값 키우면 더 퍼짐)
+  const startAngle = -Math.PI/2; // 맨 위 꼭지점부터
+
   ctx.save();
 
-  let centerX = canvas.width / 2;
-  let baseY = canvas.height - 70;
+  for(let i=0;i<player.maxOrbs;i++){
 
-  for(let i = 0; i < player.maxOrbs; i++){
-    let x = centerX - 60 + i * 30;
+    // 오각형 꼭지점: 72도(2π/5) 간격
+    const a = startAngle + (i * (Math.PI * 2 / player.maxOrbs));
+
+    const x = cx + Math.cos(a) * ringR;
+    const y = cy + Math.sin(a) * ringR;
+
     ctx.beginPath();
-    ctx.arc(x, baseY, 10, 0, Math.PI * 2);
+    ctx.arc(x, y, orbR, 0, Math.PI*2);
 
     if(orbFlash > 0){
       ctx.fillStyle = "#00ff88";
       ctx.shadowColor = "#00ff88";
       ctx.shadowBlur = 35;
-    }else if(i < player.kiOrbs){
+    }
+    else if(i < player.kiOrbs){
       ctx.fillStyle = "#00ff55";
       ctx.shadowColor = "#00ff55";
       ctx.shadowBlur = 15;
-    }else{
-      ctx.fillStyle = "#002211";
     }
+    else{
+      ctx.fillStyle = "#002211";
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+    }
+
     ctx.fill();
   }
 
   ctx.restore();
 }
-
 function drawHpOrb(){
 
   // ✅ 조이스틱(movePad) 기준으로 위치 잡기
