@@ -801,7 +801,7 @@ function createPack(cx, cy, count){
 }
 function dealUltimateDamage(){
 
-  const radius = 200;
+  const radius = 160;
   const r2 = radius * radius;
 
   let killedAny = false;
@@ -811,28 +811,30 @@ function dealUltimateDamage(){
 
     const dx = e.x - player.x;
     const dy = e.y - player.y;
+
     if(dx*dx + dy*dy > r2) continue;
 
-    // 보스 무적이면 스킵(원하면 지워)
-    if(e.type === "boss" && e.invul > 0) continue;
-
-    // ✅ 이번 타격으로 "살아있던 적"이 죽으면 킬 처리
     const wasAlive = (e.hp > 0);
 
-    // 즉사(보스도 맞긴 맞게 하고 싶으면 여기서 조건 조절)
-    if(e.type !== "boss"){
-      e.hp = 0;
-    }else{
-      // 보스는 궁극기에서 "큰 데미지" 정도로만 (원하면 즉사로 바꿔)
-      if(e.invul <= 0) e.hp -= ultiDamage * 2.2;
+    // 🔥 보스 처리 (즉사 금지 + 큰 데미지)
+    if(e.type === "boss"){
+
+      if(e.invul <= 0){
+        e.hp -= ultiDamage * 2.5;   // ← 여기서 보스 데미지 배율 조절
+        e.stun = 25;
+        spawnHitBlood(e.x, e.y, 14);
+        shake = Math.max(shake, 20);
+      }
+
+      continue;   // 보스는 즉사 루트로 안 감
     }
 
+    // 🔥 일반 몹은 즉사
+    e.hp = 0;
     e.stun = 30;
 
-    // 피 연출
     spawnHitBlood(e.x, e.y, 18);
 
-    // 폭발 파티클(상한)
     if(particles.length < 240){
       for(let k=0;k<12;k++){
         particles.push({
@@ -845,13 +847,13 @@ function dealUltimateDamage(){
       }
     }
 
-    // ✅ 킬 카운트/레벨업/체감(슬로모)
-    if(wasAlive && e.hp <= 0 && e.type !== "boss"){
+    // 🔥 킬 처리
+    if(wasAlive){
       killCount++;
       checkLevelUp();
 
       player.hp = Math.min(player.maxHp, player.hp + 1);
-      slowMotion = 6;          // 🔥 궁극기 킬에도 슬로모
+      slowMotion = 6;  // 궁극기 킬도 멈칫
 
       if(player.kiOrbs < player.maxOrbs){
         player.kiOrbs++;
