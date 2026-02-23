@@ -695,14 +695,7 @@ function generateRandomMapForTier(tier){
 }
 
 // 티어 스케일 함수(여기 숫자만 조절하면 밸런스 전체가 변함)
-function tierScale(tier){
-  return {
-    hpMul:  1 + tier * 0.25,
-    dmgMul: 1 + tier * 0.18,
-    spdMul: 1 + tier * 0.03,
-    eliteBonus: tier * 0.004
-  };
-}
+
 
 // 맵 시작(= 한 판 시작)
 function startNewMap(nextTier){
@@ -1076,7 +1069,6 @@ function spawnEnemy(){
   else if(rand < 0.5) type = "archer";
   else type = "melee";
 
-  let scale = Math.min(killCount, 200);
   const st = makeEnemyStatsByTier(type, mapTier);
 
   let enemy = {
@@ -1120,8 +1112,35 @@ function spawnEnemyAt(ex, ey, pack){
   let rand = Math.random();
   let type = rand < 0.2 ? "mage" : rand < 0.5 ? "archer" : "melee";
 
-  
+  const st = makeEnemyStatsByTier(type, mapTier);
+
+  let enemy = {
+    x: ex, y: ey,
+    radius: 14,
+    stun: 0,
+    invul: 0,
+    attackFrame: 0,
+    swingDir: 1,
+    type,
+    hp: st.hp,
+    speed: st.spd,
+    damage: st.dmg,
+    shootCooldown: 0,
+    castCooldown: 120,
+    pack
+  };
+
   if(!canSpawnEnemyAt(enemy, ex, ey)) return;
+
+  // 팩에서도 엘리트
+  if(Math.random() < st.eliteChance * 0.85){
+    enemy.isElite = true;
+    enemy.eliteColor = Math.random() < 0.5 ? "yellow" : "blue";
+    enemy.speed *= 1.5;
+    enemy.damage *= st.eliteDmgMul;
+    enemy.radius *= 1.2;
+    enemy.hp *= st.eliteHpMul;
+  }
 
   enemies.push(enemy);
   pack.enemies.push(enemy);
@@ -2602,7 +2621,7 @@ function loop(){
 /* ===== 리셋 ===== */
 function resetGame(){
     mapTier = 1;
-  generateRandomMap(mapTier);
+
   if(audioUnlocked && !bgmOsc){
     bgmOsc = startBGM();
   }
@@ -2679,7 +2698,7 @@ function resetGame(){
     createPack(px, py, 18 + Math.floor(Math.random()*12));
   }
 
-  spawnRandomBoss();
+  
   resize(); // ✅ 리셋 시 캔버스도 한 번 더 맞춤
   startNewMap(1);
 }
