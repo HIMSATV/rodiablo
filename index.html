@@ -1644,9 +1644,9 @@ function drawUI(){
 
 function drawMiniMap(){
 
-  const w = 120;
-  const h = 120;
-  const margin = 16;
+  const w = 60;
+  const h = 60;
+  const margin = 12;
 
   const x0 = canvas.width - w - margin;
   const y0 = margin;
@@ -1912,35 +1912,56 @@ function drawHpOrb(){
 }
 
 function drawBossHpBar(){
-  let boss = enemies.find(e => e.type === "boss");
+  const boss = enemies.find(e => e.type === "boss");
   if(!boss) return;
 
-  let barWidth = canvas.width * 0.6;
-  let barHeight = 20;
-  let x = canvas.width/2 - barWidth/2;
-  let y = 20;
+  // ===== 월드좌표 -> 화면좌표 변환 (카메라/쉐이크 반영) =====
+  let camX = player.x - canvas.width/2;
+  let camY = player.y - canvas.height/2;
+
+  // draw()에서 shake로 흔들리니까, 여기선 간단히 shake만큼은 반영 안해도 자연스럽긴 한데
+  // 완전 일치 원하면 draw()에서 쓴 sx,sy를 전역으로 빼야 함.
+  // 지금은 안정적으로 "머리 위" 고정 느낌이 더 좋아서 shake는 제외.
+
+  const screenX = boss.x - camX;
+  const screenY = boss.y - camY;
+
+  // 캔버스 밖이면 안 그림 (성능/깔끔)
+  if(screenX < -100 || screenX > canvas.width + 100 || screenY < -100 || screenY > canvas.height + 100) return;
+
+  // ===== 작고 얇은 체력바 =====
+  const barW = 70;     // ✅ 작게
+  const barH = 7;      // ✅ 얇게
+  const x = screenX - barW/2;
+  const y = screenY - boss.radius - 18; // ✅ 머리 위
 
   let percent = boss.hp / boss.maxHp;
-  if(percent < 0) percent = 0;
+  percent = Math.max(0, Math.min(1, percent));
 
   ctx.save();
-  ctx.fillStyle = "#220000";
-  ctx.fillRect(x, y, barWidth, barHeight);
+  ctx.globalAlpha = 0.9;
 
-  let grad = ctx.createLinearGradient(x, y, x, y + barHeight);
-  grad.addColorStop(0, "#ff3333");
-  grad.addColorStop(1, "#880000");
-  ctx.fillStyle = grad;
-  ctx.fillRect(x, y, barWidth * percent, barHeight);
+  // 배경
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(x, y, barW, barH);
 
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "#550000";
-  ctx.strokeRect(x, y, barWidth, barHeight);
+  // 체력
+  ctx.fillStyle = "#ff4444";
+  ctx.fillRect(x, y, barW * percent, barH);
 
-  ctx.fillStyle = "white";
-  ctx.font = "bold 16px Arial";
+  // 테두리 얇게
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, barW - 1, barH - 1);
+
+  // 숫자(선택) - 너무 작게 원하면 지워도 됨
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = "10px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("HILLOCK", canvas.width/2, y - 5);
+  ctx.fillText(Math.ceil(boss.hp), screenX, y - 2);
+
   ctx.restore();
 }
 
