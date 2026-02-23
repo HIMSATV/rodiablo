@@ -1644,64 +1644,87 @@ function drawUI(){
 
 function drawMiniMap(){
 
-  // 🔥 크기 줄이기 (기존 150 → 100)
-  const w = 100;
-  const h = 100;
+  const w = 90;
+  const h = 90;
+  const margin = 16;
 
-  // 🔥 화면 상단 우측 배치
-  const margin = 20;
   const x0 = canvas.width - w - margin;
   const y0 = margin;
 
+  const radarRange = 700;
+  const scale = w / (radarRange * 2);
+
+  const cx = x0 + w/2;
+  const cy = y0 + h/2;
+
   ctx.save();
 
-  // 배경
+  // ===== 배경 =====
   ctx.globalAlpha = 0.85;
   ctx.fillStyle = "#000";
   ctx.fillRect(x0, y0, w, h);
 
-  const mapW = mapSize * tileSize;
-  const mapH = mapSize * tileSize;
-  const sx = w / mapW;
-  const sy = h / mapH;
-
-  // 테두리
   ctx.globalAlpha = 0.9;
-  ctx.strokeStyle = "#555";
+  ctx.strokeStyle = "#444";
   ctx.lineWidth = 2;
   ctx.strokeRect(x0+1, y0+1, w-2, h-2);
 
-  // 🔥 플레이어
-  ctx.fillStyle = "#ff4444";
-  ctx.fillRect(
-    x0 + player.x * sx - 2,
-    y0 + player.y * sy - 2,
-    4, 4
-  );
+  // ===== 벽 얇은 선 표현 =====
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = "#888";
+  ctx.lineWidth = 1;   // 🔥 얇은 선
 
-  // 🔥 적 표시 (최대 200개 제한 유지)
-  let drawCount = 0;
+  const minTX = Math.max(0, Math.floor((player.x - radarRange) / tileSize));
+  const maxTX = Math.min(mapSize-1, Math.floor((player.x + radarRange) / tileSize));
+  const minTY = Math.max(0, Math.floor((player.y - radarRange) / tileSize));
+  const maxTY = Math.min(mapSize-1, Math.floor((player.y + radarRange) / tileSize));
 
-  for(let i=0;i<enemies.length;i++){
-    if(drawCount > 200) break;
+  for(let ty=minTY; ty<=maxTY; ty++){
+    for(let tx=minTX; tx<=maxTX; tx++){
 
-    const e = enemies[i];
+      if(map[ty][tx] !== 1) continue; // 벽만
 
-    if(e.type === "boss"){
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(x0 + e.x*sx - 3, y0 + e.y*sy - 3, 6, 6);
+      const wx = tx * tileSize;
+      const wy = ty * tileSize;
+
+      const dx = wx - player.x;
+      const dy = wy - player.y;
+
+      const mx = cx + dx * scale;
+      const my = cy + dy * scale;
+
+      const size = tileSize * scale;
+
+      // 화면 밖이면 스킵
+      if(mx+size < x0 || mx > x0+w || my+size < y0 || my > y0+h) continue;
+
+      // 🔥 채우지 않고 라인만
+      ctx.strokeRect(mx, my, size, size);
     }
-    else if(e.isElite){
-      ctx.fillStyle = "#00aaff";
-      ctx.fillRect(x0 + e.x*sx - 2, y0 + e.y*sy - 2, 4, 4);
-    }
-    else{
-      ctx.fillStyle = "#00ff55";
-      ctx.fillRect(x0 + e.x*sx - 1, y0 + e.y*sy - 1, 2, 2);
-    }
-
-    drawCount++;
   }
+
+  // ===== 보스만 표시 =====
+  const boss = enemies.find(e => e.type === "boss");
+  if(boss){
+    const dx = boss.x - player.x;
+    const dy = boss.y - player.y;
+
+    if(dx*dx + dy*dy <= radarRange*radarRange){
+      const mx = cx + dx * scale;
+      const my = cy + dy * scale;
+
+      if(mx >= x0 && mx <= x0+w && my >= y0 && my <= y0+h){
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(mx-3, my-3, 6, 6);
+      }
+    }
+  }
+
+  // ===== 플레이어 =====
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#ff4444";
+  ctx.fillRect(cx-2, cy-2, 4, 4);
 
   ctx.restore();
 }
