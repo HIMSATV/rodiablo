@@ -65,13 +65,19 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
 /* ============================= */
 /* ✅ (추가) 궁극기 중앙 버튼 UI   */
 /* ============================= */
+/* ✅ 오른쪽 버튼 묶음 박스 */
+#btnBox{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;           /* ulti / attack 사이 간격 */
+}
+
+/* ✅ 궁극기 버튼(오각형 중앙 느낌) */
 #ultiBtn{
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  width:46px;
-  height:46px;
+  width:52px;
+  height:52px;
   border-radius:50%;
   background:#113355;
   border:2px solid #66aaff;
@@ -81,13 +87,12 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   color:white;
   font-weight:900;
   font-size:18px;
-  z-index:6;
   box-shadow:0 0 14px rgba(120,180,255,0.55);
   touch-action:none;
   user-select:none;
 }
 #ultiBtn.active{
-  transform:translate(-50%,-50%) scale(0.88);
+  transform:scale(0.88);
   filter:brightness(1.25);
 }
 #ultiBtn.locked{
@@ -103,12 +108,13 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
 <div id="ui">
   <div id="movePad"><div id="stick"></div></div>
 
+ <div id="btnBox">
+  <div id="ultiBtn">U</div>
+
   <div id="attackBtn">
     <canvas id="attackIcon" width="60" height="60"></canvas>
-
-    <!-- ✅ (추가) 궁극기 버튼: 오각형 중앙 -->
-    <div id="ultiBtn">U</div>
   </div>
+</div>
 </div>
 
 <script>
