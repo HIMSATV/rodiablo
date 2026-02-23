@@ -1000,7 +1000,49 @@ function canEnemyMoveTo(enemy, x, y){
 }
 function isFloorTile(tx, ty){ return !!(map[ty] && map[ty][tx] === 0); }
 function canSpawnEnemyAt(enemy, x, y){ return canEnemyMoveTo(enemy, x, y); }
+// ✅ 플레이어-적 겹침 방지(밀어내기)
+function resolvePlayerEnemyOverlap(){
+  const pad = 2; // 살짝 여유
+  for(const e of enemies){
+    // 보스 죽음 연출/팩 비활성/사망 적은 스킵
+    if(e.type === "boss" && e.dead) continue;
+    if(e.hp <= 0) continue;
+    if(e.pack && !e.pack.activated) continue;
 
+    let dx = e.x - player.x;
+    let dy = e.y - player.y;
+    let dist = Math.hypot(dx, dy);
+
+    const minDist = player.radius + e.radius + pad;
+
+    // 완전 같은 좌표로 겹친 경우(0 나눗셈 방지)
+    if(dist === 0){
+      dx = (Math.random() - 0.5) * 0.01;
+      dy = (Math.random() - 0.5) * 0.01;
+      dist = Math.hypot(dx, dy);
+    }
+
+    if(dist < minDist){
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const push = (minDist - dist);
+
+      // 기본은 "적을 밀기" (플레이어 조작감 유지)
+      const ex = e.x + nx * push;
+      const ey = e.y + ny * push;
+
+      if(canEnemyMoveTo(e, ex, ey)){
+        e.x = ex; e.y = ey;
+      }else{
+        // 적이 못 움직이면 플레이어를 반대로 살짝 밀기
+        const px = player.x - nx * push;
+        const py = player.y - ny * push;
+        if(canMoveTo(px, player.y)) player.x = px;
+        if(canMoveTo(player.x, py)) player.y = py;
+      }
+    }
+  }
+}
 /* ===== 플레이어 피격 처리 ===== */
 function damagePlayer(dmg, knockX, knockY){
   if(player.invul > 0 || gameOver) return;
@@ -1448,6 +1490,7 @@ function update(){
   // ✅ 슬로우 중에도 보스 사망 타이머/연출은 진행되게
   updateEnemySystem();
 
+resolvePlayerEnemyOverlap(); // ✅ 추가
   // ✅ 파티클/피 같은 이펙트도 멈추지 않게
   updateEffectSystem();
 
@@ -1456,7 +1499,8 @@ function update(){
 
   updatePlayerState();
   updateUltimateSystem();
-  updateEnemySystem();
+   updateEnemySystem();
+  resolvePlayerEnemyOverlap(); // ✅ 추가
   updateCombatSystem();
   updateProjectileSystem();
   updateEffectSystem();
@@ -2254,7 +2298,6 @@ function drawUI(){
   drawMiniMap();
 }
   
-}
 function drawXPBar(){
 
   const barW = canvas.width * 0.6;
