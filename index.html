@@ -2562,7 +2562,7 @@ function drawTextUI(){
 
 function drawOrbUI(){
 
-  const btnRect = document.getElementById("attackBtn").getBoundingClientRect();
+  const btnRect = document.getElementById("ultiBtn").getBoundingClientRect();
 
   // 버튼 중심(화면좌표)
   const centerScreenX = btnRect.left + btnRect.width * 0.5;
@@ -2624,7 +2624,7 @@ function drawHpOrb(){
   let x = padRect.left + padRect.width * 0.5;
 
   // ✅ Y는 "기(오브) 중심" = 공격버튼(attackBtn) 중심과 동일하게 맞춤
-  const btnRect = document.getElementById("attackBtn").getBoundingClientRect();
+  const btnRect = document.getElementById("ultiBtn").getBoundingClientRect();
   let y = (btnRect.top + btnRect.height * 0.5) - uiH;
 
   // 화면 밖 보정
