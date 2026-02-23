@@ -1606,6 +1606,10 @@ function performUltimateStrike(){
 function dealUltimateDamage(){
   const radius = 160;
   const r2 = radius * radius;
+
+  const ULT_LEECH = 0.12; // ✅ 궁극기 흡혈 비율(예: 12%) 원하는대로 0.08~0.2 추천
+
+  let totalDealt = 0;   // ✅ 이번 궁극기 한 번(1타)에서 준 총 피해량
   let killedAny = false;
 
   for(let i=0; i<enemies.length; i++){
@@ -1614,16 +1618,20 @@ function dealUltimateDamage(){
     const dy = e.y - player.y;
     if(dx*dx + dy*dy > r2) continue;
 
-    const wasAlive = (e.hp > 0);
-
+    // 보스 처리
     if(e.type === "boss"){
       if(e.invul <= 0 && !e.dead){
-        e.hp -= ultiDamage * 2.5;
+        const dmg = ultiDamage * 2.5;
+        const before = e.hp;
+        e.hp -= dmg;
+
+        // ✅ 실제로 깎인 만큼만 합산(오버킬 방지)
+        totalDealt += Math.max(0, Math.min(before, dmg));
+
         e.stun = 25;
         spawnHitBlood(e.x, e.y, 14);
         shake = Math.max(shake, 20);
 
-        // ✅ 궁극기로 보스가 죽어도 사망연출/포탈 로직 타게
         if(e.hp <= 0){
           startBossDeath(e);
         }
@@ -1631,28 +1639,38 @@ function dealUltimateDamage(){
       continue;
     }
 
-    e.hp = 0;
-    e.stun = 30;
-    spawnHitBlood(e.x, e.y, 18);
+    // 일반몹 처리(즉사 유지하되, '피해량'은 현재 HP만큼으로 계산)
+    if(e.hp > 0){
+      const before = e.hp;
+      const dealt = before;   // ✅ 즉사니까 "현재 HP만큼 피해 준 것"으로 잡음
+      totalDealt += dealt;
 
-    if(particles.length < 240){
-      for(let k=0;k<12;k++){
-        particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 40 });
+      e.hp = 0;
+      e.stun = 30;
+      spawnHitBlood(e.x, e.y, 18);
+
+      if(particles.length < 240){
+        for(let k=0;k<12;k++){
+          particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 40 });
+        }
       }
-    }
 
-    if(wasAlive){
       giveXP(e);
-      player.hp = Math.min(player.maxHp, player.hp + 1);
       slowMotion = 6;
       if(player.kiOrbs < player.maxOrbs) player.kiOrbs++;
       killedAny = true;
     }
   }
 
+  // ✅ 데미지 기반 흡혈 적용 (이번 1타에서 준 총 피해량의 %)
+  if(totalDealt > 0){
+    const heal = totalDealt * ULT_LEECH;
+    player.hp = Math.min(player.maxHp, player.hp + heal);
+  }
+
   if(killedAny) hitSound();
   shake = Math.max(shake, 35);
-    // ✅ 궁극기 광역 처치 후 죽은 몹 즉시 정리
+
   pruneDeadEnemies();
 }
 
