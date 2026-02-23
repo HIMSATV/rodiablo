@@ -559,10 +559,13 @@ function nextMap(){
 
   for(let i=0;i<10;i++){
     let tileX, tileY;
-   while(true){
+ for(let tries=0; tries<200; tries++){
   tileX = Math.floor(Math.random() * mapSize);
   tileY = Math.floor(Math.random() * mapSize);
-  if( ... 조건 ... ) break;
+
+  if(map[tileY] && map[tileY][tileX] === 0){
+    break;
+  }
 }
     createPack(tileX*tileSize + tileSize/2, tileY*tileSize + tileSize/2, 18 + Math.floor(Math.random()*12));
   }
