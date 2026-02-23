@@ -802,11 +802,36 @@ function startNewMap(nextTier){
 function spawnMapPacks(tier){
   const rng = srand(mapRun.seed ^ 0xA53C9E1B);
 
-  const packCount = mapRun.packsToClear + 4 + Math.floor(tier*0.6);
+  // ===== 1) 티어별 "맵에 깔리는 팩 수" =====
+  // 기본: 목표팩 + 여유팩 + 티어 보정
+  // 티어 구간별로 팩 수가 더 많이 늘어나도록 가속
+  let packCount =
+    mapRun.packsToClear + 4
+    + Math.floor(tier * 0.8)                // 기존(0.6)보다 증가
+    + (tier >= 4  ? 2 : 0)
+    + (tier >= 8  ? 3 : 0)
+    + (tier >= 12 ? 4 : 0)
+    + (tier >= 16 ? 5 : 0);
+
+  // 너무 과도해지면 상한(원하면 조절)
+  packCount = clamp(packCount, 12, 60);
+
+  // ===== 2) 티어별 "팩당 몹 수" =====
+  // 기본팩: 14 + 랜덤(0~9) + 티어선형(0.6) + 구간 보너스
+  // 대형팩: 확률로 40~60마리(티어 높을수록 확률/규모 증가)
+  const bigPackChance =
+    (tier < 6)  ? 0.06 :
+    (tier < 10) ? 0.10 :
+    (tier < 14) ? 0.14 :
+    (tier < 18) ? 0.18 : 0.22;
+
+  // 팩이 너무 스폰 근처에 몰려도 부담이라, 스폰 회피반경 조금 키움
+  const avoidSpawnR2 = (tier >= 10 ? 320*320 : 260*260);
+
   for(let i=0;i<packCount;i++){
     let placed = false;
 
-    for(let tries=0; tries<120; tries++){
+    for(let tries=0; tries<140; tries++){
       const tx = 1 + Math.floor(rng()*(mapSize-2));
       const ty = 1 + Math.floor(rng()*(mapSize-2));
       if(map[ty][tx] !== 0) continue;
@@ -814,22 +839,54 @@ function spawnMapPacks(tier){
       const px = tx*tileSize + tileSize/2;
       const py = ty*tileSize + tileSize/2;
 
-      // 스폰 근처는 피하기
+      // 스폰 근처 피하기
       const dx = px - player.x, dy = py - player.y;
-      if(dx*dx + dy*dy < 260*260) continue;
+      if(dx*dx + dy*dy < avoidSpawnR2) continue;
 
-      const count = 14 + Math.floor(rng()*10) + Math.floor(tier*0.4);
+      // ---- 팩 마릿수 결정 ----
+      let count;
+
+      const isBig = (rng() < bigPackChance);
+
+      if(isBig){
+        // 대형팩: 40~60(+티어 보정) 느낌
+        // 티어가 높을수록 위쪽으로 치우치게
+        const base = 40 + Math.floor(rng()*15) + Math.floor(tier*0.6);
+        const bonus =
+          (tier >= 8  ? 6 : 0) +
+          (tier >= 12 ? 6 : 0) +
+          (tier >= 16 ? 8 : 0);
+
+        count = base + bonus;
+      }else{
+        // 일반팩: 티어 구간별 체감이 확 올라가도록 보너스 구간
+        const base = 14 + Math.floor(rng()*10) + Math.floor(tier*0.6);
+
+        const spike =
+          (tier >= 4  ? 5 : 0) +
+          (tier >= 8  ? 7 : 0) +
+          (tier >= 12 ? 9 : 0) +
+          (tier >= 16 ? 11 : 0);
+
+        count = base + spike;
+      }
+
+      // 팩당 마릿수 상한 (CPU 보호)
+      count = clamp(count, 12, 80);
+
       createPack(px, py, count);
+
       placed = true;
       break;
     }
 
+    // 못 놓으면 스킵
     if(!placed){
-      // 못 놓으면 그냥 스킵
+      // no-op
     }
   }
 
-  // 팩에 cleared 플래그 추가
+  // 팩에 cleared 플래그 보장
   for(const p of packs){
     p.cleared = false;
   }
