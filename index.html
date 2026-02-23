@@ -197,57 +197,7 @@ function bossUnsheatheSound(){
   o2.stop(now + 0.4);
 }
 function thudSound(){
-  function bossDeathSound(){
-  let now = audioCtx.currentTime;
-
-  // 낮게 떨어지는 베이스
-  let o1 = audioCtx.createOscillator();
-  let g1 = audioCtx.createGain();
-  o1.type = "sawtooth";
-  o1.frequency.setValueAtTime(220, now);
-  o1.frequency.exponentialRampToValueAtTime(45, now + 0.6);
-  g1.gain.setValueAtTime(0.25, now);
-  g1.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
-  o1.connect(g1); g1.connect(audioCtx.destination);
-  o1.start(now); o1.stop(now + 0.65);
-
-  // 터지는 하이 노이즈 느낌 (사각파 짧게)
-  let o2 = audioCtx.createOscillator();
-  let g2 = audioCtx.createGain();
-  o2.type = "square";
-  o2.frequency.setValueAtTime(900, now + 0.05);
-  o2.frequency.exponentialRampToValueAtTime(180, now + 0.18);
-  g2.gain.setValueAtTime(0.12, now + 0.05);
-  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-  o2.connect(g2); g2.connect(audioCtx.destination);
-  o2.start(now + 0.05); o2.stop(now + 0.22);
-}
-  let now = audioCtx.currentTime;
-
-  let o = audioCtx.createOscillator();
-  let g = audioCtx.createGain();
-  o.type = "sine";
-  o.frequency.setValueAtTime(120, now);
-  o.frequency.exponentialRampToValueAtTime(55, now + 0.14);
-  g.gain.setValueAtTime(0.32, now);
-  g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-  o.connect(g);
-  g.connect(audioCtx.destination);
-  o.start(now);
-  o.stop(now + 0.18);
-
-  let o2 = audioCtx.createOscillator();
-  let g2 = audioCtx.createGain();
-  o2.type = "triangle";
-  o2.frequency.setValueAtTime(220, now);
-  o2.frequency.exponentialRampToValueAtTime(90, now + 0.08);
-  g2.gain.setValueAtTime(0.12, now);
-  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-  o2.connect(g2);
-  g2.connect(audioCtx.destination);
-  o2.start(now);
-  o2.stop(now + 0.09);
-}
+ 
 function hitSound(){
   let o=audioCtx.createOscillator();
   let g=audioCtx.createGain();
@@ -333,6 +283,30 @@ const pad = document.getElementById("movePad");
 const stick = document.getElementById("stick");
 const attackBtn = document.getElementById("attackBtn");
 let joyActive=false;
+
+function bossDeathSound(){
+  let now = audioCtx.currentTime;
+
+  let o1 = audioCtx.createOscillator();
+  let g1 = audioCtx.createGain();
+  o1.type = "sawtooth";
+  o1.frequency.setValueAtTime(220, now);
+  o1.frequency.exponentialRampToValueAtTime(45, now + 0.6);
+  g1.gain.setValueAtTime(0.25, now);
+  g1.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+  o1.connect(g1); g1.connect(audioCtx.destination);
+  o1.start(now); o1.stop(now + 0.65);
+
+  let o2 = audioCtx.createOscillator();
+  let g2 = audioCtx.createGain();
+  o2.type = "square";
+  o2.frequency.setValueAtTime(900, now + 0.05);
+  o2.frequency.exponentialRampToValueAtTime(180, now + 0.18);
+  g2.gain.setValueAtTime(0.12, now + 0.05);
+  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+  o2.connect(g2); g2.connect(audioCtx.destination);
+  o2.start(now + 0.05); o2.stop(now + 0.22);
+}
 
 function setStickByVector(vx, vy){
   const r = pad.getBoundingClientRect();
@@ -935,9 +909,16 @@ function update(){
   if(gameOver) return;
 
   if(slowMotion > 0){
-    slowMotion--;
-    return;
-  }
+  slowMotion--;
+
+  // ✅ 슬로우 중에도 보스 사망 타이머/연출은 진행되게
+  updateEnemySystem();
+
+  // ✅ 파티클/피 같은 이펙트도 멈추지 않게
+  updateEffectSystem();
+
+  return;
+}
 
   updatePlayerState();
   updateUltimateSystem();
