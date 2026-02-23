@@ -845,7 +845,22 @@ function bossCleave(boss){
   }
   shake = Math.max(shake, 22);
 }
+function isEnemyOnScreen(e){
+  const camX = player.x - canvas.width/2;
+  const camY = player.y - canvas.height/2;
 
+  const screenLeft   = camX - 50;
+  const screenRight  = camX + canvas.width + 50;
+  const screenTop    = camY - 50;
+  const screenBottom = camY + canvas.height + 50;
+
+  return (
+    e.x > screenLeft &&
+    e.x < screenRight &&
+    e.y > screenTop &&
+    e.y < screenBottom
+  );
+}
 /* ===== 업데이트 ===== */
 function update(){
   frameCount++;
@@ -902,10 +917,17 @@ function endUltimate(){
 }
 
 function updateEnemySystem(){
+
+  // 🔥 시야 기반 팩 활성화
   packs.forEach(pack=>{
-    let dx = player.x - pack.x;
-    let dy = player.y - pack.y;
-    if(dx*dx + dy*dy < 600*600) pack.activated = true;
+    if(pack.activated) return;
+
+    for(let i=0;i<pack.enemies.length;i++){
+      if(isEnemyOnScreen(pack.enemies[i])){
+        pack.activated = true;
+        break;
+      }
+    }
   });
 
   enemies.forEach(e=>{
