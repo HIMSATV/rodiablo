@@ -197,6 +197,31 @@ function bossUnsheatheSound(){
   o2.stop(now + 0.4);
 }
 function thudSound(){
+  function bossDeathSound(){
+  let now = audioCtx.currentTime;
+
+  // 낮게 떨어지는 베이스
+  let o1 = audioCtx.createOscillator();
+  let g1 = audioCtx.createGain();
+  o1.type = "sawtooth";
+  o1.frequency.setValueAtTime(220, now);
+  o1.frequency.exponentialRampToValueAtTime(45, now + 0.6);
+  g1.gain.setValueAtTime(0.25, now);
+  g1.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+  o1.connect(g1); g1.connect(audioCtx.destination);
+  o1.start(now); o1.stop(now + 0.65);
+
+  // 터지는 하이 노이즈 느낌 (사각파 짧게)
+  let o2 = audioCtx.createOscillator();
+  let g2 = audioCtx.createGain();
+  o2.type = "square";
+  o2.frequency.setValueAtTime(900, now + 0.05);
+  o2.frequency.exponentialRampToValueAtTime(180, now + 0.18);
+  g2.gain.setValueAtTime(0.12, now + 0.05);
+  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+  o2.connect(g2); g2.connect(audioCtx.destination);
+  o2.start(now + 0.05); o2.stop(now + 0.22);
+}
   let now = audioCtx.currentTime;
 
   let o = audioCtx.createOscillator();
@@ -411,7 +436,44 @@ function spawnHitBlood(x, y, amount=10){
     });
   }
 }
+function startBossDeath(boss){
+  if(boss.dead) return;
 
+  boss.dead = true;
+  boss.deathTimer = 60;      // ✅ 1초 연출(60fps 기준)
+  boss.deathMax = 60;
+
+  shake = Math.max(shake, 28);
+  slowMotion = Math.max(slowMotion, 10);
+
+  // 피 + 파편
+  spawnHitBlood(boss.x, boss.y, 40);
+
+  // 큰 폭발 파티클(주황/빨강 느낌은 fillStyle이 이미 red라 "피 파편"처럼 보임)
+  for(let i=0;i<140;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = 2 + Math.random()*8;
+    particles.push({
+      x: boss.x + (Math.random()-0.5)*10,
+      y: boss.y + (Math.random()-0.5)*10,
+      vx: Math.cos(a)*sp,
+      vy: Math.sin(a)*sp - (Math.random()*2),
+      life: 45 + Math.floor(Math.random()*25)
+    });
+  }
+
+  // 바닥에 큰 피웅덩이(남는 느낌)
+  if(bloodPools.length < 140){
+    bloodPools.push({
+      x: boss.x,
+      y: boss.y,
+      size: 26,
+      life: 900
+    });
+  }
+
+  bossDeathSound();
+}
 /* ===== 충돌/이동 가능 ===== */
 function canMoveTo(x,y){
   let left = Math.floor((x - player.radius) / tileSize);
@@ -1061,6 +1123,25 @@ function updateBoss(e){
 }
 
 function updateSingleEnemy(e){
+  // ✅ 보스 사망 연출 중이면 움직임/공격 안 하고 타이머만 감소
+  if(e.type === "boss" && e.dead){
+    e.deathTimer--;
+    // 연출 중에도 살짝 떨림 느낌
+    if(e.deathTimer % 10 === 0){
+      shake = Math.max(shake, 10);
+      spawnHitBlood(e.x + (Math.random()-0.5)*12, e.y + (Math.random()-0.5)*12, 10);
+      for(let i=0;i<12;i++){
+        particles.push({
+          x: e.x, y: e.y,
+          vx: (Math.random()-0.5)*6,
+          vy: (Math.random()-0.5)*6,
+          life: 25
+        });
+      }
+    }
+    return;
+  }
+
   if(e.invul > 0) e.invul--;
 
   if(e.phaseLock > 0){
@@ -1336,6 +1417,12 @@ function checkHit(){
     }
 
     if(e.hp <= 0){
+      if(e.type === "boss"){
+  startBossDeath(e);
+  // 보스는 여기서 killCount 처리 안 할 거면 return/continue로 빠져도 됨
+  // 일단은 아래 일반 죽음 로직을 타지 않게 막자:
+  continue;
+}
       killCount++;
       checkLevelUp();
 
@@ -1357,7 +1444,7 @@ function checkHit(){
     }
   }
 
-  enemies = enemies.filter(e => e.hp > 0);
+  enemies = enemies.filter(e => (e.hp > 0) || (e.type === "boss" && e.dead && e.deathTimer > 0));
   packs.forEach(pack=>{
     pack.enemies = pack.enemies.filter(e=>e.hp>0);
   });
@@ -1559,6 +1646,31 @@ function drawSwordShape(c){
 /* ===== 몬스터 ===== */
 function drawEnemy(e){
   if(e.type === "boss"){
+    if(e.dead){
+  const t = (e.deathTimer / e.deathMax); // 1 -> 0
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, t);
+
+  // 커지는 붉은 원(폭발 잔광)
+  ctx.fillStyle = "rgba(255,60,60,0.25)";
+  ctx.beginPath();
+  ctx.arc(e.x, e.y, e.radius + (1-t)*35, 0, Math.PI*2);
+  ctx.fill();
+
+  // 몸통은 점점 사라짐(간단)
+  ctx.fillStyle = "#777777";
+  ctx.fillRect(e.x-20, e.y-25, 40, 50);
+
+  // 붉은 눈 깜빡
+  if(Math.floor(frameCount/3)%2===0){
+    ctx.fillStyle = "rgba(255,0,0,0.8)";
+    ctx.fillRect(e.x-6, e.y-15, 4,4);
+    ctx.fillRect(e.x+2, e.y-15, 4,4);
+  }
+
+  ctx.restore();
+  return;
+}
     if(e.invul > 0){
       ctx.save();
       ctx.globalAlpha = 0.4;
