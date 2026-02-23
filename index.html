@@ -288,6 +288,10 @@ let arrows = [];
 let bloodParticles = [];
 let fireZones = [];
 let frameCount = 0;
+  // ✅ (추가) 누락되면 게임이 멈출 수 있는 전역들
+let killCount = 0;
+let killsAtLevelStart = 0;
+let killsForNextLevel = 20;
 let explosionActive = false;
 let bossSpawned = false;
 let bossTimer = 0;
@@ -1119,18 +1123,25 @@ function spawnEnemy(){
   if(enemies.length >= 300) return;
 
   let tileX, tileY;
-  while(true){
-    tileX = Math.floor(Math.random() * mapSize);
-    tileY = Math.floor(Math.random() * mapSize);
-    if(
-      map[tileY][tileX] === 0 &&
-      map[tileY-1]?.[tileX] === 0 &&
-      map[tileY+1]?.[tileX] === 0 &&
-      map[tileY]?.[tileX-1] === 0 &&
-      map[tileY]?.[tileX+1] === 0
-    ) break;
-  }
+let found = false;
 
+for(let tries=0; tries<500; tries++){
+  tileX = Math.floor(Math.random() * mapSize);
+  tileY = Math.floor(Math.random() * mapSize);
+
+  if(
+    map[tileY]?.[tileX] === 0 &&
+    map[tileY-1]?.[tileX] === 0 &&
+    map[tileY+1]?.[tileX] === 0 &&
+    map[tileY]?.[tileX-1] === 0 &&
+    map[tileY]?.[tileX+1] === 0
+  ){
+    found = true;
+    break;
+  }
+}
+
+if(!found) return; // ✅ 못 찾으면 그냥 스폰 포기 (프리즈 방지)
   let ex = tileX * tileSize + tileSize/2;
   let ey = tileY * tileSize + tileSize/2;
 
@@ -1345,56 +1356,6 @@ function teleportTo(target){
   shake = Math.max(shake, 10);
 }
 
-function dealUltimateDamage(){
-  const radius = 160;
-  const r2 = radius * radius;
-  let killedAny = false;
-
-  for(let i=0; i<enemies.length; i++){
-    const e = enemies[i];
-    const dx = e.x - player.x;
-    const dy = e.y - player.y;
-    if(dx*dx + dy*dy > r2) continue;
-
-    const wasAlive = (e.hp > 0);
-
-    if(e.type === "boss"){
-      if(e.invul <= 0 && !e.dead){
-        e.hp -= ultiDamage * 2.5;
-        e.stun = 25;
-        spawnHitBlood(e.x, e.y, 14);
-        shake = Math.max(shake, 20);
-
-        // ✅ 궁극기로 보스가 죽어도 사망연출/포탈 로직 타게
-        if(e.hp <= 0){
-          startBossDeath(e);
-        }
-      }
-      continue;
-    }
-
-    e.hp = 0;
-    e.stun = 30;
-    spawnHitBlood(e.x, e.y, 18);
-
-    if(particles.length < 240){
-      for(let k=0;k<12;k++){
-        particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 40 });
-      }
-    }
-
-    if(wasAlive){
-      giveXP(e);
-      player.hp = Math.min(player.maxHp, player.hp + 1);
-      slowMotion = 6;
-      if(player.kiOrbs < player.maxOrbs) player.kiOrbs++;
-      killedAny = true;
-    }
-  }
-
-  if(killedAny) hitSound();
-  shake = Math.max(shake, 35);
-}
 
 /* ===== 보스 스킬 ===== */
 function bossEnterPhase2(boss){
