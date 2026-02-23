@@ -932,14 +932,24 @@ function updateEnemySystem(){
     levelParticles.splice(0, levelParticles.length - 200);
   }
 }
-  function updateParticles(){
-  particles.forEach(p=>{
+  // ✅ 붙여넣기 패치: updateParticles() 통째로 교체 (filter 제거)
+function updateParticles(){
+
+  for(let i = particles.length - 1; i >= 0; i--){
+    const p = particles[i];
     p.x += p.vx;
     p.y += p.vy;
     p.life--;
-  });
 
-  particles = particles.filter(p=>p.life > 0);
+    if(p.life <= 0){
+      particles.splice(i,1);
+    }
+  }
+
+  // 안전 상한
+  if(particles.length > 260){
+    particles.splice(0, particles.length - 260);
+  }
 }
 function updateMelee(e){
   const dx = player.x - e.x;
@@ -1471,36 +1481,55 @@ function createBlood(x, y){
   }
 }
 
+// ✅ 붙여넣기 패치: updateBlood() 통째로 교체 (filter 제거)
 function updateBlood(){
-  bloodParticles.forEach(p=>{
+
+  for(let i = bloodParticles.length - 1; i >= 0; i--){
+    const p = bloodParticles[i];
     p.x += p.vx;
     p.y += p.vy;
-    p.vy += 0.25; // 중력
+    p.vy += 0.25;
     p.life--;
-  });
 
-  bloodParticles = bloodParticles.filter(p=>p.life > 0);
-if(bloodParticles.length > 300){
-  bloodParticles.splice(0, 50);
-}
+    if(p.life <= 0){
+      bloodParticles.splice(i,1);
+    }
+  }
+
+  // 상한선
+  if(bloodParticles.length > 260){
+    bloodParticles.splice(0, bloodParticles.length - 260);
+  }
 }
 
+// ✅ 붙여넣기 패치: drawBlood() 통째로 교체 (가벼운 버전)
 function drawBlood(){
 
+  if(bloodParticles.length === 0) return;
+
   ctx.save();
+  ctx.fillStyle = "#8b0000";
 
-  bloodParticles.forEach(p=>{
-    ctx.save();   // 🔥 이 줄 추가
+  // 여러 개를 한 path로 묶어서 fill 1번만
+  ctx.beginPath();
 
-    ctx.globalAlpha = p.life / 30;
-    ctx.fillStyle = "#8b0000";
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-    ctx.fill();
+  for(let i=0;i<bloodParticles.length;i++){
+    const p = bloodParticles[i];
 
-    ctx.restore();   // 🔥 이 줄 추가
-  });
+    // alpha는 입자마다 다르지만, alpha까지 다 적용하려면 fill이 여러번 필요함.
+    // 대신 "구간별로" alpha를 뭉치면 가벼워짐.
+    // 여기서는 아주 가볍게: life 기반으로 3단계만.
+    const a = p.life / 30;
+    if(a > 0.66) ctx.globalAlpha = 0.9;
+    else if(a > 0.33) ctx.globalAlpha = 0.6;
+    else ctx.globalAlpha = 0.35;
 
+    // arc 대신 작은 원을 사각형으로 그리면 훨씬 가벼움(픽셀 느낌도 살아남)
+    // 원 유지하고 싶으면 아래 fillRect 대신 arc로 바꾸면 됨.
+    ctx.fillRect(p.x - p.size*0.5, p.y - p.size*0.5, p.size, p.size);
+  }
+
+  // fillRect는 beginPath가 필요 없지만, 구조 맞추려고 둠
   ctx.restore();
 }
 /* ===== 렌더 ===== */
@@ -1541,15 +1570,20 @@ for(let y = 0; y < map.length; y++){
 }
  
 
- bloodPools.forEach(b=>{
-  ctx.save();
-  ctx.globalAlpha = b.life / 600;
-  ctx.fillStyle="#550000";
+// ✅ bloodPools 최적화: save/restore 제거 + 너무 작은 건 스킵
+ctx.fillStyle = "#550000";
+for(let i=0;i<bloodPools.length;i++){
+  const b = bloodPools[i];
+  const a = b.life / 600;
+  if(a <= 0.05) continue; // 거의 안 보이면 스킵
+  ctx.globalAlpha = a;
+
+  // arc 유지(웅덩이는 적어서 OK)
   ctx.beginPath();
-  ctx.arc(b.x,b.y,b.size,0,Math.PI*2);
+  ctx.arc(b.x, b.y, b.size, 0, Math.PI*2);
   ctx.fill();
-  ctx.restore();
-});
+}
+ctx.globalAlpha = 1;
 fireZones.forEach(f=>{
 
   ctx.save();
@@ -1570,10 +1604,12 @@ fireZones.forEach(f=>{
   }
   ctx.restore();
 });
- particles.forEach(p=>{
-  ctx.fillStyle="red";
-  ctx.fillRect(p.x,p.y,3,3);
- });
+// ✅ particles 렌더 최적화: fillStyle 1번만
+ctx.fillStyle = "red";
+for(let i=0;i<particles.length;i++){
+  const p = particles[i];
+  ctx.fillRect(p.x, p.y, 3, 3);
+}
   drawBlood();
 
  enemies.forEach(e=>drawEnemy(e));
