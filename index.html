@@ -2191,58 +2191,13 @@ function loop(){
   requestAnimationFrame(loop); // ✅ 게임오버여도 계속 루프 유지
 }
   // 🔥 맵 랜덤 위치에 보스 소환
-function spawnRandomBoss(){
-  if(enemies.some(e => e.type === "boss")) return;
 
-  let bx = player.x + 300;
-  let by = player.y;
-
-  // 맵 랜덤 바닥 타일에서, 플레이어랑 300 이상 떨어진 곳
-  for(let i=0;i<120;i++){
-    let tileX = Math.floor(Math.random() * mapSize);
-    let tileY = Math.floor(Math.random() * mapSize);
-
-    if(map[tileY][tileX] !== 0) continue;
-
-    let tx = tileX * tileSize + tileSize/2;
-    let ty = tileY * tileSize + tileSize/2;
-
-    if(Math.hypot(tx - player.x, ty - player.y) > 300){
-      bx = tx; by = ty;
-      break;
-    }
-  }
-
-  let scale = 1 + level * 0.15;
-// ✅ 보스도 스폰 위치가 진짜 안전한지(반지름 포함) 체크
-let tempBoss = { radius: 30 };
-if(!canEnemyMoveTo(tempBoss, bx, by)) return; // 안전 아니면 그냥 스폰 취소
-  enemies.push({
-    x: bx,
-    y: by,
-    radius: 30,
-    type: "boss",
-    maxHp: 800 * scale,
-    hp: 800 * scale,
-    speed: 0.6 + level * 0.02,
-    damage: 25 * scale,
-    stun: 0,
-    attackFrame: 0,
-    swordPulled: false,
-    phase2Used: false,
-
-    dashCooldown: 120,
-    cleaveCooldown: 160,
-    invul: 0,
-    phaseLock: 0
-  });
-}
 function resetGame(){
 
-  if(bgmOsc){
-    bgmOsc.stop();
-    bgmOsc = null;
-  }
+ // ✅ 리셋 후에도 BGM 다시 시작 (오디오가 이미 언락된 경우)
+if(audioUnlocked && !bgmOsc){
+  bgmOsc = startBGM();
+}
 
   player.x = mapSize * tileSize / 2;
   player.y = mapSize * tileSize / 2;
