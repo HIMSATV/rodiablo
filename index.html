@@ -6,11 +6,12 @@
 <title>Oni Samurai</title>
 <style>
 :root{
+  --uiScale: 1.2; /* ✅ UI 20% 확대 */
   /* ✅ 기기별 UI 자동 스케일 (아이폰12미니 포함) */
-  --uiH: clamp(84px, 16vh, 120px);
-  --pad: clamp(66px, 12.5vw, 90px);
-  --stick: clamp(28px, 5.6vw, 40px);
-  --btn: clamp(70px, 13vw, 90px);
+--uiH: clamp(calc(84px * var(--uiScale)),  calc(16vh * var(--uiScale)),  calc(120px * var(--uiScale)));
+--pad: clamp(calc(66px * var(--uiScale)),  calc(12.5vw * var(--uiScale)), calc(90px  * var(--uiScale)));
+--stick:clamp(calc(28px * var(--uiScale)),  calc(5.6vw * var(--uiScale)),  calc(40px  * var(--uiScale)));
+--btn: clamp(calc(70px * var(--uiScale)),  calc(13vw * var(--uiScale)),   calc(90px  * var(--uiScale)));
 }
 
 body{
