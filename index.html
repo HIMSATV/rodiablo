@@ -100,6 +100,14 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   box-shadow:none;
   filter:saturate(0.6);
 }
+
+/* 👇 여기부터 붙여넣기 */
+#rightBtns{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:12px;
+}
 </style>
 </head>
 <body>
@@ -1597,7 +1605,12 @@ function updateUltimateSystem(){
   if(player.ultiTimer % 10 === 0) performUltimateStrike();
   if(player.ultiCount >= 5) endUltimate();
 }
-
+function endUltimate(){
+  player.ultiActive = false;
+  player.ultiTimer = 0;
+  player.ultiCount = 0;
+  explosionActive = false;
+}
 /* ✅ (주의) 네 코드에 endUltimate()가 원래 있어야 정상동작해.
    만약 네 파일 어딘가에 endUltimate가 없다면 알려줘! */
 function performUltimateStrike(){
