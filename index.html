@@ -616,32 +616,102 @@ function spawnEnemyAt(ex, ey, pack){
   pack.enemies.push(enemy);
 }
 
-function spawnBoss(){
+// ✅ 붙여넣기 패치: spawnRandomBoss() 통째로 교체 (스폰 재시도 버전)
+function spawnRandomBoss(){
   if(enemies.some(e => e.type === "boss")) return;
 
-  let scale = 1 + level * 0.15;
-
-  // 플레이어 근처 랜덤 스폰 (너무 가까우면 안)
   let bx = player.x + 300;
   let by = player.y;
 
-  // 간단 보정(벽 피하기)
-  let tries = 80;
-  while(tries--){
-    let angle = Math.random()*Math.PI*2;
-    let dist = 320 + Math.random()*220;
-    let tx = player.x + Math.cos(angle)*dist;
-    let ty = player.y + Math.sin(angle)*dist;
+  const scale = 1 + level * 0.15;
 
-    let tileX = Math.floor(tx / tileSize);
-    let tileY = Math.floor(ty / tileSize);
+  // ✅ 반지름 포함 안전 체크용 임시 보스
+  const tempBoss = { radius: 30 };
 
-    if(map[tileY] && map[tileY][tileX] === 0){
-      bx = tileX * tileSize + tileSize/2;
-      by = tileY * tileSize + tileSize/2;
-      break;
+  // 1) 먼저 "랜덤 바닥 타일"에서 플레이어와 300 이상 떨어진 곳 찾기
+  let found = false;
+
+  for(let i=0;i<160;i++){
+    let tileX = Math.floor(Math.random() * mapSize);
+    let tileY = Math.floor(Math.random() * mapSize);
+
+    if(!map[tileY] || map[tileY][tileX] !== 0) continue;
+
+    let tx = tileX * tileSize + tileSize/2;
+    let ty = tileY * tileSize + tileSize/2;
+
+    // 플레이어랑 너무 가까우면 패스
+    const dx = tx - player.x;
+    const dy = ty - player.y;
+    if(dx*dx + dy*dy < 300*300) continue;
+
+    // 반지름까지 고려해서 진짜로 설 수 있는지
+    if(!canEnemyMoveTo(tempBoss, tx, ty)) continue;
+
+    bx = tx; by = ty;
+    found = true;
+    break;
+  }
+
+  // 2) 못 찾았으면: 플레이어 주변 링(원형)으로 위치 잡고, 거기서 근처 타일을 확장 탐색
+  if(!found){
+
+    // 플레이어 기준 임시 목표점(원형 링)
+    let angle = Math.random() * Math.PI * 2;
+    let dist = 340 + Math.random() * 260; // 340~600
+    let cx = player.x + Math.cos(angle) * dist;
+    let cy = player.y + Math.sin(angle) * dist;
+
+    let baseTX = Math.floor(cx / tileSize);
+    let baseTY = Math.floor(cy / tileSize);
+
+    // ✅ 근처 확장 탐색(반경 1~6 타일)
+    outer:
+    for(let r=1; r<=6; r++){
+      for(let oy=-r; oy<=r; oy++){
+        for(let ox=-r; ox<=r; ox++){
+          // 테두리만 훑기(가볍게)
+          if(Math.abs(ox)!==r && Math.abs(oy)!==r) continue;
+
+          let txi = baseTX + ox;
+          let tyi = baseTY + oy;
+
+          if(!map[tyi] || map[tyi][txi] !== 0) continue;
+
+          let tx = txi * tileSize + tileSize/2;
+          let ty = tyi * tileSize + tileSize/2;
+
+          const dx = tx - player.x;
+          const dy = ty - player.y;
+          if(dx*dx + dy*dy < 280*280) continue; // 최소거리 약간 완화
+
+          if(!canEnemyMoveTo(tempBoss, tx, ty)) continue;
+
+          bx = tx; by = ty;
+          found = true;
+          break outer;
+        }
+      }
     }
   }
+
+  // 3) 그래도 못 찾았으면: "완전 취소" 대신, 현재 bx/by라도 한 번 더 안전 보정 시도
+  if(!found){
+    // bx/by가 벽이면 근처 몇 번만 흔들어서 시도
+    for(let k=0;k<40;k++){
+      let tx = bx + (Math.random()-0.5) * tileSize * 3;
+      let ty = by + (Math.random()-0.5) * tileSize * 3;
+
+      if(canEnemyMoveTo(tempBoss, tx, ty)){
+        bx = tx; by = ty;
+        found = true;
+        break;
+      }
+    }
+  }
+
+  // 4) 최종: 정말로 불가능하면(거의 없음) 그때만 스폰 취소
+  if(!canEnemyMoveTo(tempBoss, bx, by)) return;
 
   enemies.push({
     x: bx,
