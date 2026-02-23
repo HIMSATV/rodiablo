@@ -1610,36 +1610,27 @@ function updateBoss(e){
 }
 
 function updateSingleEnemy(e){
-  // ✅ 보스 사망 연출 중이면 움직임/공격 안 하고 타이머만 감소
-  if(e.type === "boss" && e.dead){
-    e.deathTimer--;
-        // ✅ 연출 끝나면 다음 맵으로
-    if(e.deathTimer <= 0){
-      // 보스가 더 이상 enemies에 없어도 되도록
-      // (필터가 제거하기 전에 즉시 맵 전환)
-      nextMap();
-      return;
-    }
-        // ✅ 죽음 연출 끝나는 순간 포탈 생성(1회)
-    if(e.deathTimer === 0 && !mapRun.bossDefeated){
-      mapRun.bossDefeated = true;
-      spawnPortal(e.x, e.y);
-    }
-    // 연출 중에도 살짝 떨림 느낌
-    if(e.deathTimer % 10 === 0){
-      shake = Math.max(shake, 10);
-      spawnHitBlood(e.x + (Math.random()-0.5)*12, e.y + (Math.random()-0.5)*12, 10);
-      for(let i=0;i<12;i++){
-        particles.push({
-          x: e.x, y: e.y,
-          vx: (Math.random()-0.5)*6,
-          vy: (Math.random()-0.5)*6,
-          life: 25
-        });
-      }
-    }
-    return;
+if(e.type === "boss" && e.dead){
+  e.deathTimer--;
+
+  // 연출 중 파티클
+  if(e.deathTimer % 10 === 0){
+    shake = Math.max(shake, 10);
+    spawnHitBlood(
+      e.x + (Math.random()-0.5)*12,
+      e.y + (Math.random()-0.5)*12,
+      10
+    );
   }
+
+  // 🔥 연출 끝나는 순간 포탈 1회 생성
+  if(e.deathTimer === 1 && !mapRun.bossDefeated){
+    mapRun.bossDefeated = true;
+    spawnPortal(e.x, e.y);
+  }
+
+  return;
+}
 
   if(e.invul > 0) e.invul--;
 
@@ -2700,7 +2691,7 @@ function resetGame(){
 
   
   resize(); // ✅ 리셋 시 캔버스도 한 번 더 맞춤
-  startNewMap(1);
+
 }
 
 /* ===== 공격 아이콘 ===== */
