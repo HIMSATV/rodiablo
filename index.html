@@ -265,22 +265,26 @@ let player={
   dir:"left",
   speed:5,
   radius:14,
-  hp:100,maxHp:100,
+
+  hp:100,
+  maxHp:100,
+  baseMaxHp:100,   // ✅ 추가: 레벨업/영구 증가용 베이스 체력
+
+  baseArmor:0,     // ✅ 추가: 기본 방어력(영구/레벨업/장비 기본값)
   invul:0,
   knockbackX:0,
   knockbackY:0,
+
   kiOrbs:0,
   maxOrbs:5,
   levelGlow:0,
   ultiActive:false,
   ultiCount:0,
   ultiTimer:0,
-  buffs: {
-  dmgMul: 1,
-  spdMul: 1,
-  atkSpdMul: 1
-},
-activeBuffs: []
+
+  // ✅ buffs 기본값은 updateBuffs에서 매 프레임 세팅
+  buffs: { dmgMul:1, spdMul:1, atkSpdMul:1 },
+  activeBuffs: []
 };
 
 let map = [];
@@ -460,25 +464,76 @@ attackBtn.addEventListener("touchend", ()=>{
 
 
 /* ===== 유틸 ===== */
-function applyBuff(target, type, value, duration, source=""){
+
+// ✅ 확장 가능한 기본 버프 스탯
+function defaultBuffStats(){
+  return {
+    // 공격계
+    dmgMul: 1,
+    spdMul: 1,
+    atkSpdMul: 1,
+
+    // 범위계 (공용 + 스킬별)
+    rangeMul: 1,        // 평타/궁극기 모두에 적용되는 "공용 범위"
+    meleeRangeMul: 1,   // 평타 전용
+    aoeMul: 1,          // 광역(폭발/장판 등) 공용
+    ultiAoeMul: 1,      // 궁극기 폭파 전용
+
+    // 방어계
+    armorAdd: 0,        // ✅ 방어력(가산)
+    armorMul: 1,        // ✅ 방어력(배수) - 필요 없으면 안 써도 됨
+    maxHpMul: 1,        // ✅ 최대체력 배수
+    maxHpAdd: 0,        // ✅ 최대체력 가산
+    hpRegen: 0          // ✅ 초당 체력 재생(가산)
+  };
+}
+
+/**
+ * applyBuff(target, type, value, duration, source="", mode="mul")
+ * - mode: "mul" 또는 "add"
+ * - 기존 코드(leader 오라)의 "damage / atkSpeed / speed" 호출도 그대로 동작하게 맵핑됨
+ */
+function applyBuff(target, type, value, duration, source="", mode="mul"){
   if(!target.activeBuffs) target.activeBuffs = [];
 
-  const key = type + "|" + source;
+  const key = type + "|" + source + "|" + mode;
   const b = target.activeBuffs.find(x => x.key === key);
 
   if(b){
-    // 같은 버프면 "추가"가 아니라 "갱신"
     b.value = value;
     b.duration = Math.max(b.duration, duration);
   }else{
-    target.activeBuffs.push({ key, type, value, duration });
+    target.activeBuffs.push({ key, type, value, duration, mode });
   }
 }
 
-function updateBuffs(target){
-  if(!target.activeBuffs) return;
+// ✅ 타입명을 buffs 키로 매핑(호환 + 확장)
+function mapBuffTypeToStat(type){
+  // 기존 호환
+  if(type === "damage")   return "dmgMul";
+  if(type === "speed")    return "spdMul";
+  if(type === "atkSpeed") return "atkSpdMul";
 
-  target.buffs = { dmgMul:1, spdMul:1, atkSpdMul:1 };
+  // 신규(아이템/버프용)
+  if(type === "range")        return "rangeMul";        // 공용 범위
+  if(type === "meleeRange")   return "meleeRangeMul";   // 평타 범위
+  if(type === "aoe")          return "aoeMul";          // 광역 범위 공용
+  if(type === "ultiAoe")      return "ultiAoeMul";      // 궁극기 폭파
+
+  if(type === "armor")        return "armorAdd";        // 방어력(기본은 add로 쓰는 걸 추천)
+  if(type === "armorMul")     return "armorMul";
+  if(type === "maxHpMul")     return "maxHpMul";
+  if(type === "maxHp")        return "maxHpAdd";
+  if(type === "hpRegen")      return "hpRegen";
+
+  return null;
+}
+
+function updateBuffs(target){
+  if(!target.activeBuffs) target.activeBuffs = [];
+
+  // 기본값
+  target.buffs = defaultBuffStats();
 
   for(let i = target.activeBuffs.length - 1; i >= 0; i--){
     const b = target.activeBuffs[i];
@@ -489,9 +544,30 @@ function updateBuffs(target){
       continue;
     }
 
-    if(b.type === "damage") target.buffs.dmgMul *= b.value;
-    if(b.type === "speed") target.buffs.spdMul *= b.value;
-    if(b.type === "atkSpeed") target.buffs.atkSpdMul *= b.value;
+    const stat = mapBuffTypeToStat(b.type);
+    if(!stat) continue;
+
+    // mul/add 처리
+    if(b.mode === "mul"){
+      if(target.buffs[stat] !== undefined) target.buffs[stat] *= b.value;
+    }else if(b.mode === "add"){
+      if(target.buffs[stat] !== undefined) target.buffs[stat] += b.value;
+    }
+  }
+
+  // ✅ 플레이어면 maxHp/armor 같은 “최종값” 반영
+  if(target === player){
+    const b = target.buffs;
+
+    // 최종 최대체력 = baseMaxHp * maxHpMul + maxHpAdd
+    const newMax = Math.max(1, Math.floor(target.baseMaxHp * (b.maxHpMul ?? 1) + (b.maxHpAdd ?? 0)));
+    target.maxHp = newMax;
+
+    // 체력 상한 보정
+    if(target.hp > target.maxHp) target.hp = target.maxHp;
+
+    // 최종 방어력(표시/계산용)
+    target.armor = Math.max(0, (target.baseArmor + (b.armorAdd ?? 0)) * (b.armorMul ?? 1));
   }
 }
   function pruneDeadEnemies(){
@@ -1308,7 +1384,14 @@ function resolvePlayerEnemyOverlap(){
 function damagePlayer(dmg, knockX, knockY){
   if(player.invul > 0 || gameOver) return;
 
-  player.hp -= dmg;
+  // ✅ 방어력 기반 피해 감소
+  const armor = (player.armor ?? 0);
+
+  // 감쇠식(자연스러운 곡선): dmg * 50/(50+armor)
+  const reduced = dmg * (50 / (50 + Math.max(0, armor)));
+  const finalDmg = Math.max(1, Math.floor(reduced)); // 최소 1은 받게
+
+  player.hp -= finalDmg;
   player.invul = 25;
   shake = Math.max(shake, 10);
 
@@ -1739,6 +1822,10 @@ function updatePlayerState(){
   updateMovement();
   updateInvulnerability();
   updateLevelGlow();
+
+  // ✅ 초당 재생(hpRegen)을 프레임당으로 환산(60fps 가정)
+  const regen = (player.buffs?.hpRegen ?? 0) / 60;
+  if(regen > 0) player.hp = Math.min(player.maxHp, player.hp + regen);
 }
 function handleGameOver(){
   gameOver = true;
@@ -1774,7 +1861,7 @@ function performUltimateStrike(){
   player.ultiCount++;
 }
 function dealUltimateDamage(){
-  const radius = 40;
+  const radius = getUltiAoeRadius(); // ✅ 변경
   const r2 = radius * radius;
   let killedAny = false;
 
@@ -2178,9 +2265,9 @@ function checkLevelUp(){
     xpToNext = Math.floor(100 + level * level * 20);
 
     // 스탯 증가
-    player.maxHp += 12;
-    player.hp = player.maxHp;
-
+    player.baseMaxHp += 12;  // ✅ 베이스 체력 증가
+player.hp = Math.min(player.maxHp, player.hp); // 일단 유지
+player.hp = player.maxHp; // 레벨업 풀힐 유지하고 싶으면 이 줄만 남겨도 됨
     baseDamage *= 1.08;
     ultiDamage *= 1.1;
 
@@ -2199,9 +2286,25 @@ function checkLevelUp(){
     levelUpSound();
   }
 }
+// ✅ 네가 정한 기본 범위
+const BASE_MELEE_RANGE = 40;
+const BASE_ULTI_AOE    = 40;
+
+// 평타 최종 범위
+function getMeleeRange(){
+  const b = player.buffs || defaultBuffStats();
+  return BASE_MELEE_RANGE * (b.rangeMul ?? 1) * (b.meleeRangeMul ?? 1);
+}
+
+// 궁극기 폭파(광역) 최종 범위
+function getUltiAoeRadius(){
+  const b = player.buffs || defaultBuffStats();
+  // ✅ "범위 증가(rangeMul)"가 궁극기에도 적용되게 포함
+  return BASE_ULTI_AOE * (b.rangeMul ?? 1) * (b.aoeMul ?? 1) * (b.ultiAoeMul ?? 1);
+}
 /* ===== 공격 ===== */
 function checkHit(){
-  const range = 40;
+  const range = getMeleeRange(); // ✅ 변경
   const hitLimit = 12;
   let hitDone = 0;
 
@@ -3143,8 +3246,12 @@ function resetGame(){
   }
 
   // 플레이어 기본값
-  player.hp = 100;
-  player.maxHp = 100;
+  player.baseMaxHp = 100;
+player.maxHp = 100;
+player.hp = 100;
+
+player.baseArmor = 0;
+player.armor = 0;
   player.invul = 0;
   player.kiOrbs = 0;
   player.ultiActive = false;
