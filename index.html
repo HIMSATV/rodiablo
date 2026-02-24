@@ -513,7 +513,7 @@ function giveXP(enemy){
   else if(enemy.type === "boss") base = 200 * mapTier;
 
   if(enemy.isElite) base *= 3;
-
+  if(enemy.isLeader) base *= 4;
   // 🔥 레벨 차이 패널티
   const levelMul = getLevelPenalty(level, mapTier);
 
@@ -982,9 +982,50 @@ createPack(px, py, count);
   // 팩에 cleared 플래그 추가
   for(const p of packs){
     p.cleared = false;
+    }
+   linkNearbyPacks();   
+  
+}
+function linkNearbyPacks(){
+  const linkDist = 360; // ✅ 이 거리 안이면 같은 그룹 (320~420 취향)
+  const link2 = linkDist * linkDist;
+
+  const n = packs.length;
+  const parent = Array.from({length:n}, (_,i)=>i);
+  const find = (a)=>{ while(parent[a]!==a){ parent[a]=parent[parent[a]]; a=parent[a]; } return a; };
+  const union = (a,b)=>{ a=find(a); b=find(b); if(a!==b) parent[b]=a; };
+
+  for(let i=0;i<n;i++){
+    for(let j=i+1;j<n;j++){
+      const dx = packs[i].x - packs[j].x;
+      const dy = packs[i].y - packs[j].y;
+      if(dx*dx + dy*dy <= link2) union(i,j);
+    }
+  }
+
+  const rootToG = new Map();
+  let gid = 0;
+
+  for(let i=0;i<n;i++){
+    const r = find(i);
+    if(!rootToG.has(r)) rootToG.set(r, gid++);
+    packs[i].groupId = rootToG.get(r);
+    packs[i].groupCleared = false;
   }
 }
 
+function activatePackGroup(groupId){
+  for(const p of packs){
+    if(p.groupId === groupId){
+      p.activated = true;
+
+      // 스폰 실패로 빈팩이면 진행 막히지 않게
+      if(p.enemies.length === 0 && !p.cleared){
+        p.cleared = true;
+      }
+    }
+  }
+}
 // 팩 클리어 체크 + 진행도 업데이트
 function updateMapProgress(){
   for(const p of packs){
@@ -1403,6 +1444,35 @@ function spawnEnemyAt(ex, ey, pack){
   enemies.push(enemy);
   pack.enemies.push(enemy);
 }
+function spawnPackLeaderAt(ex, ey, pack){
+  const st = makeEnemyStatsByTier("melee", mapTier);
+
+  let leader = {
+    x: ex, y: ey,
+    radius: 18,
+    stun: 0,
+    invul: 0,
+    attackFrame: 0,
+    swingDir: 1,
+    type: "melee",
+
+    // ✅ 리더 강화 수치 (여기만 조절하면 됨)
+    hp: st.hp * 3.2,
+    speed: st.spd * 1.08,
+    damage: st.dmg * 1.6,
+
+    shootCooldown: 0,
+    castCooldown: 120,
+
+    pack,
+    isLeader: true
+  };
+
+  if(!canSpawnEnemyAt(leader, ex, ey)) return;
+
+  enemies.push(leader);
+  pack.enemies.push(leader);
+}
 
 function spawnRandomBoss(){
   // 이미 보스가 있으면 스킵
@@ -1441,10 +1511,25 @@ function spawnRandomBoss(){
 }
 
 function createPack(cx, cy, count){
-  let pack = { x: cx, y: cy, enemies: [], activated: false, cleared:false };
+  let pack = {
+    x: cx, y: cy,
+    enemies: [],
+    activated: false,
+    cleared: false,
 
+    // ✅ 그룹용 (아래 “팩 합치기”에서 씀)
+    groupId: -1,
+    groupCleared: false
+  };
+
+  // ✅ 리더 1마리 먼저
+  spawnPackLeaderAt(cx, cy, pack);
+
+  // ✅ 나머지 일반몹
+  const normalCount = Math.max(0, count - 1);
   let tries = 0;
-  while(pack.enemies.length < count && tries < count * 8){
+
+  while(pack.enemies.length < (normalCount + 1) && tries < count * 8){
     tries++;
     let angle = Math.random()*Math.PI*2;
     let radius = Math.random()*140;
@@ -1705,14 +1790,13 @@ function updateEnemySystem(){
     const dy = pack.y - player.y;
 
     // ✅ 이 거리 안으로 들어오면 활성화 (원하면 520 숫자만 조절)
-    if(dx*dx + dy*dy < 520*520){
-      pack.activated = true;
+      if(dx*dx + dy*dy < 520*520){
+      activatePackGroup(pack.groupId);
 
-      // ✅ 팩 스폰이 실패해서 비어있으면 진행 막히지 않게 즉시 클리어 처리
-      if(pack.enemies.length === 0 && !pack.cleared){
-        pack.cleared = true;
-        mapRun.clearedPacks++;
-      }
+      // 웨이브 느낌 연출
+      shake = Math.max(shake, 8);
+      slowMotion = Math.max(slowMotion, 1);
+    }
     }
   });
 
@@ -2410,7 +2494,12 @@ function drawEnemy(e){
     }
     return;
   }
-
+  if(e.isLeader){
+    ctx.fillStyle = "#ffd000";
+    ctx.fillRect(e.x-6, e.y-24, 12, 3);
+    ctx.fillRect(e.x-4, e.y-28, 3, 4);
+    ctx.fillRect(e.x+1, e.y-28, 3, 4);
+  }
   if(e.isElite){
     ctx.fillStyle = (e.eliteColor === "yellow") ? "#ffcc00" : "#00aaff";
   }else if(e.type === "archer"){
