@@ -680,35 +680,35 @@ function applyItemDataToGear(data){
     critMultiAdd: data.critMultiAdd
   });
 }
-// ✅ 드랍 테이블(원하면 여기 계속 추가하면 됨)
+// ✅ 드랍 테이블(POE식 base + affix 시스템용)
 const ITEM_POOL = [
   {
     id:"dmg_up",
     slot:"weapon",
     name:"강화된 일격",
     rarity:"common",
-    ...
+    descGen:(d)=>`평타 피해 +${Math.round(((d.dmgMul ?? 1)-1)*100)}%`,
   },
   {
     id:"ulti_up",
     slot:"weapon",
     name:"폭발 강화",
     rarity:"common",
-    ...
+    descGen:(d)=>`궁극기 피해 +${Math.round(((d.ultiMul ?? 1)-1)*100)}%`,
   },
   {
     id:"hp",
     slot:"chest",
     name:"생명의 정수",
     rarity:"rare",
-    ...
+    descGen:(d)=>`최대 체력 +${Math.floor(d.maxHpAdd ?? 0)}`,
   },
   {
     id:"armor",
     slot:"helm",
     name:"철벽 갑옷",
     rarity:"rare",
-    ...
+    descGen:(d)=>`방어력 +${Math.floor(d.armorAdd ?? 0)}`,
   }
 ];
 const PREFIXES = [
@@ -1091,7 +1091,7 @@ function openLootChoice(L){
     pick.name = nm;
 
     pick.shownName = pick.name;
-    pick.shownDesc = it.descGen(pick.totalData.maxHpAdd || pick.totalData.armorAdd || 0); // 필요하면 바꿔도 됨
+    pick.shownDesc = it.descGen ? it.descGen(pick.totalData) : (it.desc || "");
   }
 
   card.innerHTML = `
