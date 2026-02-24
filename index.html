@@ -693,58 +693,45 @@ function openLootChoice(L){
   lootOverlay.style.display = "flex";
   lootCardsEl.innerHTML = "";
 
-  L.choices.forEach((it, idx)=>{
-    const card = document.createElement("div");
-    card.className = `lootCard ${it.rarity}`;
+  L.choices.forEach((it)=>{
+  const card = document.createElement("div");
+  card.className = `lootCard ${it.rarity}`;
 
-    const affixed = rollAffixes(it);
+  // 미리 한 번 굴려서 "표시용"으로 고정
+  const preview = (it.rarity === "legendary") ? null : rollAffixes(it);
+  const shownName = (it.rarity === "legendary") ? it.name : preview.name;
+  const shownDesc = (it.rarity === "legendary")
+    ? it.desc
+    : it.descGen(preview.data.percent ?? preview.data.flat);
 
-const descText = (it.rarity === "legendary")
-  ? it.desc
-  : it.descGen(affixed.data.percent ?? affixed.data.flat);
-
-card.innerHTML = `
-  <div class="name">[${it.rarity.toUpperCase()}] ${affixed.name}</div>
-  <div class="desc">${descText}</div>
-  <button type="button">이걸 선택</button>
-`;
+  card.innerHTML = `
+    <div class="name">[${it.rarity.toUpperCase()}] ${shownName}</div>
+    <div class="desc">${shownDesc}</div>
+    <button type="button">이걸 선택</button>
+  `;
 
   card.querySelector("button").addEventListener("click", ()=>{
-  if(it.rarity === "legendary"){
-    // ✅ 전설: 고유효과 등록 + apply 실행
-    it.apply();
-    ownedItems.push(it.name);
-    ownedUniques.push(it); // 이벤트 훅 활성화
-  }else{
-    const affixed = rollAffixes(it);
-    it.apply(affixed.data);
-    ownedItems.push(affixed.name);
-  }
+    if(it.rarity === "legendary"){
+      it.apply();
+      ownedItems.push(it.name);
+      ownedUniques.push(it);
+    }else{
+      // 적용도 "표시된 것" 그대로 적용 (다시 굴리지 않기)
+      it.apply(preview.data);
+      ownedItems.push(preview.name);
+    }
 
-  updateBuffs(player);
-  player.hp = Math.min(player.maxHp, player.hp);
+    updateBuffs(player);
+    player.hp = Math.min(player.maxHp, player.hp);
 
-  L.taken = true;
-  closeLootChoice();
+    L.taken = true;
+    closeLootChoice();
 
-  shake = Math.max(shake, 10);
-});
-
-      // 버프/스탯 반영 즉시 업데이트 1회
-      updateBuffs(player);
-      player.hp = Math.min(player.maxHp, player.hp);
-
-      // 루트 제거
-      L.taken = true;
-
-      closeLootChoice();
-      // 연출
-      shake = Math.max(shake, 10);
-      orbFlash = 8;
-    });
-
-    lootCardsEl.appendChild(card);
+    shake = Math.max(shake, 10);
   });
+
+  lootCardsEl.appendChild(card);
+});
 }
 
 function closeLootChoice(){
