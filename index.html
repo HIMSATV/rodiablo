@@ -735,52 +735,93 @@ const SUFFIXES = [
 // ✅ 전설 아이템(고유효과)
 // =============================
 const LEGENDARY_POOL = [
-  {
-    id:"unique_thunderstep",
-    name:"천둥걸음 (Thunderstep)",
-    rarity:"legendary",
-    desc:"적 처치 시 번개가 주변으로 연쇄 (쿨 0.8초)",
-    apply(){
-      // 스탯도 조금
-      apply(){
-  applyGearDelta({ dmgMul: 1.10 });
-},
-    onEvent(type, p){
-      if(type !== "kill") return;
+  function cloneLegendary(template){
+  // 함수(onEvent/apply)는 그대로 복사(참조)해도 괜찮고,
+  // 상태는 uniqueState로 분리되어 있으니 템플릿 공유 위험을 줄임
+  return {
+    id: template.id,
+    name: template.name,
+    rarity: template.rarity,
+    desc: template.desc,
+    apply: template.apply,
+    onEvent: template.onEvent
+  };
+}
 
-      const now = frameCount;
-      const key = this.id + "_cd";
-      const cd = uniqueState[key] ?? 0;
-      if(now < cd) return;
-      uniqueState[key] = now + 48; // 0.8초(60fps 기준)
+function acquireLegendary(template, ilvl){
+  // ✅ 중복 획득 방지(원하면 허용으로 바꿔도 됨)
+  if(ownedUniques.some(u => u.id === template.id)){
+    // 이미 있으면 그냥 인벤에만 넣거나, 아예 무시
+    // 여기서는 인벤에는 넣지 않고 "이미 보유" 처리
+    shake = Math.max(shake, 6);
+    return;
+  }
 
-      // 주변 체인 번개: 죽인 위치 중심으로 반경 내 4마리
-      const cx = p.x, cy = p.y;
-      let hits = 0;
-      for(const e of enemies){
-        if(e.hp <= 0) continue;
-        if(e.type === "boss" && e.dead) continue;
+  const u = cloneLegendary(template);
 
-        const dx = e.x - cx, dy = e.y - cy;
-        if(dx*dx + dy*dy > 200*200) continue;
+  // ✅ 1회만 적용
+  if(u.apply) u.apply();
 
-        e.hp -= baseDamage * 0.65;
-        spawnHitBlood(e.x, e.y, 8);
+  ownedUniques.push(u);
 
-        // 번개 이펙트 느낌 파티클
-        if(particles.length < 260){
-          for(let i=0;i<6;i++){
-            particles.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:18 });
-          }
+  inventory.push({
+    id: u.id,
+    slot: "unique",
+    name: u.name,
+    rarity: "legendary",
+    ilvl,
+    isUnique: true,
+    uniqueRef: u,
+    data: null,
+    affixes: []
+  });
+
+  recalcFromGear();
+}
+  
+   {
+  id:"unique_thunderstep",
+  name:"천둥걸음 (Thunderstep)",
+  rarity:"legendary",
+  desc:"적 처치 시 번개가 주변으로 연쇄 (쿨 0.8초)",
+  apply(){
+    applyGearDelta({ dmgMul: 1.10 });
+  },
+  onEvent(type, p){
+    if(type !== "kill") return;
+
+    const now = frameCount;
+    const key = this.id + "_cd";
+    const cd = uniqueState[key] ?? 0;
+    if(now < cd) return;
+    uniqueState[key] = now + 48;
+
+    const cx = p.x, cy = p.y;
+    let hits = 0;
+
+    for(const e of enemies){
+      if(e.hp <= 0) continue;
+      if(e.type === "boss" && e.dead) continue;
+
+      const dx = e.x - cx, dy = e.y - cy;
+      if(dx*dx + dy*dy > 200*200) continue;
+
+      e.hp -= baseDamage * 0.65;
+      spawnHitBlood(e.x, e.y, 8);
+
+      if(particles.length < 260){
+        for(let i=0;i<6;i++){
+          particles.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:18 });
         }
-
-        hits++;
-        if(hits >= 4) break;
       }
 
-      pruneDeadEnemies();
+      hits++;
+      if(hits >= 4) break;
     }
-  },
+
+    pruneDeadEnemies();
+  }
+}
 
   {
     id:"unique_oni_aegis",
@@ -990,98 +1031,85 @@ function openLootChoice(L){
   lootOverlay.style.display = "flex";
   lootCardsEl.innerHTML = "";
 
-    L.choices.forEach((it)=>{
-    const card = document.createElement("div");
-    card.className = `lootCard ${it.rarity}`;
+   L.choices.forEach((it)=>{
+  const card = document.createElement("div");
+  card.className = `lootCard ${it.rarity}`;
 
-    // ✅ 표시용 프리뷰(표시된 값이 그대로 적용되게 고정)
-    const preview = (it.rarity === "legendary") ? null : rollAffixesByRarity(it, it.rarity);
-
-    const shownName = (it.rarity === "legendary") ? it.name : preview.name;
-    const shownDesc = (it.rarity === "legendary")
-      ? it.desc
-      : it.descGen(preview.data.percent ?? preview.data.flat);
-
-    card.innerHTML = `
-      <div class="name">[${it.rarity.toUpperCase()}] ${shownName}</div>
-      <div class="desc">${shownDesc}</div>
-      <button type="button">이걸 선택</button>
-    `;
-
-    card.querySelector("button").addEventListener("click", ()=>{
-      const ilvl = getItemLevel();
-
-if(it.rarity === "legendary"){
-  it.apply();
-  ownedUniques.push(it);
-
-  inventory.push({
-    id: it.id,
-    name: it.name,
-    rarity: "legendary",
-    ilvl,
-    isUnique: true,
-    uniqueRef: it,
-    data: null,
-    affixes: []
-  });
-
-}else{
+  // ✅ 선택 결과를 "카드 생성 시점에 고정"해두기
   const ilvl = getItemLevel();
+  const pick = { it, ilvl };
 
-  // ✅ base는 “고정”
-  const baseData = buildBaseDataFromItemId(it.id);
+  if(it.rarity === "legendary"){
+    pick.kind = "legendary";
+    pick.shownName = it.name;
+    pick.shownDesc = it.desc;
+  }else{
+    pick.kind = "normal";
+    pick.baseData = buildBaseDataFromItemId(it.id);
+    pick.affixes = rollAffixesPOE(it.rarity, ilvl);
 
-  // ✅ affix만 굴림
-  const affixes = rollAffixesPOE(it.rarity, ilvl);
+    const affixData = makeEmptyItemData();
+    for(const a of pick.affixes){
+      a.affix.apply(affixData, a.value);
+    }
 
-  // affixData에만 반영
-  const affixData = makeEmptyItemData();
-  for(const a of affixes){
-    a.affix.apply(affixData, a.value);
+    pick.affixData = affixData;
+    pick.totalData = mergeItemData(pick.baseData, pick.affixData);
+
+    const preNames = pick.affixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+    const sufNames = pick.affixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+
+    pick.baseName = it.name;
+    let nm = pick.baseName;
+    if(preNames.length) nm = preNames.join(" ") + " " + nm;
+    if(sufNames.length) nm = nm + " " + sufNames.join(" ");
+    pick.name = nm;
+
+    pick.shownName = pick.name;
+    pick.shownDesc = it.descGen(pick.totalData.maxHpAdd || pick.totalData.armorAdd || 0); // 필요하면 바꿔도 됨
   }
 
-  // 최종 합산(total)
-  const totalData = mergeItemData(baseData, affixData);
+  card.innerHTML = `
+    <div class="name">[${it.rarity.toUpperCase()}] ${pick.shownName}</div>
+    <div class="desc">${pick.shownDesc}</div>
+    <button type="button">이걸 선택</button>
+  `;
 
-  // ✅ 적용
-  applyItemDataToGear(totalData);
-  if(totalData.maxHpAdd > 0) player.hp = Math.min(player.maxHp, player.hp + totalData.maxHpAdd);
+  card.querySelector("button").addEventListener("click", ()=>{
+    if(pick.kind === "legendary"){
+      acquireLegendary(pick.it, pick.ilvl);
+    }else{
+      // ✅ 적용(고정된 결과 그대로)
+      applyItemDataToGear(pick.totalData);
+      if(pick.totalData.maxHpAdd > 0){
+        player.hp = Math.min(player.maxHp, player.hp + pick.totalData.maxHpAdd);
+      }
 
-  // ✅ 이름(POE 느낌)
-  const preNames = affixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
-  const sufNames = affixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+      inventory.push({
+        id: pick.it.id,
+        slot: pick.it.slot,            // ✅ 중요: slot 저장 (없으면 나중에 장착 시스템에서 망가짐)
+        baseName: pick.baseName,
+        name: pick.name,
+        rarity: pick.it.rarity,
+        ilvl: pick.ilvl,
+        isUnique:false,
 
-  // base 이름은 기존 ITEM_POOL name을 쓰되, 인벤 재표시를 위해 id로도 복원 가능하게 저장
-  let baseName = it.name;
-  let nm = baseName;
-  if(preNames.length) nm = preNames.join(" ") + " " + nm;
-  if(sufNames.length) nm = nm + " " + sufNames.join(" ");
+        baseData: pick.baseData,
+        affixData: pick.affixData,
+        data: pick.totalData,
+        affixes: pick.affixes
+      });
 
-  inventory.push({
-    id: it.id,
-    baseName,
-    name: nm,
-    rarity: it.rarity,
-    ilvl,
-    isUnique:false,
+      recalcFromGear();
+    }
 
-    baseData,     // ✅ 고정
-    affixData,    // ✅ 카오스로 리롤 대상
-    data: totalData, // ✅ 최종 적용값(편의)
-    affixes
+    L.taken = true;
+    closeLootChoice();
+    shake = Math.max(shake, 10);
   });
-}
 
-recalcFromGear();
-
-      L.taken = true;
-      closeLootChoice();
-      shake = Math.max(shake, 10);
-    });
-
-    lootCardsEl.appendChild(card);
-  });
+  lootCardsEl.appendChild(card);
+});
 }
 
 function closeLootChoice(){
@@ -1220,13 +1248,12 @@ function recalcFromGear(){
 
 // ✅ gear에 값을 적용(한 번 먹은 아이템은 여기로만 누적)
 function applyGearDelta(delta){
-  // delta 예: { dmgMul:1.12 } 또는 { armorAdd:5 } 또는 { rangeMul:1.10 }
   for(const k in delta){
     const v = delta[k];
     if(typeof v !== "number") continue;
 
     // Mul 계열은 곱, Add 계열은 더하기
-    if(k.endsWith("Mul") 
+    if(k.endsWith("Mul")){
       player.gear[k] = (player.gear[k] ?? 1) * v;
     }else{
       player.gear[k] = (player.gear[k] ?? 0) + v;
@@ -4444,7 +4471,42 @@ function renderInventory(){
 }
 
 btnInvClose.addEventListener("click", closeInventory);
+function rebuildGearFromInventory(){
+  // gear 초기화
+  player.gear = {
+    dmgMul: 1, ultiMul: 1, spdMul: 1, atkSpdMul: 1, rangeMul: 1,
+    armorAdd: 0, maxHpAdd: 0, hpRegen: 0,
+    critChanceAdd: 0, critChanceMul: 1, critMultiAdd: 0
+  };
 
+  // 유니크 다시 적용(중복 방지 위해 apply는 호출하지 말고,
+  // 유니크가 gearDelta를 applyGearDelta로 직접 넣는 구조면 여기선 곤란함)
+  // => 유니크는 applyGearDelta를 쓰지 말고 "스탯 데이터"를 반환하는 구조로 바꾸는 게 정석이지만,
+  // 지금은 임시로: 유니크는 gear 재구성에서 제외(이벤트만 유지)
+  // 필요하면 다음 단계에서 유니크 구조를 스탯/이벤트 분리로 개선하자.
+
+  // 일반 아이템만 다시 합산
+  for(const it of inventory){
+    if(it.isUnique) continue;
+    if(!it.data) continue;
+
+    // data는 merge된 최종값. applyGearDelta를 쓰면 다시 recalc가 도니,
+    // 여기선 직접 누적해야 안전함.
+    const d = it.data;
+
+    player.gear.dmgMul   *= (d.dmgMul   ?? 1);
+    player.gear.ultiMul  *= (d.ultiMul  ?? 1);
+    player.gear.rangeMul *= (d.rangeMul ?? 1);
+
+    player.gear.armorAdd      += (d.armorAdd ?? 0);
+    player.gear.maxHpAdd      += (d.maxHpAdd ?? 0);
+    player.gear.hpRegen       += (d.hpRegen ?? 0);
+    player.gear.critChanceAdd += (d.critChanceAdd ?? 0);
+    player.gear.critMultiAdd  += (d.critMultiAdd ?? 0);
+  }
+
+  recalcFromGear();
+}
 btnChaos.addEventListener("click", ()=>{
   if(selectedInvIndex < 0) return;
   const it = inventory[selectedInvIndex];
