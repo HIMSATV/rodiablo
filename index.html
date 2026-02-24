@@ -843,6 +843,7 @@ function makeEmptyItemData(){
     dmgMul: 1,
     ultiMul: 1,
     rangeMul: 1,
+    spdMul: 1,          // ✅ 추가
     armorAdd: 0,
     maxHpAdd: 0,
     hpRegen: 0,
@@ -858,6 +859,7 @@ function mergeItemData(baseData, affixData){
   out.dmgMul   = (baseData.dmgMul   ?? 1) * (affixData.dmgMul   ?? 1);
   out.ultiMul  = (baseData.ultiMul  ?? 1) * (affixData.ultiMul  ?? 1);
   out.rangeMul = (baseData.rangeMul ?? 1) * (affixData.rangeMul ?? 1);
+  out.spdMul   = (baseData.spdMul   ?? 1) * (affixData.spdMul   ?? 1); // ✅ 추가
 
   // add 계열: 합
   out.armorAdd      = (baseData.armorAdd      ?? 0) + (affixData.armorAdd      ?? 0);
@@ -876,15 +878,37 @@ function buildBaseDataFromItemId(itemId){
   if(itemId === "dmg_up"){
     const v = Math.floor(8 + level * 1.2 + mapTier * 1.5);
     base.dmgMul *= (1 + v/100);
+
   }else if(itemId === "ulti_up"){
     const v = Math.floor(12 + level * 1.5 + mapTier * 2);
     base.ultiMul *= (1 + v/100);
+
   }else if(itemId === "hp"){
     const v = Math.floor(15 + level*3 + mapTier*4);
     base.maxHpAdd += v;
+
   }else if(itemId === "armor"){
     const v = Math.floor(5 + mapTier*2);
     base.armorAdd += v;
+
+  }else if(itemId === "ring_crit"){
+    // 치확/치피 링 베이스
+    const cc = (0.015 + mapTier*0.002 + level*0.0006);   // 대충 스케일
+    const cm = (0.10  + mapTier*0.01  + level*0.002);    // 대충 스케일
+    base.critChanceAdd += cc;
+    base.critMultiAdd  += cm;
+
+  }else if(itemId === "ring_regen"){
+    // 재생/체력 링 베이스
+    const r = (0.6 + mapTier*0.08 + level*0.03);
+    const hp = Math.floor(6 + mapTier*2 + level*1.2);
+    base.hpRegen += r;
+    base.maxHpAdd += hp;
+
+  }else if(itemId === "ring_speed"){
+    // 이속 링 베이스
+    const ms = Math.floor(6 + mapTier*1.2 + level*0.8); // %
+    base.spdMul *= (1 + ms/100);
   }
 
   return base;
@@ -4182,6 +4206,11 @@ btnChaos.addEventListener("click", ()=>{
     return;
   }
 
+  if(chaosOrbs <= 0){
+    showHint("카오스 오브가 없어!");
+    return;
+  }
+
   let it = null;
   let equippedSlot = null;
 
@@ -4194,44 +4223,60 @@ btnChaos.addEventListener("click", ()=>{
 
   if(!it){ showHint("선택된 아이템이 없어."); return; }
   if(it.isUnique){ showHint("유니크는 카오스 불가!"); return; }
-  if(!it.data){ showHint("옵션이 없는 아이템이야."); return; }
 
-  // 새 옵션 생성(동일 슬롯/기본템 기준)
-  const tmpl = (it.baseId ? ITEM_POOL.find(x=>x.id===it.baseId) : null) || ITEM_POOL.find(x=>x.slot===it.slot) || null;
-  const rarity = it.rarity || "common";
-  const ilvl = it.ilvl || player.level || 1;
+  // ✅ 베이스 템플릿 찾기 (descGen 재생성용)
+  const baseId = it.baseId || it.id; // 안전
+  const tmpl = ITEM_POOL.find(x => x.id === baseId);
 
-  it.baseData = buildBaseDataFromItemId(it.baseId);
-  const rolled = rollAffixesPOE(rarity, ilvl);
-  it.prefixes = rolled.prefixes;
-  it.suffixes = rolled.suffixes;
-
-  // affix/totalData 재구성
-  let affixData = makeEmptyItemData();
-  for(const p of (it.prefixes||[])){
-    if(p && p.affix) mergeItemData(affixData, p.affix.dataMul, p.affix.dataAdd);
+  if(!tmpl){
+    showHint("이 아이템의 베이스 템플릿을 못 찾았어. (ITEM_POOL 확인)");
+    return;
   }
-  for(const s of (it.suffixes||[])){
-    if(s && s.affix) mergeItemData(affixData, s.affix.dataMul, s.affix.dataAdd);
+
+  // ✅ 비용 소비
+  chaosOrbs--;
+
+  const rarity = it.rarity || tmpl.rarity || "common";
+  const ilvl = it.ilvl || getItemLevel();
+
+  // ✅ 베이스는 유지, affix만 새로
+  const baseData = buildBaseDataFromItemId(baseId);
+  const newAffixes = rollAffixesPOE(rarity, ilvl); // ✅ 배열로 옴
+
+  // ✅ affixData 재구성 (apply 함수로 누적)
+  const affixData = makeEmptyItemData();
+  for(const a of newAffixes){
+    if(a && a.affix && typeof a.affix.apply === "function"){
+      a.affix.apply(affixData, a.value);
+    }
   }
-  it.affixData = affixData;
 
-  it.totalData = makeEmptyItemData();
-  mergeItemData(it.totalData, null, it.baseData);
-  mergeItemData(it.totalData, it.affixData.mul, it.affixData.add);
+  const totalData = mergeItemData(baseData, affixData);
 
-  // 이름/설명 재구성
-  const preNames = (it.prefixes||[]).filter(x=>x && x.affix).map(x=>x.affix.name);
-  const sufNames = (it.suffixes||[]).filter(x=>x && x.affix).map(x=>x.affix.name);
-  const baseName = it.baseName || (tmpl ? tmpl.name : it.name);
-  let nm = baseName;
+  // ✅ 이름 재구성 (prefix/suffix)
+  const preNames = newAffixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+  const sufNames = newAffixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+
+  let nm = tmpl.name;
   if(preNames.length) nm = preNames.join(" ") + " " + nm;
   if(sufNames.length) nm = nm + " " + sufNames.join(" ");
-  it.name = nm;
-  it.shownName = it.name;
-if(tmpl && tmpl.descGen) it.shownDesc = tmpl.descGen(it.totalData);
 
-  // 장비에 걸려있으면 스탯 재계산
+  // ✅ 아이템에 반영
+  it.baseId = baseId;
+  it.baseName = tmpl.name;
+  it.ilvl = ilvl;
+
+  it.baseData = baseData;
+  it.affixes = newAffixes;     // ✅ 단일 배열
+  it.affixData = affixData;
+  it.totalData = totalData;
+  it.data = totalData;         // ✅ 기존 호환
+
+  it.name = nm;
+  it.shownName = nm;
+  it.shownDesc = tmpl.descGen ? tmpl.descGen(totalData) : (tmpl.desc || "");
+
+  // ✅ 장비에 걸려있으면 스탯 재계산
   if(equippedSlot){
     equipment[equippedSlot] = it;
     rebuildGearFromEquipment();
