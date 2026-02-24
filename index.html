@@ -293,6 +293,7 @@ for(let y=0; y<mapSize; y++){
 player.x = mapSize * tileSize / 2;
 player.y = mapSize * tileSize / 2;
 
+let orbUIState = { cx:0, cy:0, centerR:24 }; // 파란 구슬(중앙) 터치 판정
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
@@ -2804,8 +2805,50 @@ function drawGameOver(){
   ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 40);
 }
 
-canvas.addEventListener("touchstart", ()=>{ if(gameOver) resetGame(); });
-canvas.addEventListener("mousedown", ()=>{ if(gameOver) resetGame(); });
+function tryUltimate(){
+  if(player.ultiActive) return;
+  if(player.kiOrbs >= player.maxOrbs && enemies.length > 0){
+    player.kiOrbs = 0;
+    orbFlash = 0;
+    explosionActive = true;
+    player.ultiActive = true;
+    player.ultiCount = 0;
+    player.ultiTimer = 0;
+  }
+}
+
+function handleUltimateOrbPress(clientX, clientY){
+  // 화면좌표 -> 캔버스좌표 변환
+  const rect = canvas.getBoundingClientRect();
+  const tx = clientX - rect.left;
+  const ty = clientY - rect.top;
+
+  // 파란 구슬(중앙) 눌렀는지 판정
+  const dx = tx - orbUIState.cx;
+  const dy = ty - orbUIState.cy;
+  const r = orbUIState.centerR;
+
+  if(dx*dx + dy*dy <= r*r){
+    tryUltimate();
+    return true;
+  }
+  return false;
+}
+
+canvas.addEventListener("touchstart", (e)=>{
+  if(gameOver){ resetGame(); return; }
+  if(!e.touches || !e.touches[0]) return;
+
+  // 파란구슬(중앙) 터치면 궁극기
+  if(handleUltimateOrbPress(e.touches[0].clientX, e.touches[0].clientY)){
+    e.preventDefault();
+  }
+},{passive:false});
+
+canvas.addEventListener("mousedown", (e)=>{
+  if(gameOver){ resetGame(); return; }
+  handleUltimateOrbPress(e.clientX, e.clientY);
+});
 
 let lastErr = null;
 
