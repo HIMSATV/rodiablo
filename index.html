@@ -3972,7 +3972,24 @@ const btnChaos   = document.getElementById("btnChaos");
 let invOpen = false;
 // 선택 상태: POE처럼 "가방 아이템 선택 → 슬롯 클릭"
 let selected = null; // {type:"bag", idx:number} | {type:"equip", slot:string}
+function itemEmoji(it){
+  if(!it) return "";
+  if(it.isUnique) return "⭐";
 
+  const slot = it.slot;
+  if(slot==="weapon") return "🗡";
+  if(slot==="helm")   return "🪖";
+  if(slot==="chest")  return "🛡️";
+  if(slot==="ring")   return "💍";
+  return "📦";
+}
+
+function rarityBorderClass(r){
+  if(r==="epic") return "epic";
+  if(r==="rare") return "rare";
+  if(r==="legendary") return "unique";
+  return "";
+}
 function slotLabel(slot){
   if(slot==="weapon") return "무기";
   if(slot==="helm")   return "투구";
@@ -4006,6 +4023,56 @@ function itemLines(it){
     }
   }
   return lines;
+}
+function formatPct(x){ return (x*100).toFixed(1) + "%"; }
+function fmtNum(x){ return Number.isInteger(x) ? String(x) : x.toFixed(2); }
+
+function prettyItemText(it){
+  if(!it) return "빈 칸";
+
+  const lines = [];
+  const rarity = (it.rarity || (it.isUnique?"legendary":"common")).toUpperCase();
+  lines.push(`[${rarity}] ${it.name || "(이름없음)"}`);
+  lines.push(`슬롯: ${slotLabel(it.slot || "기타")}  |  iLvl: ${it.ilvl ?? "-"}`);
+
+  if(it.isUnique){
+    lines.push("");
+    lines.push(it.uniqueRef?.desc || it.desc || "유니크 효과");
+    return lines.join("\n");
+  }
+
+  // ✅ affix 상세
+  if(Array.isArray(it.affixes) && it.affixes.length){
+    lines.push("");
+    lines.push("[옵션]");
+    for(const a of it.affixes){
+      if(!a || !a.affix) continue;
+      const kind = a.kind === "prefix" ? "접두" : "접미";
+      const tier = a.tier ? `T${a.tier}` : "";
+      // 숫자 보기: 퍼센트/정수 혼합이라 그냥 value 출력
+      lines.push(`- ${kind} ${a.affix.name} ${tier} : ${fmtNum(a.value)}`);
+    }
+  }
+
+  // ✅ 최종 스탯(적용값)
+  const d = it.totalData || it.data;
+  if(d){
+    lines.push("");
+    lines.push("[최종 적용 스탯]");
+    for(const k of Object.keys(d)){
+      const v = d[k];
+      if(typeof v !== "number") continue;
+
+      if(k.endsWith("Mul")){
+        lines.push(`- ${k}: x${v.toFixed(2)}`);
+      }else{
+        const sign = v>=0 ? "+" : "";
+        lines.push(`- ${k}: ${sign}${fmtNum(v)}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
 }
 
 function showHint(msg){
@@ -4106,12 +4173,14 @@ function renderBag(){
     const d = document.createElement("div");
     d.className = "bagItem";
     if(it && it.isUnique) d.classList.add("unique");
-    if(selected && selected.type==="bag" && selected.idx===i) d.classList.add("selected");
-    d.textContent = it ? it.name : "(빈칸)";
+   d.classList.add(rarityBorderClass(it.rarity));
+     if(selected && selected.type==="bag" && selected.idx===i) d.classList.add("selected");
+    d.textContent = it ? itemEmoji(it) : "";
+d.title = it ? it.name : ""; // 길게 누르거나 마우스오버 시 이름
 
     d.addEventListener("click", ()=>{
       selected = {type:"bag", idx:i};
-      invItemInfo.textContent = itemLines(it).join("\n");
+      invItemInfo.textContent = prettyItemText(it);
       showHint("가방 아이템 선택됨 → 장비 슬롯을 눌러 장착 (또는 다시 눌러 선택 해제).");
       renderInventory();
     });
@@ -4158,15 +4227,24 @@ Crit: ${(getCritChance()*100).toFixed(1)}% / x${getCritMulti().toFixed(2)}
 Chaos: ${chaosOrbs}`;
 
   // 선택 정보
-  if(!selected){
-    invItemInfo.textContent = "하단 가방에서 아이템을 누르면 상세가 여기 표시돼.";
-  }else if(selected.type==="equip"){
-    const it = equipment[selected.slot];
-    invItemInfo.textContent = it ? itemLines(it).join("\n") : `${slotLabel(selected.slot)} 슬롯 비어있음`;
-  }else if(selected.type==="bag"){
-    const it = inventory[selected.idx];
-    invItemInfo.textContent = it ? itemLines(it).join("\n") : "빈 칸";
-  }
+  // 선택 정보
+if(!selected){
+  invItemInfo.textContent =
+    "하단 가방에서 아이템을 누르면 상세가 여기 표시돼.";
+}
+else if(selected.type === "equip"){
+  const it = equipment[selected.slot];
+  invItemInfo.textContent =
+    it
+      ? itemLines(it).join("\n")
+      : `${slotLabel(selected.slot)} 슬롯 비어있음`;
+}
+else if(selected.type === "bag"){
+  const it = inventory[selected.idx];
+  invItemInfo.textContent =
+    it
+      ? itemLines(it).join("\n")
+      : "빈 칸";
 }
 
 function equipFromBagToSlot(invIndex, slot){
