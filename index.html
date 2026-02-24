@@ -293,7 +293,7 @@ for(let y=0; y<mapSize; y++){
 player.x = mapSize * tileSize / 2;
 player.y = mapSize * tileSize / 2;
 
-
+let reachableMask = null; // 플레이어 시작점에서 도달 가능한 바닥 타일 표시
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
@@ -717,7 +717,29 @@ function placeRandomWalls(rng, wallCount){
     }
   }
 }
+function buildReachableMaskFromPlayer(){
+  const startX = Math.floor(player.x / tileSize);
+  const startY = Math.floor(player.y / tileSize);
 
+  const vis = Array.from({length: mapSize}, ()=>Array(mapSize).fill(false));
+  if(!map[startY] || map[startY][startX] !== 0) return vis;
+
+  const q = [[startX, startY]];
+  vis[startY][startX] = true;
+
+  while(q.length){
+    const [x,y] = q.pop();
+    const nb = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+    for(const [nx,ny] of nb){
+      if(nx<=0||ny<=0||nx>=mapSize-1||ny>=mapSize-1) continue;
+      if(vis[ny][nx]) continue;
+      if(map[ny][nx] !== 0) continue;
+      vis[ny][nx] = true;
+      q.push([nx,ny]);
+    }
+  }
+  return vis;
+}
 // 연결성 체크(스폰에서 도달 가능한 바닥 비율이 너무 낮으면 다시)
 function floodFillReachableFromPlayer(){
   const startX = Math.floor(player.x / tileSize);
@@ -810,7 +832,7 @@ function startNewMap(nextTier){
 
   // 랜덤 지형 생성
   mapRun.seed = generateRandomMapForTier(nextTier);
-
+reachableMask = buildReachableMaskFromPlayer();
   // 팩 생성(맵 전체에 배치)
   spawnMapPacks(nextTier);
 
@@ -830,6 +852,7 @@ function spawnMapPacks(tier){
       const tx = 1 + Math.floor(rng()*(mapSize-2));
       const ty = 1 + Math.floor(rng()*(mapSize-2));
       if(map[ty][tx] !== 0) continue;
+if(reachableMask && !reachableMask[ty][tx]) continue; // ✅ 도달 가능한 바닥에서만
 
       const px = tx*tileSize + tileSize/2;
       const py = ty*tileSize + tileSize/2;
@@ -2467,7 +2490,27 @@ function drawMiniMap(){
       ctx.fillRect(mx-3, my-3, 6, 6);
     }
   }
+  // ===== 몬스터 표시(미니맵) =====
+  ctx.globalAlpha = 0.95;
 
+  for(const e of enemies){
+    if(e.hp <= 0) continue;
+    if(e.type === "boss") continue; // 보스는 아래에서 따로
+
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    if(dx*dx + dy*dy > radarRange*radarRange) continue;
+
+    const mx = cx + dx * scale;
+    const my = cy + dy * scale;
+
+    // 타입별 색(원하면 바꿔도 됨)
+    if(e.type === "mage") ctx.fillStyle = "#aa55ff";
+    else if(e.type === "archer") ctx.fillStyle = "#dddddd";
+    else ctx.fillStyle = "#00ff66";
+
+    ctx.fillRect(mx-1.5, my-1.5, 3, 3);
+  }
   // ===== 플레이어 =====
   ctx.globalAlpha = 1;
   ctx.fillStyle = "#ff4444";
