@@ -84,11 +84,89 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   /* 레이아웃을 밀지 않게 */
   display:block;
   overflow:visible;
+/* ... (기존) ... */
+
+/* ============================= */
+/* ✅ 아이템 선택 오버레이 UI     */
+/* ============================= */
+#lootOverlay{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.75);
+  z-index:9999;
+  font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+#lootPanel{
+  width:min(92vw, 520px);
+  background:#111;
+  border:2px solid #444;
+  border-radius:14px;
+  padding:14px;
+  box-shadow:0 0 30px rgba(0,0,0,0.6);
+}
+#lootTitle{
+  color:#fff;
+  font-weight:800;
+  font-size:18px;
+  margin:4px 2px 10px;
+  text-align:center;
+}
+.lootCards{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.lootCard{
+  background:#1a1a1a;
+  border:2px solid #333;
+  border-radius:12px;
+  padding:12px;
+  color:#eee;
+  line-height:1.25;
+}
+.lootCard .name{
+  font-weight:900;
+  margin-bottom:6px;
+}
+.lootCard .desc{
+  color:#cfcfcf;
+  font-size:14px;
+}
+.lootCard button{
+  margin-top:10px;
+  width:100%;
+  padding:10px 12px;
+  border:0;
+  border-radius:10px;
+  background:#2d6cff;
+  color:#fff;
+  font-weight:800;
+  font-size:15px;
+}
+.lootCard.common{ border-color:#3a3a3a; }
+.lootCard.rare{ border-color:#2f7bff; }
+.lootCard.epic{ border-color:#b44dff; }
+.lootHint{
+  margin-top:10px;
+  font-size:12px;
+  color:#aaa;
+  text-align:center;
 }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<!-- ✅ 아이템 선택 UI -->
+<div id="lootOverlay">
+  <div id="lootPanel">
+    <div id="lootTitle">아이템 선택 (1개만)</div>
+    <div class="lootCards" id="lootCards"></div>
+    <div class="lootHint">선택하면 즉시 적용됩니다.</div>
+  </div>
+</div>
 
 <div id="ui">
   <div id="movePad"><div id="stick"></div></div>
@@ -310,6 +388,215 @@ let spawnTimer = 0;
 let spawnInterval = 90;
 let enemies=[];
 let packs = [];
+/* ============================= */
+/* ✅ 아이템 드랍/선택 시스템     */
+/* ============================= */
+let loots = [];            // 바닥에 떨어진 루트
+let lootOverlayOpen = false;
+let pendingLoot = null;    // 현재 선택 UI에 띄운 루트
+
+const lootOverlay = document.getElementById("lootOverlay");
+const lootCardsEl = document.getElementById("lootCards");
+
+// ✅ 드랍 테이블(원하면 여기 계속 추가하면 됨)
+const ITEM_POOL = [
+  // 공격/속도
+  { id:"dmg_up",   name:"+데미지",        rarity:"common", desc:"평타 데미지 +12%", apply(){ baseDamage *= 1.12; } },
+  { id:"ulti_up",  name:"+궁극기 데미지", rarity:"common", desc:"궁극기 데미지 +15%", apply(){ ultiDamage *= 1.15; } },
+  { id:"atkspd",   name:"검술 숙련",      rarity:"rare",   desc:"공격속도 +20% (상시 버프)", apply(){
+      applyBuff(player, "atkSpeed", 1.20, 60*60*999, "item_atkspd", "mul");
+    } 
+  },
+  { id:"movespd",  name:"경쾌한 발걸음",  rarity:"common", desc:"이동속도 +10% (상시 버프)", apply(){
+      applyBuff(player, "speed", 1.10, 60*60*999, "item_movespd", "mul");
+    }
+  },
+
+  // 방어/체력
+  { id:"hp_base",  name:"강인함",         rarity:"common", desc:"최대 체력 +18 (영구)", apply(){
+      player.baseMaxHp += 18;
+      player.hp = Math.min(player.maxHp, player.hp + 18);
+    }
+  },
+  { id:"armor",    name:"철갑",           rarity:"rare",   desc:"방어력 +12 (영구)", apply(){
+      player.baseArmor += 12;
+    }
+  },
+  { id:"regen",    name:"재생",           rarity:"rare",   desc:"체력재생 +2/초 (상시)", apply(){
+      applyBuff(player, "hpRegen", 2, 60*60*999, "item_regen", "add");
+    }
+  },
+
+  // 범위
+  { id:"range",    name:"검 길이 증가",    rarity:"common", desc:"공용 범위 +12% (상시)", apply(){
+      applyBuff(player, "range", 1.12, 60*60*999, "item_range", "mul");
+    }
+  },
+  { id:"meleeR",   name:"근접 특화",       rarity:"rare",   desc:"평타 범위 +18% (상시)", apply(){
+      applyBuff(player, "meleeRange", 1.18, 60*60*999, "item_meleeR", "mul");
+    }
+  },
+  { id:"ultiAoe",  name:"폭파 확장",       rarity:"epic",   desc:"궁극기 폭발 범위 +25% (상시)", apply(){
+      applyBuff(player, "ultiAoe", 1.25, 60*60*999, "item_ultiAoe", "mul");
+    }
+  },
+];
+
+// ✅ 확률 (원하면 조절)
+function rollRarity(){
+  // 티어가 오를수록 고급 확률 조금씩 증가
+  const t = mapTier;
+  const epic = clamp(0.03 + (t-1)*0.002, 0.03, 0.08);
+  const rare = clamp(0.18 + (t-1)*0.004, 0.18, 0.32);
+
+  const r = Math.random();
+  if(r < epic) return "epic";
+  if(r < epic + rare) return "rare";
+  return "common";
+}
+
+function pickItemsForChoice(count=3){
+  const rarity = rollRarity();
+  // 같은 레어리티 중심 + 일부 섞이게
+  const candidates = ITEM_POOL.filter(it => it.rarity === rarity);
+  const fallback = ITEM_POOL;
+
+  let picks = [];
+  let guard = 0;
+  while(picks.length < count && guard++ < 200){
+    const src = (Math.random() < 0.85 ? candidates : fallback);
+    const it = src[(Math.random()*src.length)|0];
+    if(!it) continue;
+    if(picks.some(p=>p.id===it.id)) continue;
+    picks.push(it);
+  }
+  // 부족하면 그냥 채우기
+  while(picks.length < count){
+    const it = fallback[(Math.random()*fallback.length)|0];
+    if(!picks.some(p=>p.id===it.id)) picks.push(it);
+  }
+  return picks;
+}
+
+// ✅ 몹 죽을 때 드랍 생성
+function spawnLoot(x, y, source="mob"){
+  // 너무 많이 쌓이면 정리
+  if(loots.length > 25) loots.splice(0, loots.length-25);
+
+  const choices = pickItemsForChoice(3);
+  loots.push({
+    x, y,
+    r: 14,
+    ttl: 60*45,     // 45초 후 사라짐
+    choices,
+    taken: false,
+    source
+  });
+}
+
+// ✅ 플레이어 근처에서 "줍기" 가능 루트 찾기
+function getNearbyLoot(){
+  for(const L of loots){
+    if(L.taken) continue;
+    const dx = L.x - player.x;
+    const dy = L.y - player.y;
+    const rr = (L.r + player.radius + 18);
+    if(dx*dx + dy*dy <= rr*rr) return L;
+  }
+  return null;
+}
+
+// ✅ 선택 UI 열기
+function openLootChoice(L){
+  if(!L || L.taken) return;
+  lootOverlayOpen = true;
+  pendingLoot = L;
+
+  // 게임 멈춤 느낌(업데이트에서 early return)
+  lootOverlay.style.display = "flex";
+  lootCardsEl.innerHTML = "";
+
+  L.choices.forEach((it, idx)=>{
+    const card = document.createElement("div");
+    card.className = `lootCard ${it.rarity}`;
+
+    card.innerHTML = `
+      <div class="name">[${it.rarity.toUpperCase()}] ${it.name}</div>
+      <div class="desc">${it.desc}</div>
+      <button type="button">이걸 선택</button>
+    `;
+
+    card.querySelector("button").addEventListener("click", ()=>{
+      // 적용
+      it.apply();
+
+      // 버프/스탯 반영 즉시 업데이트 1회
+      updateBuffs(player);
+      player.hp = Math.min(player.maxHp, player.hp);
+
+      // 루트 제거
+      L.taken = true;
+
+      closeLootChoice();
+      // 연출
+      shake = Math.max(shake, 10);
+      orbFlash = 8;
+    });
+
+    lootCardsEl.appendChild(card);
+  });
+}
+
+function closeLootChoice(){
+  lootOverlayOpen = false;
+  pendingLoot = null;
+  lootOverlay.style.display = "none";
+}
+
+// ✅ 루트 업데이트/그리기
+function updateLoots(){
+  for(let i=loots.length-1;i>=0;i--){
+    const L = loots[i];
+    if(L.taken){ loots.splice(i,1); continue; }
+    L.ttl--;
+    if(L.ttl <= 0) loots.splice(i,1);
+  }
+}
+
+function drawLoots(){
+  if(loots.length === 0) return;
+
+  ctx.save();
+  for(const L of loots){
+    if(L.taken) continue;
+
+    // 빛나는 드랍
+    const pulse = 0.5 + 0.5*Math.sin(frameCount*0.15);
+    ctx.globalAlpha = 0.75 + pulse*0.25;
+
+    // 바깥 글로우
+    ctx.fillStyle = "rgba(80,140,255,0.25)";
+    ctx.beginPath();
+    ctx.arc(L.x, L.y, L.r + 10 + pulse*6, 0, Math.PI*2);
+    ctx.fill();
+
+    // 본체
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = "rgba(40,120,255,0.9)";
+    ctx.beginPath();
+    ctx.arc(L.x, L.y, L.r, 0, Math.PI*2);
+    ctx.fill();
+
+    // "!" 표시
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 16px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("!", L.x, L.y+1);
+  }
+  ctx.restore();
+}
 let orbUIState = { cx:0, cy:0, centerR:24, ready:false };
 let particles=[];
 let bloodPools=[];
@@ -1306,7 +1593,11 @@ function startBossDeath(boss){
     });
   }
 
+    // ✅ 보스 확정 드랍(선택 1회)
+  spawnLoot(boss.x, boss.y, "boss");
+
   bossDeathSound();
+}
 }
 /* ===== 충돌/이동 가능 ===== */
 function canMoveTo(x,y){
@@ -1784,6 +2075,11 @@ function isEnemyOnScreen(e){
 /* ===== 업데이트 ===== */
 function update(){
   frameCount++;
+
+  // ✅ 아이템 선택창 열려있으면 게임 정지(렌더는 계속)
+  if(lootOverlayOpen) return;
+
+  if(gameOver) return;
   if(gameOver) return;
 
   if(slowMotion > 0){
@@ -1889,6 +2185,8 @@ function dealUltimateDamage(){
     }
 
     e.hp = 0;
+      // ✅ 드랍 생성
+    spawnLoot(e.x, e.y, "ulti");
     e.stun = 30;
     spawnHitBlood(e.x, e.y, 18);
 
@@ -2153,6 +2451,7 @@ function updateEffectSystem(){
     if(bloodPools[i].life <= 0) bloodPools.splice(i,1);
   }
   if(bloodPools.length > 120) bloodPools.splice(0, bloodPools.length-120);
+updateLoots(); // ✅ 추가
 }
 
 function updateCombatSystem(){
@@ -2374,6 +2673,8 @@ function checkHit(){
   // 일단은 아래 일반 죽음 로직을 타지 않게 막자:
   continue;
 }
+    // ✅ 드랍 생성
+      spawnLoot(e.x, e.y, "normal");
       giveXP(e);
       killCount++;
       //checkLevelUp();
@@ -2386,7 +2687,7 @@ function checkHit(){
           size: 10 + Math.random()*6,
           life: 600
         });
-      }
+      }#
 
       slowMotion = 6;
 
@@ -2501,7 +2802,11 @@ let sy = shake ? (Math.random()-0.5) * amp : 0;
   }
   // ✅ 포탈(월드)
   drawPortal();
+  // ✅ 바닥 드랍 아이템
+  drawLoots();
+
   drawBlood();
+  enemies.forEach(e=>drawEnemy(e));
   enemies.forEach(e=>drawEnemy(e));
 
   levelParticles.forEach(p=>{
@@ -3194,6 +3499,19 @@ canvas.addEventListener("touchstart", (e)=>{
   if(gameOver){ resetGame(); return; }
   if(!e.touches || !e.touches[0]) return;
 
+  // ✅ 1) 근처 드랍 있으면 줍기(선택창)
+  const near = getNearbyLoot();
+  if(near){
+    openLootChoice(near);
+    e.preventDefault();
+    return;
+  }
+
+  // ✅ 2) 아니면 궁극기 구슬 터치 판정
+  if(handleUltimateOrbPress(e.touches[0].clientX, e.touches[0].clientY)){
+    e.preventDefault();
+  }
+},{passive:false});
   // 파란구슬(중앙) 터치면 궁극기
   if(handleUltimateOrbPress(e.touches[0].clientX, e.touches[0].clientY)){
     e.preventDefault();
@@ -3202,9 +3520,12 @@ canvas.addEventListener("touchstart", (e)=>{
 
 canvas.addEventListener("mousedown", (e)=>{
   if(gameOver){ resetGame(); return; }
+
+  const near = getNearbyLoot();
+  if(near){ openLootChoice(near); return; }
+
   handleUltimateOrbPress(e.clientX, e.clientY);
 });
-
 let lastErr = null;
 
 function drawRuntimeError(e){
@@ -3288,7 +3609,10 @@ iconCtx.translate(30, 34);
 iconCtx.scale(1.4, 1.4);
 drawSwordShape(iconCtx);
 iconCtx.restore();
-
+  loots = [];
+  lootOverlayOpen = false;
+  pendingLoot = null;
+  lootOverlay.style.display = "none";
 resetGame();
 loop();
 </script>
