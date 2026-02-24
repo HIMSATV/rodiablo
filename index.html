@@ -346,6 +346,7 @@ let portal = {
   hold: 0,           // 포탈 진입 대기(자동 진입 방지용)
   holdNeed: 25       // 25프레임 정도 서있으면 진입
 };
+let bossRoom = { x:0, y:0, w:0, h:0, cx:0, cy:0, doorX:0, doorY:0 };
 /* ===== 입력 ===== */
 let joyDX=0, joyDY=0;
 let attacking=false;
@@ -681,7 +682,75 @@ function clearSpawnArea(cx, cy, radiusTiles=3){
     }
   }
 }
+function carveBossRoomAndCorridor(){
+  // 1) 보스룸 크기/위치
+  const w = 7 + Math.floor(Math.random()*5); // 7~11
+  const h = 7 + Math.floor(Math.random()*5);
+  const margin = 2;
 
+  // 구석쪽 랜덤 배치(4코너 중 하나)
+  const corner = (Math.random()*4)|0;
+  let x0, y0;
+
+  if(corner===0){ x0 = mapSize - margin - w; y0 = margin; }               // 우상
+  if(corner===1){ x0 = margin; y0 = margin; }                             // 좌상
+  if(corner===2){ x0 = margin; y0 = mapSize - margin - h; }               // 좌하
+  if(corner===3){ x0 = mapSize - margin - w; y0 = mapSize - margin - h; } // 우하
+
+  // 2) 방 파기(0으로)
+  for(let y=y0; y<y0+h; y++){
+    for(let x=x0; x<x0+w; x++){
+      map[y][x] = 0;
+    }
+  }
+
+  // 3) 문(door) 위치(방 한 변 중앙쯤)
+  // 스폰이 중앙이니, 중앙쪽을 향한 면에 문을 두면 통로가 짧아짐
+  const cx = Math.floor(mapSize/2), cy = Math.floor(mapSize/2);
+  const roomCx = x0 + (w>>1), roomCy = y0 + (h>>1);
+
+  let doorX = roomCx;
+  let doorY = roomCy;
+
+  // 중앙과의 상대 위치로 문을 어느 면에 둘지 결정
+  if(Math.abs(roomCx - cx) > Math.abs(roomCy - cy)){
+    // 좌/우로 더 멀면: 방의 중앙쪽 면(좌면 또는 우면)
+    if(roomCx > cx){ doorX = x0;       doorY = roomCy; }  // 방 왼쪽벽에 문
+    else           { doorX = x0+w-1;   doorY = roomCy; }  // 방 오른쪽벽에 문
+  }else{
+    // 상/하로 더 멀면: 방의 중앙쪽 면(윗면 또는 아랫면)
+    if(roomCy > cy){ doorY = y0;       doorX = roomCx; }  // 방 윗벽
+    else           { doorY = y0+h-1;   doorX = roomCx; }  // 방 아랫벽
+  }
+
+  map[doorY][doorX] = 0;
+
+  // 4) 스폰 근처 타일 좌표
+  const startX = Math.floor(player.x / tileSize);
+  const startY = Math.floor(player.y / tileSize);
+
+  // 5) L자 통로를 강제로 뚫기 (start -> door)
+  // 가로 먼저
+  let x = startX, y = startY;
+  const stepX = doorX > x ? 1 : -1;
+  while(x !== doorX){
+    map[y][x] = 0;
+    map[y-1] && (map[y-1][x] = 0);
+    map[y+1] && (map[y+1][x] = 0);
+    x += stepX;
+  }
+  // 세로
+  const stepY = doorY > y ? 1 : -1;
+  while(y !== doorY){
+    map[y][x] = 0;
+    map[y][x-1] !== undefined && (map[y][x-1] = 0);
+    map[y][x+1] !== undefined && (map[y][x+1] = 0);
+    y += stepY;
+  }
+  map[doorY][doorX] = 0;
+
+  bossRoom = { x:x0, y:y0, w, h, cx:roomCx, cy:roomCy, doorX, doorY };
+}
 function buildEmptyMap(){
   map = [];
   for(let y=0; y<mapSize; y++){
@@ -1295,68 +1364,16 @@ function spawnEnemyAt(ex, ey, pack){
 }
 
 function spawnRandomBoss(){
+  // 이미 보스가 있으면 스킵
   if(enemies.some(e => e.type === "boss")) return;
-const sc = tierScale(mapTier);
-  let bx = player.x + 300;
-  let by = player.y;
+
+  // bossRoom 중심(타일좌표 -> 월드좌표)
+  const bx = bossRoom.cx * tileSize + tileSize/2;
+  const by = bossRoom.cy * tileSize + tileSize/2;
+
   const tempBoss = { radius: 30 };
-  let found = false;
 
-  for(let i=0;i<160;i++){
-    let tileX = Math.floor(Math.random() * mapSize);
-    let tileY = Math.floor(Math.random() * mapSize);
-    if(!map[tileY] || map[tileY][tileX] !== 0) continue;
-
-    let tx = tileX * tileSize + tileSize/2;
-    let ty = tileY * tileSize + tileSize/2;
-
-    const dx = tx - player.x;
-    const dy = ty - player.y;
-    if(dx*dx + dy*dy < 300*300) continue;
-    if(!canEnemyMoveTo(tempBoss, tx, ty)) continue;
-
-    bx = tx; by = ty; found = true; break;
-  }
-
-  if(!found){
-    let angle = Math.random() * Math.PI * 2;
-    let dist = 340 + Math.random() * 260;
-    let cx = player.x + Math.cos(angle) * dist;
-    let cy = player.y + Math.sin(angle) * dist;
-    let baseTX = Math.floor(cx / tileSize);
-    let baseTY = Math.floor(cy / tileSize);
-
-    outer:
-    for(let r=1; r<=6; r++){
-      for(let oy=-r; oy<=r; oy++){
-        for(let ox=-r; ox<=r; ox++){
-          if(Math.abs(ox)!==r && Math.abs(oy)!==r) continue;
-          let txi = baseTX + ox;
-          let tyi = baseTY + oy;
-          if(!map[tyi] || map[tyi][txi] !== 0) continue;
-
-          let tx = txi * tileSize + tileSize/2;
-          let ty = tyi * tileSize + tileSize/2;
-
-          const dx = tx - player.x;
-          const dy = ty - player.y;
-          if(dx*dx + dy*dy < 280*280) continue;
-          if(!canEnemyMoveTo(tempBoss, tx, ty)) continue;
-
-          bx = tx; by = ty; found = true; break outer;
-        }
-      }
-    }
-  }
-
-  if(!found){
-    for(let k=0;k<40;k++){
-      let tx = bx + (Math.random()-0.5) * tileSize * 3;
-      let ty = by + (Math.random()-0.5) * tileSize * 3;
-      if(canEnemyMoveTo(tempBoss, tx, ty)){ bx = tx; by = ty; found = true; break; }
-    }
-  }
-
+  // 보스룸 중앙이 벽/막힘이면(혹시 생성 실패 대비) 그냥 리턴
   if(!canEnemyMoveTo(tempBoss, bx, by)) return;
 
   const bst = makeBossStatsByTier(mapTier);
