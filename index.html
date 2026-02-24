@@ -734,36 +734,50 @@ const SUFFIXES = [
 // =============================
 // ✅ 전설 아이템(고유효과)
 // =============================
-const LEGENDARY_POOL = [
-  function cloneLegendary(template){
-  // 함수(onEvent/apply)는 그대로 복사(참조)해도 괜찮고,
-  // 상태는 uniqueState로 분리되어 있으니 템플릿 공유 위험을 줄임
+// =============================
+// ✅ 전설(Unique) 시스템
+// =============================
+
+// 전설 보유 목록(이벤트용 인스턴스)
+let ownedUniques = [];   // { id, name, desc, rarity, applyStat?, onEvent? }
+let uniqueState = {};    // 전설별 쿨/스택 등
+
+function emitEvent(type, payload){
+  for(const u of ownedUniques){
+    if(u.onEvent) u.onEvent(type, payload);
+  }
+}
+
+// ✅ 템플릿 -> 인스턴스 복제
+function cloneLegendary(template){
   return {
     id: template.id,
     name: template.name,
-    rarity: template.rarity,
-    desc: template.desc,
-    apply: template.apply,
-    onEvent: template.onEvent
+    rarity: template.rarity ?? "legendary",
+    desc: template.desc ?? "",
+    // 중요: 함수는 참조로 들고 있어도 OK
+    applyStat: template.applyStat,
+    onEvent: template.onEvent,
   };
 }
 
+// ✅ 획득
 function acquireLegendary(template, ilvl){
-  // ✅ 중복 획득 방지(원하면 허용으로 바꿔도 됨)
+  // 중복 방지(원하면 허용으로 바꿔도 됨)
   if(ownedUniques.some(u => u.id === template.id)){
-    // 이미 있으면 그냥 인벤에만 넣거나, 아예 무시
-    // 여기서는 인벤에는 넣지 않고 "이미 보유" 처리
     shake = Math.max(shake, 6);
     return;
   }
 
   const u = cloneLegendary(template);
 
-  // ✅ 1회만 적용
-  if(u.apply) u.apply();
+  // 1회만 스탯 적용
+  if(u.applyStat) u.applyStat();
 
+  // 이벤트 등록
   ownedUniques.push(u);
 
+  // 인벤에 표시용 아이템 추가(스탯은 data=null, 이벤트는 uniqueRef로)
   inventory.push({
     id: u.id,
     slot: "unique",
@@ -776,59 +790,67 @@ function acquireLegendary(template, ilvl){
     affixes: []
   });
 
+  // gear 기반 재계산
   recalcFromGear();
 }
-  
-   {
-  id:"unique_thunderstep",
-  name:"천둥걸음 (Thunderstep)",
-  rarity:"legendary",
-  desc:"적 처치 시 번개가 주변으로 연쇄 (쿨 0.8초)",
-  apply(){
-    applyGearDelta({ dmgMul: 1.10 });
-  },
-  onEvent(type, p){
-    if(type !== "kill") return;
 
-    const now = frameCount;
-    const key = this.id + "_cd";
-    const cd = uniqueState[key] ?? 0;
-    if(now < cd) return;
-    uniqueState[key] = now + 48;
+// =============================
+// ✅ 전설 템플릿 풀 (객체만 넣기!)
+// =============================
+const LEGENDARY_POOL = [
+  {
+    id:"unique_thunderstep",
+    name:"천둥걸음 (Thunderstep)",
+    rarity:"legendary",
+    desc:"적 처치 시 번개가 주변으로 연쇄 (쿨 0.8초)",
+    // ✅ 스탯은 여기서만 (재계산 대비)
+    applyStat(){
+      applyGearDelta({ dmgMul: 1.10 });
+    },
+    // ✅ 이벤트는 여기서만
+    onEvent(type, p){
+      if(type !== "kill") return;
 
-    const cx = p.x, cy = p.y;
-    let hits = 0;
+      const now = frameCount;
+      const key = this.id + "_cd";
+      const cd = uniqueState[key] ?? 0;
+      if(now < cd) return;
+      uniqueState[key] = now + 48; // 0.8초(60fps 기준)
 
-    for(const e of enemies){
-      if(e.hp <= 0) continue;
-      if(e.type === "boss" && e.dead) continue;
+      const cx = p.x, cy = p.y;
+      let hits = 0;
 
-      const dx = e.x - cx, dy = e.y - cy;
-      if(dx*dx + dy*dy > 200*200) continue;
+      for(const e of enemies){
+        if(e.hp <= 0) continue;
+        if(e.type === "boss" && e.dead) continue;
 
-      e.hp -= baseDamage * 0.65;
-      spawnHitBlood(e.x, e.y, 8);
+        const dx = e.x - cx, dy = e.y - cy;
+        if(dx*dx + dy*dy > 200*200) continue;
 
-      if(particles.length < 260){
-        for(let i=0;i<6;i++){
-          particles.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:18 });
+        e.hp -= baseDamage * 0.65;
+        spawnHitBlood(e.x, e.y, 8);
+
+        if(particles.length < 260){
+          for(let i=0;i<6;i++){
+            particles.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:18 });
+          }
         }
+
+        hits++;
+        if(hits >= 4) break;
       }
 
-      hits++;
-      if(hits >= 4) break;
+      pruneDeadEnemies();
     }
-
-    pruneDeadEnemies();
-  }
-}
+  },
 
   {
     id:"unique_oni_aegis",
     name:"오니의 수호 (Oni Aegis)",
     rarity:"legendary",
-    desc:"피격 시 보호막 1회 생성 (피해 35% 감소, 2초 지속, 쿨 6초)",
-    apply(){
+    desc:"피격 시 보호막 1회 생성 (피해 35% 감소 느낌, 2초, 쿨 6초)",
+    applyStat(){
+      // base에 박는 건 “영구 스탯”이라 재계산에도 안전
       player.baseArmor += 4;
       player.baseMaxHp += 20;
       player.hp += 20;
@@ -840,13 +862,10 @@ function acquireLegendary(template, ilvl){
       const cdKey = this.id + "_cd";
       if((uniqueState[cdKey] ?? 0) > now) return;
 
-      // 보호막 버프 부여 (2초)
-      // 피해감소는 damagePlayer 내부에서 "buffs.damageTakenMul" 같은 게 없으니
-      // 여기서는 armor를 크게 올리는 방식으로 구현(간단/안전)
+      // 임시 방어 버프(2초)
       applyBuff(player, "armor", 30, 120, "oni_aegis", "add");
-      uniqueState[cdKey] = now + 360; // 6초 쿨
+      uniqueState[cdKey] = now + 360; // 6초
 
-      // 시각 연출
       shake = Math.max(shake, 12);
       for(let i=0;i<22;i++){
         particles.push({ x:player.x, y:player.y, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8, life:22 });
@@ -859,8 +878,9 @@ function acquireLegendary(template, ilvl){
     name:"혈귀의 도 (Blood Katana)",
     rarity:"legendary",
     desc:"타격 시 20% 확률로 출혈 장판 생성(3초). 장판은 초당 피해 + 흡혈",
-    apply(){
-      baseDamage *= 1.08;
+    applyStat(){
+      baseDamageBase *= 1.08;  // ✅ baseDamage가 아니라 baseDamageBase가 더 안전
+      recalcFromGear();
     },
     onEvent(type, p){
       if(type !== "hit") return;
@@ -869,9 +889,14 @@ function acquireLegendary(template, ilvl){
       const x = p.enemy.x;
       const y = p.enemy.y;
 
-      // fireZones를 재활용하되, 빨간 장판을 별도 배열로 두는 게 더 깔끔
-      // 여기선 최소침습: fireZones에 damage를 낮게 넣고, tick에서 흡혈 처리만 추가하자
-      fireZones.push({ x, y, radius:60, life:180, tick:0, damage: Math.max(2, baseDamage*0.18), isBleed:true });
+      fireZones.push({
+        x, y,
+        radius:60,
+        life:180,
+        tick:0,
+        damage: Math.max(2, baseDamage * 0.18),
+        isBleed:true
+      });
     }
   }
 ];
@@ -1523,20 +1548,7 @@ function updateBuffs(target){
 
   // ✅ (추가) 영구 gear를 “기본 버프”에 먼저 합성
   // - 플레이어만 gear를 씀(적은 안 씀)
-  if(target === player && target.gear){
-    const g = target.gear;
-
-    // mul
-    target.buffs.dmgMul     *= (g.dmgMul     ?? 1);
-    target.buffs.spdMul     *= (g.spdMul     ?? 1);
-    target.buffs.atkSpdMul  *= (g.atkSpdMul  ?? 1);
-    target.buffs.rangeMul   *= (g.rangeMul   ?? 1);
-
-    // add
-    target.buffs.armorAdd   += (g.armorAdd   ?? 0);
-    target.buffs.maxHpAdd   += (g.maxHpAdd   ?? 0);
-    target.buffs.hpRegen    += (g.hpRegen    ?? 0);
-  }
+  
 
   // ✅ 임시 버프들 처리
   for(let i = target.activeBuffs.length - 1; i >= 0; i--){
