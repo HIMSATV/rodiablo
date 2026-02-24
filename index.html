@@ -1782,7 +1782,7 @@ function dealUltimateDamage(){
 }
 
 function updateEnemySystem(){
-  // ✅ 팩 활성화: "적이 화면에 보이면" → "플레이어가 팩 근처면"
+  // ✅ 팩 활성화: "플레이어가 팩 근처면" 활성화
   packs.forEach(pack=>{
     if(pack.activated) return;
 
@@ -1790,13 +1790,12 @@ function updateEnemySystem(){
     const dy = pack.y - player.y;
 
     // ✅ 이 거리 안으로 들어오면 활성화 (원하면 520 숫자만 조절)
-      if(dx*dx + dy*dy < 520*520){
+    if(dx*dx + dy*dy < 520*520){
       activatePackGroup(pack.groupId);
 
       // 웨이브 느낌 연출
       shake = Math.max(shake, 8);
       slowMotion = Math.max(slowMotion, 1);
-    }
     }
   });
 
