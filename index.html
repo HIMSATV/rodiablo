@@ -293,7 +293,7 @@ for(let y=0; y<mapSize; y++){
 player.x = mapSize * tileSize / 2;
 player.y = mapSize * tileSize / 2;
 
-let orbUIState = { cx:0, cy:0, centerR:24 }; // 파란 구슬(중앙) 터치 판정
+
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
@@ -450,36 +450,6 @@ attackBtn.addEventListener("touchend", ()=>{
 
 /* ========================================= */
 
-/* ===== 궁극기(오각형 중앙 버튼) 입력 ===== */
-let orbUIState = { cx:0, cy:0, centerR:26, ready:false };
-
-/* 캔버스 좌표로 클릭/터치 -> 중앙 오브(궁극기)인지 체크 */
-function handleUltimateOrbPress(clientX, clientY){
-  // 캔버스의 화면 위치
-  const r = canvas.getBoundingClientRect();
-  const x = clientX - r.left;
-  const y = clientY - r.top;
-
-  const dx = x - orbUIState.cx;
-  const dy = y - orbUIState.cy;
-  if(dx*dx + dy*dy <= orbUIState.centerR*orbUIState.centerR){
-    // 중앙 오브 눌렀으면 궁극기 시도
-    tryUltimate();
-    return true;
-  }
-  return false;
-}
-
-canvas.addEventListener("touchstart", (e)=>{
-  if(!e.touches || !e.touches[0]) return;
-  if(handleUltimateOrbPress(e.touches[0].clientX, e.touches[0].clientY)){
-    e.preventDefault();
-  }
-},{passive:false});
-
-canvas.addEventListener("mousedown", (e)=>{
-  handleUltimateOrbPress(e.clientX, e.clientY);
-});
 
 /* ===== 유틸 ===== */
   function pruneDeadEnemies(){
