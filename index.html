@@ -4512,7 +4512,13 @@ function rebuildGearFromInventory(){
 btnChaos.addEventListener("click", ()=>{
   if(selectedInvIndex < 0) return;
   const it = inventory[selectedInvIndex];
-  if(!it || it.isUnique) return;
+
+  // ✅ 전설(유니크 포함)은 카오스 오브 금지
+  if(!it) return;
+  if(it.isUnique || it.rarity === "legendary"){
+    invHint.textContent = "전설 아이템은 카오스 오브를 사용할 수 없습니다!";
+    return;
+  }
 
   if(chaosOrbs <= 0){
     invHint.textContent = "카오스 오브가 없습니다!";
@@ -4531,12 +4537,10 @@ btnChaos.addEventListener("click", ()=>{
 
   const total = mergeItemData(it.baseData, newAffixData);
 
-  // ✅ 아이템 갱신
   it.affixes = affixes;
   it.affixData = newAffixData;
   it.data = total;
 
-  // 이름 다시 만들기
   const preNames = affixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
   const sufNames = affixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
 
@@ -4545,9 +4549,7 @@ btnChaos.addEventListener("click", ()=>{
   if(sufNames.length) nm = nm + " " + sufNames.join(" ");
   it.name = nm;
 
-  // ✅ gear를 인벤 기준으로 전체 재구성(되돌리기/누적오차 방지)
   rebuildGearFromInventory();
-
   renderInventory();
 });
 
