@@ -323,6 +323,7 @@ for(let y=0; y<mapSize; y++){
 player.x = mapSize * tileSize / 2;
 player.y = mapSize * tileSize / 2;
 
+let ultiBtnArea = { x:0, y:0, r:26 };
 let hpWaveOffset = 0;
 let slowMotion = 0;
 let spawnTimer = 0;
@@ -2640,6 +2641,30 @@ function drawOrbUI(){
   }
 
   ctx.restore();
+  // ===== 중앙 궁극기 버튼 =====
+ultiBtnArea.x = cx;
+ultiBtnArea.y = cy;
+ultiBtnArea.r = 22;
+
+ctx.beginPath();
+ctx.arc(cx, cy, 22, 0, Math.PI*2);
+
+if(player.kiOrbs >= player.maxOrbs){
+  ctx.fillStyle = "#2a66ff";
+  ctx.shadowColor = "#66aaff";
+  ctx.shadowBlur = 20;
+}else{
+  ctx.fillStyle = "#113355";
+  ctx.shadowBlur = 0;
+}
+
+ctx.fill();
+
+ctx.shadowBlur = 0;
+ctx.fillStyle = "white";
+ctx.font = "bold 16px Arial";
+ctx.textAlign = "center";
+ctx.fillText("U", cx, cy+5);
 }
 function drawHpOrb(){
 
@@ -2810,7 +2835,25 @@ function drawGameOver(){
   ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 40);
 }
 
-canvas.addEventListener("touchstart", ()=>{ if(gameOver) resetGame(); });
+canvas.addEventListener("touchstart", e=>{
+  if(gameOver){
+    resetGame();
+    return;
+  }
+
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+
+  const tx = touch.clientX - rect.left;
+  const ty = touch.clientY - rect.top;
+
+  const dx = tx - ultiBtnArea.x;
+  const dy = ty - ultiBtnArea.y;
+
+  if(dx*dx + dy*dy < ultiBtnArea.r * ultiBtnArea.r){
+    tryUltimate();
+  }
+});
 canvas.addEventListener("mousedown", ()=>{ if(gameOver) resetGame(); });
 
 let lastErr = null;
