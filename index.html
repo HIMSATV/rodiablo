@@ -37,11 +37,12 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
 }
 #stick{
   position:absolute;
-  width:var(--stick);height:var(--stick);
+  width:var(--stick);
+  height:var(--stick);
   border-radius:50%;
   background:#666;
-  left:calc(50% - var(--stick)/2);
-  top:calc(50% - var(--stick)/2);
+  left: calc(50% - (var(--stick) / 2));
+  top:  calc(50% - (var(--stick) / 2));
 }
 
 #attackBtn{
@@ -2629,16 +2630,62 @@ function updateFireZones(){
     f.tick++;
 
     if(f.tick % 10 === 0){
-  const dx = player.x - f.x;
-  const dy = player.y - f.y;
-  if(dx*dx + dy*dy < f.radius*f.radius){
-    // 원래는 플레이어 피해인데,
-    // 출혈 장판은 적에게 깔리는 장판이니 "플레이어가 서면 피해"가 아니라
-    // "장판 안의 적에게 피해"로 처리해야 함.
-  }
-}
 
-    if(f.life <= 0) fireZones.splice(i,1);
+      // 🔴 출혈 장판 (Blood Katana 등)
+      if(f.isBleed){
+
+        let hitCount = 0;
+
+        for(const e of enemies){
+          if(e.hp <= 0) continue;
+          if(e.type === "boss" && e.dead) continue;
+
+          const dx = e.x - f.x;
+          const dy = e.y - f.y;
+          if(dx*dx + dy*dy > f.radius*f.radius) continue;
+
+          const dealt = f.damage;
+
+          if(e.type === "boss"){
+            if(e.invul <= 0 && !e.dead){
+              e.hp -= dealt;
+              if(e.hp <= 0) startBossDeath(e);
+            }
+          }else{
+            e.hp -= dealt;
+            if(e.hp <= 0){
+              emitEvent("kill", { enemy:e, x:e.x, y:e.y, type:e.type });
+              spawnLoot(e.x, e.y, "bleed");
+              giveXP(e);
+            }
+          }
+
+          // 흡혈
+          player.hp = Math.min(player.maxHp, player.hp + dealt * 0.12);
+
+          spawnHitBlood(e.x, e.y, 3);
+
+          hitCount++;
+          if(hitCount >= 10) break;
+        }
+
+        pruneDeadEnemies();
+
+      } 
+      // 🔥 메이지 장판
+      else {
+        const dx = player.x - f.x;
+        const dy = player.y - f.y;
+
+        if(dx*dx + dy*dy < f.radius*f.radius){
+          damagePlayer(f.damage, 0, 0);
+        }
+      }
+    }
+
+    if(f.life <= 0){
+      fireZones.splice(i,1);
+    }
   }
 }
 
@@ -2765,9 +2812,11 @@ function checkLevelUp(){
     xpToNext = Math.floor(100 + level * level * 20);
 
     // 스탯 증가
-    player.baseMaxHp += 12;  // ✅ 베이스 체력 증가
+     player.baseMaxHp += 12;
+updateBuffs(player);       // 먼저 갱신
+player.hp = player.maxHp;  // 진짜 최대치로 회복 // ✅ 베이스 체력 증가
 player.hp = Math.min(player.maxHp, player.hp); // 일단 유지
-player.hp = player.maxHp; // 레벨업 풀힐 유지하고 싶으면 이 줄만 남겨도 됨
+ // 레벨업 풀힐 유지하고 싶으면 이 줄만 남겨도 됨
     baseDamage *= 1.08;
     ultiDamage *= 1.1;
 
@@ -3421,7 +3470,7 @@ function drawOrbUI(){
 
   // ✅ 중앙(궁극기) 버튼
   const centerR = 24;
-  const ready = (player.kiOrbs >= player.maxOrbs && enemies.length > 0 && !player.ultiActive);
+  const ready = (player.kiOrbs >= 1 && enemies.length > 0 && !player.ultiActive);
 
   // 중앙 버튼 상태를 입력용으로 저장
   orbUIState.cx = cx;
