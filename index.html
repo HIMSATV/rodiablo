@@ -921,6 +921,8 @@ function applyItemDataToGear(data){
     dmgMul: data.dmgMul,
     ultiMul: data.ultiMul,
     rangeMul: data.rangeMul,
+    spdMul: data.spdMul,         // ✅ 추가
+    atkSpdMul: data.atkSpdMul,
     armorAdd: data.armorAdd,
     maxHpAdd: data.maxHpAdd,
     hpRegen: data.hpRegen,
@@ -1648,6 +1650,9 @@ function updateBuffs(target){
     // ultiMul은 데미지 계산에서 직접 사용하지만, 여기서 따로 넣진 않음(혼동 방지)
     target.buffs.rangeMul *= (player.gear.rangeMul ?? 1);
     // add
+합산
+  target.buffs.spdMul    *= (player.gear.spdMul ?? 1);
+  target.buffs.atkSpdMul *= (player.gear.atkSpdMul ?? 1);
     target.buffs.armorAdd += (player.gear.armorAdd ?? 0);
     target.buffs.maxHpAdd += (player.gear.maxHpAdd ?? 0);
     target.buffs.hpRegen  += (player.gear.hpRegen ?? 0);
@@ -4012,9 +4017,9 @@ function showHint(msg){
 function rebuildGearFromEquipment(){
   // gear 초기화
   player.gear = {
-    dmgMul: 1, ultiMul: 1, spdMul: 1, rangeMul: 1,
+    dmgMul: 1, ultiMul: 1, spdMul: 1, atkSpdMul: 1, rangeMul: 1,
     armorAdd: 0, maxHpAdd: 0, hpRegen: 0,
-    critChanceAdd: 0, critMultiAdd: 0,
+    critChanceAdd: 0, critChanceMul: 1, critMultiAdd: 0,
   };
 
   for(const slot of EQUIP_SLOTS){
