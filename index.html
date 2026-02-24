@@ -373,7 +373,7 @@ let player={
   // ✅ buffs 기본값은 updateBuffs에서 매 프레임 세팅
   buffs: { dmgMul:1, spdMul:1, atkSpdMul:1 },
   activeBuffs: []
-  :;
+  };
 // ✅ 무기 베이스 (POE 스타일)
 player.weapon = {
   name: "Rusty Katana",
@@ -484,20 +484,22 @@ const ITEM_POOL = [
 const PREFIXES = [
   { name:"맹렬한", mod:(data)=>{ data.percent += 10; } },
   { name:"광폭한", mod:(data)=>{ data.percent += 15; } },
-  { name:"견고한", mod:(data)=>{ data.flat += 8; } }
- // ✅ 크리 접두
-{ name:"정밀한", mod:(data)=>{ data.critChanceAdd = (data.critChanceAdd ?? 0) + 0.02; } },  // +2%
-{ name:"예리한",  mod:(data)=>{ data.critChanceAdd = (data.critChanceAdd ?? 0) + 0.03; } },  // +3%
-{ name:"치명적인", mod:(data)=>{ data.critChanceMul = (data.critChanceMul ?? 1) * 1.25; } }, // 치확 25% 증가
+  { name:"견고한", mod:(data)=>{ data.flat += 8; } },
+
+  // ✅ 크리 접두
+  { name:"정밀한", mod:(data)=>{ data.critChanceAdd = (data.critChanceAdd ?? 0) + 0.02; } },  // +2%
+  { name:"예리한",  mod:(data)=>{ data.critChanceAdd = (data.critChanceAdd ?? 0) + 0.03; } },  // +3%
+  { name:"치명적인", mod:(data)=>{ data.critChanceMul = (data.critChanceMul ?? 1) * 1.25; } }  // increased
 ];
 
 
 const SUFFIXES = [
   { name:"의 분노", mod:(data)=>{ data.percent += 5; } },
-  { name:"의 거인", mod:(data)=>{ data.flat += 10; } }
+  { name:"의 거인", mod:(data)=>{ data.flat += 10; } },
+
   // ✅ 크리 접미
-{ name:"의 암살자", mod:(data)=>{ data.critMultiAdd = (data.critMultiAdd ?? 0) + 0.25; } }, // +25%p (1.50->1.75)
-{ name:"의 도살자", mod:(data)=>{ data.critMultiAdd = (data.critMultiAdd ?? 0) + 0.35; } }, // +35%p
+  { name:"의 암살자", mod:(data)=>{ data.critMultiAdd = (data.critMultiAdd ?? 0) + 0.25; } },
+  { name:"의 도살자", mod:(data)=>{ data.critMultiAdd = (data.critMultiAdd ?? 0) + 0.35; } }
 ];
 // =============================
 // ✅ 전설 아이템(고유효과)
@@ -512,8 +514,7 @@ const LEGENDARY_POOL = [
       // 스탯도 조금
       apply(){
   applyGearDelta({ dmgMul: 1.10 });
-}
-    },
+},
     onEvent(type, p){
       if(type !== "kill") return;
 
@@ -1135,7 +1136,7 @@ function defaultBuffStats(){
     armorMul: 1,        // ✅ 방어력(배수) - 필요 없으면 안 써도 됨
     maxHpMul: 1,        // ✅ 최대체력 배수
     maxHpAdd: 0,        // ✅ 최대체력 가산
-    hpRegen: 0          // ✅ 초당 체력 재생(가산)
+    hpRegen: 0,          // ✅ 초당 체력 재생(가산)
   };
 }
 
@@ -4054,10 +4055,10 @@ player.gear = {
   rangeMul: 1,
   armorAdd: 0,
   maxHpAdd: 0,
-  hpRegen: 0
+  hpRegen: 0,
     critChanceAdd: 0,
   critChanceMul: 1,
-  critMultiAdd: 0
+  critMultiAdd: 0,
 };
 
 recalcFromGear();
