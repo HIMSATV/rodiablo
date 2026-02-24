@@ -1080,13 +1080,16 @@ function spawnHitBlood(x, y, amount=10){
   }
 }
 function startBossDeath(boss){
-  if(boss.dead) return;
-
+    if(boss.dead) return;
+ if(!boss.xpGiven){
+    boss.xpGiven = true;
+    giveXP(boss);
+    }
   boss.dead = true;
   boss.deathTimer = 60;      // ✅ 1초 연출(60fps 기준)
   boss.deathMax = 60;
 
-  shake = Math.max(shake, 28);
+  shake = Math.max(shake, 60);
   slowMotion = Math.max(slowMotion, 10);
 
   // 피 + 파편
@@ -2091,8 +2094,9 @@ function checkHit(){
   // 일단은 아래 일반 죽음 로직을 타지 않게 막자:
   continue;
 }
+      giveXP(e);
       killCount++;
-      checkLevelUp();
+      //checkLevelUp();
 
       player.hp = Math.min(player.maxHp, player.hp + 1);
 
@@ -2164,8 +2168,10 @@ function draw(){
 
   let camX = player.x - canvas.width/2;
   let camY = player.y - canvas.height/2;
-  let sx = shake ? (Math.random()-0.5)*12 : 0;
-  let sy = shake ? (Math.random()-0.5)*12 : 0;
+// ✅ shake가 클수록 흔들림 폭 증가 (보스 사망 연출이 훨씬 강해짐)
+let amp = shake ? (6 + shake * 0.45) : 0;   // 숫자 조절로 더 과격/순하게 가능
+let sx = shake ? (Math.random()-0.5) * amp : 0;
+let sy = shake ? (Math.random()-0.5) * amp : 0;
 
   ctx.save();
   ctx.translate(-camX+sx, -camY+sy);
