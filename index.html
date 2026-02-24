@@ -101,6 +101,20 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   z-index:9999;
   font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
 }
+<!-- ✅ 인벤/장비창 UI -->
+<div id="invOverlay">
+  <div id="invPanel">
+    <div id="invTitle">장비 / 인벤토리</div>
+    <div id="invStats"></div>
+    <div id="invList"></div>
+
+    <div class="invBtns">
+      <button id="btnChaos" type="button">카오스 오브 (리롤)</button>
+      <button id="btnInvClose" type="button">닫기</button>
+    </div>
+    <div id="invHint"></div>
+  </div>
+</div>
 #lootPanel{
   width:min(92vw, 520px);
   background:#111;
@@ -416,6 +430,220 @@ let pendingLoot = null;    // 현재 선택 UI에 띄운 루트
 const lootOverlay = document.getElementById("lootOverlay");
 const lootCardsEl = document.getElementById("lootCards");
 
+/* ============================= */
+/* ✅ POE식 Affix/Tier/ilvl 시스템 */
+/* ============================= */
+
+// ✅ 아이템 레벨(ilvl): 맵티어/레벨 기반
+function getItemLevel(){
+  // 느낌: 맵티어가 핵심 + 레벨 조금 보정
+  return Math.floor(mapTier * 10 + level * 1.5);
+}
+
+// ✅ 가중치 랜덤 픽
+function weightedPick(list, weightKey="weight"){
+  let total = 0;
+  for(const it of list) total += (it[weightKey] ?? 0);
+  let r = Math.random() * total;
+  for(const it of list){
+    r -= (it[weightKey] ?? 0);
+    if(r <= 0) return it;
+  }
+  return list[list.length - 1];
+}
+
+// ✅ Affix DB (POE 느낌: group, tiers, weight, minIlvl)
+const AFFIX_DB = {
+  prefix: [
+    {
+      id:"p_phys",
+      name:"Brutal",
+      group:"dmgMul",
+      weight:100,
+      tiers:[
+        { t:1, minIlvl:70, min:0.22, max:0.30, w:20 }, // +22~30%
+        { t:2, minIlvl:50, min:0.16, max:0.21, w:35 },
+        { t:3, minIlvl:30, min:0.10, max:0.15, w:60 },
+        { t:4, minIlvl:1,  min:0.05, max:0.09, w:90 }
+      ],
+      apply:(data, roll)=>{ data.dmgMul *= (1 + roll); }
+    },
+    {
+      id:"p_ulti",
+      name:"Cataclysm",
+      group:"ultiMul",
+      weight:80,
+      tiers:[
+        { t:1, minIlvl:70, min:0.25, max:0.33, w:20 },
+        { t:2, minIlvl:45, min:0.18, max:0.24, w:40 },
+        { t:3, minIlvl:20, min:0.10, max:0.17, w:70 },
+        { t:4, minIlvl:1,  min:0.06, max:0.09, w:90 }
+      ],
+      apply:(data, roll)=>{ data.ultiMul *= (1 + roll); }
+    },
+    {
+      id:"p_range",
+      name:"Wide",
+      group:"rangeMul",
+      weight:70,
+      tiers:[
+        { t:1, minIlvl:60, min:0.18, max:0.24, w:25 },
+        { t:2, minIlvl:35, min:0.12, max:0.17, w:45 },
+        { t:3, minIlvl:1,  min:0.06, max:0.11, w:80 }
+      ],
+      apply:(data, roll)=>{ data.rangeMul *= (1 + roll); }
+    },
+    {
+      id:"p_crit",
+      name:"Keen",
+      group:"critChanceAdd",
+      weight:55,
+      tiers:[
+        { t:1, minIlvl:65, min:0.04, max:0.06, w:20 }, // +4~6%
+        { t:2, minIlvl:40, min:0.025, max:0.039, w:45 },
+        { t:3, minIlvl:1,  min:0.01, max:0.024, w:85 }
+      ],
+      apply:(data, roll)=>{ data.critChanceAdd += roll; }
+    }
+  ],
+
+  suffix: [
+    {
+      id:"s_hp",
+      name:"of Vitality",
+      group:"maxHpAdd",
+      weight:100,
+      tiers:[
+        { t:1, minIlvl:70, min:45, max:70, w:22 },
+        { t:2, minIlvl:45, min:30, max:44, w:40 },
+        { t:3, minIlvl:20, min:18, max:29, w:70 },
+        { t:4, minIlvl:1,  min:10, max:17, w:95 }
+      ],
+      apply:(data, roll)=>{ data.maxHpAdd += roll; }
+    },
+    {
+      id:"s_armor",
+      name:"of Fortitude",
+      group:"armorAdd",
+      weight:85,
+      tiers:[
+        { t:1, minIlvl:70, min:18, max:26, w:22 },
+        { t:2, minIlvl:45, min:12, max:17, w:40 },
+        { t:3, minIlvl:20, min:7,  max:11, w:70 },
+        { t:4, minIlvl:1,  min:3,  max:6,  w:95 }
+      ],
+      apply:(data, roll)=>{ data.armorAdd += roll; }
+    },
+    {
+      id:"s_regen",
+      name:"of Regeneration",
+      group:"hpRegen",
+      weight:60,
+      tiers:[
+        { t:1, minIlvl:65, min:2.2, max:3.4, w:22 }, // hp/sec
+        { t:2, minIlvl:35, min:1.4, max:2.1, w:45 },
+        { t:3, minIlvl:1,  min:0.6, max:1.3, w:85 }
+      ],
+      apply:(data, roll)=>{ data.hpRegen += roll; }
+    },
+    {
+      id:"s_critmulti",
+      name:"of the Assassin",
+      group:"critMultiAdd",
+      weight:55,
+      tiers:[
+        { t:1, minIlvl:70, min:0.35, max:0.55, w:20 }, // +35~55%p
+        { t:2, minIlvl:40, min:0.20, max:0.34, w:45 },
+        { t:3, minIlvl:1,  min:0.10, max:0.19, w:85 }
+      ],
+      apply:(data, roll)=>{ data.critMultiAdd += roll; }
+    }
+  ]
+};
+
+function rollTierValue(affix, ilvl){
+  const avail = affix.tiers.filter(t => ilvl >= t.minIlvl);
+  const picked = weightedPick(avail.map(t=>({ ...t, weight:t.w })));
+  const isInt = Number.isInteger(picked.min) && Number.isInteger(picked.max);
+  let v = picked.min + Math.random() * (picked.max - picked.min);
+  if(isInt) v = Math.floor(v);
+  else v = Math.round(v * 1000) / 1000;
+  return { tier:picked.t, value:v };
+}
+
+// ✅ rarity별 prefix/suffix 개수
+function affixCountsByRarity(r){
+  if(r === "common") return { pre:1, suf:0, total:1 };
+  if(r === "rare")   return { pre:1, suf:1, total:2 };
+  if(r === "epic")   return { pre:2, suf:1, total:3 };
+  return { pre:0, suf:0, total:0 };
+}
+
+// ✅ 실제 affix 굴리기(그룹 중복 방지)
+function rollAffixesPOE(rarity, ilvl){
+  const cnt = affixCountsByRarity(rarity);
+
+  const pickedPre = [];
+  const pickedSuf = [];
+  const usedGroups = new Set();
+
+  function pickFrom(pool, count){
+    const out = [];
+    let guard = 0;
+    while(out.length < count && guard++ < 500){
+      const cand = weightedPick(pool);
+      if(usedGroups.has(cand.group)) continue;
+      usedGroups.add(cand.group);
+      out.push(cand);
+    }
+    return out;
+  }
+
+  pickedPre.push(...pickFrom(AFFIX_DB.prefix, cnt.pre));
+  pickedSuf.push(...pickFrom(AFFIX_DB.suffix, cnt.suf));
+
+  // ✅ affix 결과(티어/롤 포함) 만들기
+  const rolled = [];
+  for(const a of pickedPre){
+    const rr = rollTierValue(a, ilvl);
+    rolled.push({ kind:"prefix", affix:a, tier:rr.tier, value:rr.value });
+  }
+  for(const a of pickedSuf){
+    const rr = rollTierValue(a, ilvl);
+    rolled.push({ kind:"suffix", affix:a, tier:rr.tier, value:rr.value });
+  }
+
+  return rolled;
+}
+
+// ✅ “장비/아이템 데이터” 기본 틀 (gearDelta로 합치기 쉬운 형태)
+function makeEmptyItemData(){
+  return {
+    dmgMul: 1,
+    ultiMul: 1,
+    rangeMul: 1,
+    armorAdd: 0,
+    maxHpAdd: 0,
+    hpRegen: 0,
+    critChanceAdd: 0,
+    critMultiAdd: 0
+  };
+}
+
+// ✅ 아이템 적용(gear로 반영)
+function applyItemDataToGear(data){
+  // mul은 applyGearDelta에서 곱 처리됨
+  applyGearDelta({
+    dmgMul: data.dmgMul,
+    ultiMul: data.ultiMul,
+    rangeMul: data.rangeMul,
+    armorAdd: data.armorAdd,
+    maxHpAdd: data.maxHpAdd,
+    hpRegen: data.hpRegen,
+    critChanceAdd: data.critChanceAdd,
+    critMultiAdd: data.critMultiAdd
+  });
+}
 // ✅ 드랍 테이블(원하면 여기 계속 추가하면 됨)
 const ITEM_POOL = [
 
@@ -779,17 +1007,73 @@ function openLootChoice(L){
     `;
 
     card.querySelector("button").addEventListener("click", ()=>{
-      if(it.rarity === "legendary"){
-        it.apply();
-        ownedItems.push(it.name);
-        ownedUniques.push(it);
-      }else{
-        it.apply(preview.data);     // ✅ 표시된 데이터 그대로 적용
-        ownedItems.push(preview.name);
-      }
+      const ilvl = getItemLevel();
 
-      // ✅ gear/버프/파생 스탯 동기화
-      recalcFromGear();
+if(it.rarity === "legendary"){
+  it.apply();
+  ownedUniques.push(it);
+
+  inventory.push({
+    id: it.id,
+    name: it.name,
+    rarity: "legendary",
+    ilvl,
+    isUnique: true,
+    uniqueRef: it,
+    data: null,
+    affixes: []
+  });
+
+}else{
+  // ✅ POE식: base + affixes 굴리고 data에 누적
+  const data = makeEmptyItemData();
+
+  // base 효과(기존 ITEM_POOL의 scale + apply 로직을 대체)
+  // ✅ “기존 아이템 타입” 유지하려면: it.type에 따라 기본값을 만들어준다
+  // (dmg/ulti는 mul, hp/armor는 add)
+  if(it.type === "damage"){
+    const v = Math.floor(8 + level * 1.2 + mapTier * 1.5); // 기존 스케일 유지
+    data.dmgMul *= (1 + v/100);
+  }else if(it.type === "ulti"){
+    const v = Math.floor(12 + level * 1.5 + mapTier * 2);
+    data.ultiMul *= (1 + v/100);
+  }else if(it.type === "hp"){
+    const v = Math.floor(15 + level*3 + mapTier*4);
+    data.maxHpAdd += v;
+  }else if(it.type === "armor"){
+    const v = Math.floor(5 + mapTier*2);
+    data.armorAdd += v;
+  }
+
+  // ✅ Affix 굴리기
+  const aff = rollAffixesPOE(it.rarity, ilvl);
+  for(const a of aff){
+    a.affix.apply(data, a.value);
+  }
+
+  // ✅ 적용 + 인벤 저장
+  applyItemDataToGear(data);
+  if(data.maxHpAdd > 0) player.hp = Math.min(player.maxHp, player.hp + data.maxHpAdd);
+
+  // 표시 이름(POE 느낌)
+  const preNames = aff.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+  const sufNames = aff.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+  let nm = it.name;
+  if(preNames.length) nm = preNames.join(" ") + " " + nm;
+  if(sufNames.length) nm = nm + " " + sufNames.join(" ");
+
+  inventory.push({
+    id: it.id,
+    name: nm,
+    rarity: it.rarity,
+    ilvl,
+    isUnique:false,
+    data,
+    affixes: aff
+  });
+}
+
+recalcFromGear();
 
       L.taken = true;
       closeLootChoice();
@@ -850,7 +1134,12 @@ function drawLoots(){
   }
   ctx.restore();
 }
-let ownedItems = [];
+// ✅ 인벤: 문자열 대신 “아이템 객체”로 저장
+let inventory = [];   // { id, name, rarity, ilvl, data, affixes[], isUnique, uniqueRef? }
+let selectedInvIndex = -1;
+
+// ✅ 화폐(카오스 오브)
+let chaosOrbs = 2; // 시작 2개(취향)
 // =============================
 // ✅ 전설(Unique) 이벤트 시스템
 // =============================
@@ -1974,7 +2263,8 @@ function startBossDeath(boss){
 
     // ✅ 보스 확정 드랍(선택 1회)
   spawnLoot(boss.x, boss.y, "boss");
-
+  // ✅ 보스 처치 보상: 카오스 오브 +1
+  chaosOrbs++;
   bossDeathSound();
 }
 
@@ -3486,8 +3776,8 @@ function drawUI(){
 ctx.fillStyle = "#ccc";
 
 let startY = 140;
-for(let i=0;i<ownedItems.length && i<8;i++){
-  ctx.fillText("• " + ownedItems[i], 20, startY + i*16);
+for(let i=0;i<inventory.length && i<8;i++){
+  ctx.fillText("• " + inventory[i].name, 20, startY + i*16);
 }
 }
   
@@ -3958,6 +4248,18 @@ function handleUltimateOrbPress(clientX, clientY){
 
 canvas.addEventListener("touchstart", (e)=>{
   if(gameOver){ resetGame(); return; }
+    // ✅ 좌상단(Level 글자) 탭하면 인벤 오픈
+  // (대충 x<160, y<130 영역)
+  {
+    const rect = canvas.getBoundingClientRect();
+    const tx = e.touches[0].clientX - rect.left;
+    const ty = e.touches[0].clientY - rect.top;
+    if(tx < 170 && ty < 130){
+      openInventory();
+      e.preventDefault();
+      return;
+    }
+  }
   if(!e.touches || !e.touches[0]) return;
 
   // ✅ 1) 근처 드랍 있으면 줍기(선택창)
@@ -3978,7 +4280,15 @@ canvas.addEventListener("touchstart", (e)=>{
 
 canvas.addEventListener("mousedown", (e)=>{
   if(gameOver){ resetGame(); return; }
-
+  {
+    const rect = canvas.getBoundingClientRect();
+    const tx = e.clientX - rect.left;
+    const ty = e.clientY - rect.top;
+    if(tx < 170 && ty < 130){
+      openInventory();
+      return;
+    }
+  }
   const near = getNearbyLoot();
   if(near){ openLootChoice(near); return; }
 
@@ -4015,7 +4325,192 @@ function loop(){
     requestAnimationFrame(loop);
   }
 }
+// =============================
+// ✅ 인벤/카오스 UI 로직
+// =============================
+const invOverlay = document.getElementById("invOverlay");
+const invStats = document.getElementById("invStats");
+const invList = document.getElementById("invList");
+const btnInvClose = document.getElementById("btnInvClose");
+const btnChaos = document.getElementById("btnChaos");
+const invHint = document.getElementById("invHint");
 
+function formatAffixLine(a){
+  const t = "T" + a.tier;
+  const nm = a.affix.name;
+  // 값 표기(퍼센트/플랫 자동)
+  let v = a.value;
+  let s = "";
+  if(a.affix.group.endsWith("Mul") || a.affix.group === "rangeMul"){
+    // 이쪽은 (1+roll)로 들어가므로 roll 자체는 0.xx
+    s = `+${Math.round(v*100)}%`;
+  }else if(a.affix.group === "critChanceAdd"){
+    s = `+${Math.round(v*100)}% 치명타 확률`;
+    return `${t} ${nm}: ${s}`;
+  }else if(a.affix.group === "critMultiAdd"){
+    s = `+${Math.round(v*100)}%p 치명타 피해`;
+    return `${t} ${nm}: ${s}`;
+  }else if(a.affix.group === "hpRegen"){
+    s = `+${Math.round(v*10)/10} hp/sec`;
+    return `${t} ${nm}: ${s}`;
+  }else{
+    s = `+${v}`;
+  }
+  return `${t} ${nm}: ${s}`;
+}
+
+function openInventory(){
+  lootOverlayOpen = true; // ✅ 게임 멈춤 효과 재사용
+  invOverlay.style.display = "flex";
+  selectedInvIndex = -1;
+  renderInventory();
+}
+
+function closeInventory(){
+  invOverlay.style.display = "none";
+  lootOverlayOpen = false;
+}
+
+function renderInventory(){
+  // 스탯 요약
+  const cc = Math.round(getCritChance()*1000)/10;
+  const cm = Math.round(getCritMulti()*100)/100;
+
+  invStats.innerHTML = `
+    <div><b>Level</b> ${level} / <b>MapTier</b> ${mapTier} / <b>ilvl</b> ${getItemLevel()}</div>
+    <div><b>HP</b> ${Math.floor(player.hp)} / ${Math.floor(player.maxHp)} (Regen ${Math.round((player.gear.hpRegen??0)*10)/10}/s)</div>
+    <div><b>Armor</b> ${Math.floor(player.armor ?? 0)}</div>
+    <div><b>Crit</b> ${cc}% / x${cm}</div>
+    <div><b>Chaos Orbs</b> ${chaosOrbs}</div>
+  `;
+
+  // 목록
+  invList.innerHTML = "";
+  if(inventory.length === 0){
+    invList.innerHTML = `<div style="color:#aaa">아직 획득한 아이템이 없습니다.</div>`;
+  }else{
+    inventory.forEach((it, idx)=>{
+      const div = document.createElement("div");
+      div.className = "invItem" + (idx === selectedInvIndex ? " sel" : "");
+      const lines = it.isUnique
+        ? it.uniqueRef?.desc ?? "(Unique)"
+        : it.affixes.map(formatAffixLine).join("\n");
+
+      div.innerHTML = `
+        <div class="nm">[${it.rarity.toUpperCase()}] ${it.name}</div>
+        <div style="color:#aaa;font-size:12px;margin-top:4px;">ilvl ${it.ilvl}</div>
+        <div class="ln">${lines || ""}</div>
+      `;
+      div.addEventListener("click", ()=>{
+        selectedInvIndex = idx;
+        renderInventory();
+      });
+      invList.appendChild(div);
+    });
+  }
+
+  invHint.textContent = "아이템을 선택하고 '카오스 오브'를 누르면 접두/접미를 다시 굴립니다. (레전더리 제외)";
+}
+
+btnInvClose.addEventListener("click", closeInventory);
+
+btnChaos.addEventListener("click", ()=>{
+  if(selectedInvIndex < 0) return;
+  const it = inventory[selectedInvIndex];
+  if(!it || it.isUnique) return;
+
+  if(chaosOrbs <= 0){
+    invHint.textContent = "카오스 오브가 없습니다!";
+    return;
+  }
+
+  // ✅ 리롤 = 기존 아이템 스탯 되돌리고 → affix 재굴림 → 다시 적용
+  // (단순화: 되돌리기는 gear를 “전체 재계산” 방식으로 처리)
+  chaosOrbs--;
+
+  // 1) 인벤에서 해당 아이템의 data를 새로 만들고 affixes 재굴림
+  const ilvl = it.ilvl;
+  const rarity = it.rarity;
+
+  const newData = makeEmptyItemData();
+
+  // base 효과는 id/type을 모르므로, “기존 data에서 base+affix가 섞여있음”
+  // ✅ 여기서는 POE 느낌으로 "카오스 = 접두/접미만 다시"를 구현하기 위해
+  // base는 유지하고 싶다면 base를 따로 저장해야 함.
+  // 지금은 간단/강력: 아이템 전체를 다시 굴림(체감은 카오스 느낌 그대로 좋음)
+
+  // base 추정(현재 시스템: dmg_up/ulti_up/hp/armor 4종 뿐이라 id로 판별)
+  if(it.id === "dmg_up"){
+    const v = Math.floor(8 + level * 1.2 + mapTier * 1.5);
+    newData.dmgMul *= (1 + v/100);
+  }else if(it.id === "ulti_up"){
+    const v = Math.floor(12 + level * 1.5 + mapTier * 2);
+    newData.ultiMul *= (1 + v/100);
+  }else if(it.id === "hp"){
+    const v = Math.floor(15 + level*3 + mapTier*4);
+    newData.maxHpAdd += v;
+  }else if(it.id === "armor"){
+    const v = Math.floor(5 + mapTier*2);
+    newData.armorAdd += v;
+  }
+
+  const aff = rollAffixesPOE(rarity, ilvl);
+  for(const a of aff) a.affix.apply(newData, a.value);
+
+  // 2) 인벤 아이템 업데이트
+  const preNames = aff.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+  const sufNames = aff.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+
+  let baseName = "Item";
+  if(it.id === "dmg_up") baseName = "강화된 일격";
+  if(it.id === "ulti_up") baseName = "폭발 강화";
+  if(it.id === "hp") baseName = "생명의 정수";
+  if(it.id === "armor") baseName = "철벽 갑옷";
+
+  let nm = baseName;
+  if(preNames.length) nm = preNames.join(" ") + " " + nm;
+  if(sufNames.length) nm = nm + " " + sufNames.join(" ");
+
+  it.name = nm;
+  it.data = newData;
+  it.affixes = aff;
+
+  // 3) gear 전체를 “인벤 기반으로 재구성”
+  //    (되돌리기/중복오차 방지 최강 방식)
+  rebuildGearFromInventory();
+
+  renderInventory();
+});
+
+function rebuildGearFromInventory(){
+  // gear 초기화
+  player.gear = {
+    dmgMul: 1,
+    ultiMul: 1,
+    spdMul: 1,
+    atkSpdMul: 1,
+    rangeMul: 1,
+    armorAdd: 0,
+    maxHpAdd: 0,
+    hpRegen: 0,
+    critChanceAdd: 0,
+    critChanceMul: 1,
+    critMultiAdd: 0
+  };
+
+  // 유니크는 apply()로 이미 반영되어 있어서 “추가 누적”이 되면 안 됨.
+  // ✅ 그래서: 유니크는 여기서 제외하고,
+  //    리셋Game/리빌드 때는 유니크도 다시 적용되게 만들면 더 완벽함.
+  //    지금은 간단하게: 유니크는 ‘카운트만’ 유지(중복 방지).
+  //    (유니크 리빌드까지 원하면 말해줘. 그럼 apply/undo 구조로 깔끔하게 정리해줄게)
+
+  for(const it of inventory){
+    if(it.isUnique) continue;
+    if(it.data) applyItemDataToGear(it.data);
+  }
+
+  recalcFromGear();
+}
 /* ===== 리셋 ===== */
 function resetGame(){
   mapTier = 1;
