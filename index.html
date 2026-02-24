@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Oni Samurai</title>
-<style>
+</style>
 :root{
   --uiScale: 1.2; /* ✅ UI 20% 확대 */
   /* ✅ 기기별 UI 자동 스케일 (아이폰12미니 포함) */
@@ -1245,7 +1245,7 @@ function applyGearDelta(delta){
     if(typeof v !== "number") continue;
 
     // Mul 계열은 곱, Add 계열은 더하기
-    if(k.endsWith("Mul") || k === "rangeMul"){
+    if(k.endsWith("Mul") 
       player.gear[k] = (player.gear[k] ?? 1) * v;
     }else{
       player.gear[k] = (player.gear[k] ?? 0) + v;
