@@ -422,7 +422,8 @@ const ITEM_POOL = [
       return { percent:value };
     },
     apply(data){
-      baseDamage *= (1 + data.percent/100);
+      // ✅ 영구: gear에 누적(곱)
+      applyGearDelta({ dmgMul: 1 + (data.percent/100) });
     }
   },
 
@@ -437,7 +438,7 @@ const ITEM_POOL = [
       return { percent:value };
     },
     apply(data){
-      ultiDamage *= (1 + data.percent/100);
+      applyGearDelta({ ultiMul: 1 + (data.percent/100) });
     }
   },
 
@@ -452,7 +453,7 @@ const ITEM_POOL = [
       return { flat:value };
     },
     apply(data){
-      player.baseMaxHp += data.flat;
+      applyGearDelta({ maxHpAdd: data.flat });
       player.hp += data.flat;
     }
   },
@@ -468,7 +469,7 @@ const ITEM_POOL = [
       return { flat:value };
     },
     apply(data){
-      player.baseArmor += data.flat;
+      applyGearDelta({ armorAdd: data.flat });
     }
   }
 ];
@@ -584,23 +585,65 @@ const LEGENDARY_POOL = [
     }
   }
 ];
-function rollAffixes(baseItem){
+function pickUnique(list, n){
+  const out = [];
+  const copy = list.slice();
+  while(out.length < n && copy.length){
+    const idx = (Math.random() * copy.length) | 0;
+    out.push(copy.splice(idx,1)[0]);
+  }
+  return out;
+}
+
+// ✅ 커먼: 접두/접미 1줄(둘 중 하나만)
+// ✅ 레어: 접두 1줄 + 접미 1줄
+// ✅ 에픽: 접두 1줄 + 접미 1줄 + (접두 또는 접미) 1줄  => 총 3줄
+function rollAffixesByRarity(baseItem, rarity){
   let data = baseItem.scale();
+  let prefixes = [];
+  let suffixes = [];
+
+  if(rarity === "common"){
+    if(Math.random() < 0.5){
+      prefixes = pickUnique(PREFIXES, 1);
+    }else{
+      suffixes = pickUnique(SUFFIXES, 1);
+    }
+  }else if(rarity === "rare"){
+    prefixes = pickUnique(PREFIXES, 1);
+    suffixes = pickUnique(SUFFIXES, 1);
+  }else if(rarity === "epic"){
+    // 기본 2줄
+    prefixes = pickUnique(PREFIXES, 1);
+    suffixes = pickUnique(SUFFIXES, 1);
+
+    // 추가 1줄(접두 or 접미)
+    if(Math.random() < 0.5){
+      // 접두 1개 더(중복 방지)
+      const cand = PREFIXES.filter(p => !prefixes.includes(p));
+      if(cand.length) prefixes.push(pickUnique(cand, 1)[0]);
+    }else{
+      // 접미 1개 더(중복 방지)
+      const cand = SUFFIXES.filter(s => !suffixes.includes(s));
+      if(cand.length) suffixes.push(pickUnique(cand, 1)[0]);
+    }
+  }else{
+    // legendary는 여기서 안 굴림
+  }
+
+  // mod 적용(누적)
+  for(const p of prefixes) p.mod(data);
+  for(const s of suffixes) s.mod(data);
+
+  // 이름 구성(접두 여러 개면 공백으로 이어붙임, 접미는 기존처럼 뒤에 붙임)
+  const preName = prefixes.map(p=>p.name).join(" ");
+  const sufName = suffixes.map(s=>s.name).join("");
+
   let name = baseItem.name;
+  if(preName) name = preName + " " + name;
+  if(sufName) name = name + sufName;
 
-  if(Math.random() < 0.4){
-    const p = PREFIXES[Math.floor(Math.random()*PREFIXES.length)];
-    p.mod(data);
-    name = p.name + " " + name;
-  }
-
-  if(Math.random() < 0.4){
-    const s = SUFFIXES[Math.floor(Math.random()*SUFFIXES.length)];
-    s.mod(data);
-    name = name + s.name;
-  }
-
-  return { name, data };
+  return { name, data, prefixes, suffixes };
 }
 
 // ✅ 확률 (원하면 조절)
@@ -694,45 +737,44 @@ function openLootChoice(L){
   lootOverlay.style.display = "flex";
   lootCardsEl.innerHTML = "";
 
-  L.choices.forEach((it)=>{
-  const card = document.createElement("div");
-  card.className = `lootCard ${it.rarity}`;
+    L.choices.forEach((it)=>{
+    const card = document.createElement("div");
+    card.className = `lootCard ${it.rarity}`;
 
-  // 미리 한 번 굴려서 "표시용"으로 고정
-  const preview = (it.rarity === "legendary") ? null : rollAffixes(it);
-  const shownName = (it.rarity === "legendary") ? it.name : preview.name;
-  const shownDesc = (it.rarity === "legendary")
-    ? it.desc
-    : it.descGen(preview.data.percent ?? preview.data.flat);
+    // ✅ 표시용 프리뷰(표시된 값이 그대로 적용되게 고정)
+    const preview = (it.rarity === "legendary") ? null : rollAffixesByRarity(it, it.rarity);
 
-  card.innerHTML = `
-    <div class="name">[${it.rarity.toUpperCase()}] ${shownName}</div>
-    <div class="desc">${shownDesc}</div>
-    <button type="button">이걸 선택</button>
-  `;
+    const shownName = (it.rarity === "legendary") ? it.name : preview.name;
+    const shownDesc = (it.rarity === "legendary")
+      ? it.desc
+      : it.descGen(preview.data.percent ?? preview.data.flat);
 
-  card.querySelector("button").addEventListener("click", ()=>{
-    if(it.rarity === "legendary"){
-      it.apply();
-      ownedItems.push(it.name);
-      ownedUniques.push(it);
-    }else{
-      // 적용도 "표시된 것" 그대로 적용 (다시 굴리지 않기)
-      it.apply(preview.data);
-      ownedItems.push(preview.name);
-    }
+    card.innerHTML = `
+      <div class="name">[${it.rarity.toUpperCase()}] ${shownName}</div>
+      <div class="desc">${shownDesc}</div>
+      <button type="button">이걸 선택</button>
+    `;
 
-    updateBuffs(player);
-    player.hp = Math.min(player.maxHp, player.hp);
+    card.querySelector("button").addEventListener("click", ()=>{
+      if(it.rarity === "legendary"){
+        it.apply();
+        ownedItems.push(it.name);
+        ownedUniques.push(it);
+      }else{
+        it.apply(preview.data);     // ✅ 표시된 데이터 그대로 적용
+        ownedItems.push(preview.name);
+      }
 
-    L.taken = true;
-    closeLootChoice();
+      // ✅ gear/버프/파생 스탯 동기화
+      recalcFromGear();
 
-    shake = Math.max(shake, 10);
+      L.taken = true;
+      closeLootChoice();
+      shake = Math.max(shake, 10);
+    });
+
+    lootCardsEl.appendChild(card);
   });
-
-  lootCardsEl.appendChild(card);
-});
 }
 
 function closeLootChoice(){
@@ -807,8 +849,59 @@ let level = 1;
 let gameOver = false;
 let orbFlash = 0;
 let flashEffect = 0;
-let baseDamage = 20;
-let ultiDamage = 40;
+/* ============================= */
+/* ✅ POE식 영구 아이템(gear) 설계 */
+/* ============================= */
+
+// ✅ “레벨업/기본 성장”은 Base에만 누적
+let baseDamageBase = 20;
+let ultiDamageBase = 40;
+
+// ✅ 실제 전투에서 쓰는 값(항상 재계산됨)
+let baseDamage = baseDamageBase;
+let ultiDamage = ultiDamageBase;
+
+// ✅ 플레이어 영구 장비 스탯(아이템으로만 누적)
+// - 공격 범위는 rangeMul만 사용
+player.gear = {
+  dmgMul: 1,        // 평타 데미지 배수
+  ultiMul: 1,       // 궁극기 데미지 배수
+  spdMul: 1,        // 이동속도 배수(원하면)
+  atkSpdMul: 1,     // 공속 배수(원하면)
+  rangeMul: 1,      // ✅ 공격범위(평타/궁극기 모두) 단일 키
+  armorAdd: 0,      // 방어력 가산
+  maxHpAdd: 0,      // 최대체력 가산
+  hpRegen: 0        // 초당 재생 가산
+};
+
+// ✅ gear 변경/레벨업 후 항상 이걸 호출해서 “파생 스탯” 재계산
+function recalcFromGear(){
+  baseDamage = baseDamageBase * (player.gear.dmgMul ?? 1);
+  ultiDamage = ultiDamageBase * (player.gear.ultiMul ?? 1);
+
+  // maxHp/armor는 updateBuffs(player)에서 최종 반영되지만,
+  // gear는 updateBuffs에 섞이도록 아래 updateBuffs 수정도 같이 해줘야 함.
+  updateBuffs(player);
+  player.hp = Math.min(player.maxHp, player.hp);
+}
+
+// ✅ gear에 값을 적용(한 번 먹은 아이템은 여기로만 누적)
+function applyGearDelta(delta){
+  // delta 예: { dmgMul:1.12 } 또는 { armorAdd:5 } 또는 { rangeMul:1.10 }
+  for(const k in delta){
+    const v = delta[k];
+    if(typeof v !== "number") continue;
+
+    // Mul 계열은 곱, Add 계열은 더하기
+    if(k.endsWith("Mul") || k === "rangeMul"){
+      player.gear[k] = (player.gear[k] ?? 1) * v;
+    }else{
+      player.gear[k] = (player.gear[k] ?? 0) + v;
+    }
+  }
+
+  recalcFromGear();
+}
 let levelParticles = [];
 let arrows = [];
 let bloodParticles = [];
@@ -1022,6 +1115,24 @@ function updateBuffs(target){
   // 기본값
   target.buffs = defaultBuffStats();
 
+  // ✅ (추가) 영구 gear를 “기본 버프”에 먼저 합성
+  // - 플레이어만 gear를 씀(적은 안 씀)
+  if(target === player && target.gear){
+    const g = target.gear;
+
+    // mul
+    target.buffs.dmgMul     *= (g.dmgMul     ?? 1);
+    target.buffs.spdMul     *= (g.spdMul     ?? 1);
+    target.buffs.atkSpdMul  *= (g.atkSpdMul  ?? 1);
+    target.buffs.rangeMul   *= (g.rangeMul   ?? 1);
+
+    // add
+    target.buffs.armorAdd   += (g.armorAdd   ?? 0);
+    target.buffs.maxHpAdd   += (g.maxHpAdd   ?? 0);
+    target.buffs.hpRegen    += (g.hpRegen    ?? 0);
+  }
+
+  // ✅ 임시 버프들 처리
   for(let i = target.activeBuffs.length - 1; i >= 0; i--){
     const b = target.activeBuffs[i];
     b.duration--;
@@ -1034,7 +1145,6 @@ function updateBuffs(target){
     const stat = mapBuffTypeToStat(b.type);
     if(!stat) continue;
 
-    // mul/add 처리
     if(b.mode === "mul"){
       if(target.buffs[stat] !== undefined) target.buffs[stat] *= b.value;
     }else if(b.mode === "add"){
@@ -1042,18 +1152,15 @@ function updateBuffs(target){
     }
   }
 
-  // ✅ 플레이어면 maxHp/armor 같은 “최종값” 반영
+  // ✅ 최종 maxHp/armor 반영
   if(target === player){
     const b = target.buffs;
 
-    // 최종 최대체력 = baseMaxHp * maxHpMul + maxHpAdd
     const newMax = Math.max(1, Math.floor(target.baseMaxHp * (b.maxHpMul ?? 1) + (b.maxHpAdd ?? 0)));
     target.maxHp = newMax;
 
-    // 체력 상한 보정
     if(target.hp > target.maxHp) target.hp = target.maxHp;
 
-    // 최종 방어력(표시/계산용)
     target.armor = Math.max(0, (target.baseArmor + (b.armorAdd ?? 0)) * (b.armorMul ?? 1));
   }
 }
@@ -2816,8 +2923,9 @@ function checkLevelUp(){
 updateBuffs(player);       // maxHp 갱신
 player.hp = player.maxHp;  // 레벨업 풀힐/ 일단 유지
  // 레벨업 풀힐 유지하고 싶으면 이 줄만 남겨도 됨
-    baseDamage *= 1.08;
-    ultiDamage *= 1.1;
+    baseDamageBase *= 1.08;
+ultiDamageBase *= 1.1;
+recalcFromGear();
 
     player.levelGlow = 60;
 
@@ -2838,17 +2946,18 @@ player.hp = player.maxHp;  // 레벨업 풀힐/ 일단 유지
 const BASE_MELEE_RANGE = 40;
 const BASE_ULTI_AOE    = 40;
 
-// 평타 최종 범위
+// ✅ 네가 정한 기본 범위
+const BASE_MELEE_RANGE = 40;
+const BASE_ULTI_AOE    = 40;
+
+// ✅ rangeMul 하나만 사용
 function getMeleeRange(){
   const b = player.buffs || defaultBuffStats();
-  return BASE_MELEE_RANGE * (b.rangeMul ?? 1) * (b.meleeRangeMul ?? 1);
+  return BASE_MELEE_RANGE * (b.rangeMul ?? 1);
 }
-
-// 궁극기 폭파(광역) 최종 범위
 function getUltiAoeRadius(){
   const b = player.buffs || defaultBuffStats();
-  // ✅ "범위 증가(rangeMul)"가 궁극기에도 적용되게 포함
-  return BASE_ULTI_AOE * (b.rangeMul ?? 1) * (b.aoeMul ?? 1) * (b.ultiAoeMul ?? 1);
+  return BASE_ULTI_AOE * (b.rangeMul ?? 1);
 }
 /* ===== 공격 ===== */
 function checkHit(){
@@ -3838,8 +3947,22 @@ player.armor = 0;
   level = 1;
   killsAtLevelStart = 0;
   killsForNextLevel = 20;
-  baseDamage = 20;
-  ultiDamage = 40;
+  baseDamageBase = 20;
+ultiDamageBase = 40;
+
+// gear 초기화
+player.gear = {
+  dmgMul: 1,
+  ultiMul: 1,
+  spdMul: 1,
+  atkSpdMul: 1,
+  rangeMul: 1,
+  armorAdd: 0,
+  maxHpAdd: 0,
+  hpRegen: 0
+};
+
+recalcFromGear();
 
   // 타이머/상태
   shake = 0;
