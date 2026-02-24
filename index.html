@@ -629,6 +629,45 @@ function makeEmptyItemData(){
     critMultiAdd: 0
   };
 }
+// ✅ baseData + affixData 합쳐서 최종 적용용 totalData 만들기
+function mergeItemData(baseData, affixData){
+  const out = makeEmptyItemData();
+
+  // mul 계열: 곱
+  out.dmgMul   = (baseData.dmgMul   ?? 1) * (affixData.dmgMul   ?? 1);
+  out.ultiMul  = (baseData.ultiMul  ?? 1) * (affixData.ultiMul  ?? 1);
+  out.rangeMul = (baseData.rangeMul ?? 1) * (affixData.rangeMul ?? 1);
+
+  // add 계열: 합
+  out.armorAdd      = (baseData.armorAdd      ?? 0) + (affixData.armorAdd      ?? 0);
+  out.maxHpAdd      = (baseData.maxHpAdd      ?? 0) + (affixData.maxHpAdd      ?? 0);
+  out.hpRegen       = (baseData.hpRegen       ?? 0) + (affixData.hpRegen       ?? 0);
+  out.critChanceAdd = (baseData.critChanceAdd ?? 0) + (affixData.critChanceAdd ?? 0);
+  out.critMultiAdd  = (baseData.critMultiAdd  ?? 0) + (affixData.critMultiAdd  ?? 0);
+
+  return out;
+}
+
+// ✅ 아이템 baseData 계산(카오스에서 base 유지하려고 분리)
+function buildBaseDataFromItemId(itemId){
+  const base = makeEmptyItemData();
+
+  if(itemId === "dmg_up"){
+    const v = Math.floor(8 + level * 1.2 + mapTier * 1.5);
+    base.dmgMul *= (1 + v/100);
+  }else if(itemId === "ulti_up"){
+    const v = Math.floor(12 + level * 1.5 + mapTier * 2);
+    base.ultiMul *= (1 + v/100);
+  }else if(itemId === "hp"){
+    const v = Math.floor(15 + level*3 + mapTier*4);
+    base.maxHpAdd += v;
+  }else if(itemId === "armor"){
+    const v = Math.floor(5 + mapTier*2);
+    base.armorAdd += v;
+  }
+
+  return base;
+}
 
 // ✅ 아이템 적용(gear로 반영)
 function applyItemDataToGear(data){
@@ -1025,51 +1064,49 @@ if(it.rarity === "legendary"){
   });
 
 }else{
-  // ✅ POE식: base + affixes 굴리고 data에 누적
-  const data = makeEmptyItemData();
+  const ilvl = getItemLevel();
 
-  // base 효과(기존 ITEM_POOL의 scale + apply 로직을 대체)
-  // ✅ “기존 아이템 타입” 유지하려면: it.type에 따라 기본값을 만들어준다
-  // (dmg/ulti는 mul, hp/armor는 add)
-  if(it.type === "damage"){
-    const v = Math.floor(8 + level * 1.2 + mapTier * 1.5); // 기존 스케일 유지
-    data.dmgMul *= (1 + v/100);
-  }else if(it.type === "ulti"){
-    const v = Math.floor(12 + level * 1.5 + mapTier * 2);
-    data.ultiMul *= (1 + v/100);
-  }else if(it.type === "hp"){
-    const v = Math.floor(15 + level*3 + mapTier*4);
-    data.maxHpAdd += v;
-  }else if(it.type === "armor"){
-    const v = Math.floor(5 + mapTier*2);
-    data.armorAdd += v;
+  // ✅ base는 “고정”
+  const baseData = buildBaseDataFromItemId(it.id);
+
+  // ✅ affix만 굴림
+  const affixes = rollAffixesPOE(it.rarity, ilvl);
+
+  // affixData에만 반영
+  const affixData = makeEmptyItemData();
+  for(const a of affixes){
+    a.affix.apply(affixData, a.value);
   }
 
-  // ✅ Affix 굴리기
-  const aff = rollAffixesPOE(it.rarity, ilvl);
-  for(const a of aff){
-    a.affix.apply(data, a.value);
-  }
+  // 최종 합산(total)
+  const totalData = mergeItemData(baseData, affixData);
 
-  // ✅ 적용 + 인벤 저장
-  applyItemDataToGear(data);
-  if(data.maxHpAdd > 0) player.hp = Math.min(player.maxHp, player.hp + data.maxHpAdd);
+  // ✅ 적용
+  applyItemDataToGear(totalData);
+  if(totalData.maxHpAdd > 0) player.hp = Math.min(player.maxHp, player.hp + totalData.maxHpAdd);
 
-  // 표시 이름(POE 느낌)
-  const preNames = aff.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
-  const sufNames = aff.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
-  let nm = it.name;
+  // ✅ 이름(POE 느낌)
+  const preNames = affixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+  const sufNames = affixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+
+  // base 이름은 기존 ITEM_POOL name을 쓰되, 인벤 재표시를 위해 id로도 복원 가능하게 저장
+  let baseName = it.name;
+  let nm = baseName;
   if(preNames.length) nm = preNames.join(" ") + " " + nm;
   if(sufNames.length) nm = nm + " " + sufNames.join(" ");
 
   inventory.push({
     id: it.id,
+    baseName,
     name: nm,
     rarity: it.rarity,
     ilvl,
     isUnique:false,
-    data,
-    affixes: aff
+
+    baseData,     // ✅ 고정
+    affixData,    // ✅ 카오스로 리롤 대상
+    data: totalData, // ✅ 최종 적용값(편의)
+    affixes
   });
 }
 
@@ -4393,9 +4430,22 @@ function renderInventory(){
       const div = document.createElement("div");
       div.className = "invItem" + (idx === selectedInvIndex ? " sel" : "");
       const lines = it.isUnique
-        ? it.uniqueRef?.desc ?? "(Unique)"
-        : it.affixes.map(formatAffixLine).join("\n");
-
+  ? (it.uniqueRef?.desc ?? "(Unique)")
+  : (
+      // base 표시
+      (() => {
+        const b = it.baseData || makeEmptyItemData();
+        const baseLines = [];
+        if((b.dmgMul ?? 1) !== 1) baseLines.push(`BASE: 평타 +${Math.round((b.dmgMul-1)*100)}%`);
+        if((b.ultiMul ?? 1) !== 1) baseLines.push(`BASE: 궁극기 +${Math.round((b.ultiMul-1)*100)}%`);
+        if((b.rangeMul ?? 1) !== 1) baseLines.push(`BASE: 범위 +${Math.round((b.rangeMul-1)*100)}%`);
+        if((b.maxHpAdd ?? 0) > 0) baseLines.push(`BASE: 최대체력 +${Math.floor(b.maxHpAdd)}`);
+        if((b.armorAdd ?? 0) > 0) baseLines.push(`BASE: 방어력 +${Math.floor(b.armorAdd)}`);
+        return baseLines.join("\n");
+      })()
+      + "\n"
+      + it.affixes.map(formatAffixLine).join("\n")
+    );
       div.innerHTML = `
         <div class="nm">[${it.rarity.toUpperCase()}] ${it.name}</div>
         <div style="color:#aaa;font-size:12px;margin-top:4px;">ilvl ${it.ilvl}</div>
@@ -4424,59 +4474,33 @@ btnChaos.addEventListener("click", ()=>{
     return;
   }
 
-  // ✅ 리롤 = 기존 아이템 스탯 되돌리고 → affix 재굴림 → 다시 적용
-  // (단순화: 되돌리기는 gear를 “전체 재계산” 방식으로 처리)
   chaosOrbs--;
 
-  // 1) 인벤에서 해당 아이템의 data를 새로 만들고 affixes 재굴림
-  const ilvl = it.ilvl;
-  const rarity = it.rarity;
+  // ✅ base는 유지, affix만 다시 굴림
+  const affixes = rollAffixesPOE(it.rarity, it.ilvl);
 
-  const newData = makeEmptyItemData();
-
-  // base 효과는 id/type을 모르므로, “기존 data에서 base+affix가 섞여있음”
-  // ✅ 여기서는 POE 느낌으로 "카오스 = 접두/접미만 다시"를 구현하기 위해
-  // base는 유지하고 싶다면 base를 따로 저장해야 함.
-  // 지금은 간단/강력: 아이템 전체를 다시 굴림(체감은 카오스 느낌 그대로 좋음)
-
-  // base 추정(현재 시스템: dmg_up/ulti_up/hp/armor 4종 뿐이라 id로 판별)
-  if(it.id === "dmg_up"){
-    const v = Math.floor(8 + level * 1.2 + mapTier * 1.5);
-    newData.dmgMul *= (1 + v/100);
-  }else if(it.id === "ulti_up"){
-    const v = Math.floor(12 + level * 1.5 + mapTier * 2);
-    newData.ultiMul *= (1 + v/100);
-  }else if(it.id === "hp"){
-    const v = Math.floor(15 + level*3 + mapTier*4);
-    newData.maxHpAdd += v;
-  }else if(it.id === "armor"){
-    const v = Math.floor(5 + mapTier*2);
-    newData.armorAdd += v;
+  const newAffixData = makeEmptyItemData();
+  for(const a of affixes){
+    a.affix.apply(newAffixData, a.value);
   }
 
-  const aff = rollAffixesPOE(rarity, ilvl);
-  for(const a of aff) a.affix.apply(newData, a.value);
+  const total = mergeItemData(it.baseData, newAffixData);
 
-  // 2) 인벤 아이템 업데이트
-  const preNames = aff.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
-  const sufNames = aff.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+  // ✅ 아이템 갱신
+  it.affixes = affixes;
+  it.affixData = newAffixData;
+  it.data = total;
 
-  let baseName = "Item";
-  if(it.id === "dmg_up") baseName = "강화된 일격";
-  if(it.id === "ulti_up") baseName = "폭발 강화";
-  if(it.id === "hp") baseName = "생명의 정수";
-  if(it.id === "armor") baseName = "철벽 갑옷";
+  // 이름 다시 만들기
+  const preNames = affixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+  const sufNames = affixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
 
-  let nm = baseName;
+  let nm = it.baseName || "Item";
   if(preNames.length) nm = preNames.join(" ") + " " + nm;
   if(sufNames.length) nm = nm + " " + sufNames.join(" ");
-
   it.name = nm;
-  it.data = newData;
-  it.affixes = aff;
 
-  // 3) gear 전체를 “인벤 기반으로 재구성”
-  //    (되돌리기/중복오차 방지 최강 방식)
+  // ✅ gear를 인벤 기준으로 전체 재구성(되돌리기/누적오차 방지)
   rebuildGearFromInventory();
 
   renderInventory();
