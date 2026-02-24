@@ -467,7 +467,16 @@ attackBtn.addEventListener("touchend", ()=>{
     p.enemies = p.enemies.filter(e => e.hp > 0 || (e.type==="boss" && e.dead && e.deathTimer > 0));
   }
 }
-
+function getRandomVisibleAliveEnemy(){
+  // 살아있고, (보스 dead 제외), 화면에 보이는 적만
+  const visible = enemies.filter(e =>
+    e.hp > 0 &&
+    !(e.type === "boss" && e.dead) &&
+    isEnemyOnScreen(e)
+  );
+  if(visible.length === 0) return null;
+  return visible[(Math.random() * visible.length) | 0];
+}
 function getRandomAliveEnemy(){
   // 살아있는 적만 대상으로 (보스 dead 제외)
   const alive = enemies.filter(e => e.hp > 0 && !(e.type === "boss" && e.dead));
@@ -1603,15 +1612,13 @@ function endUltimate(){
 /* ✅ (주의) 네 코드에 endUltimate()가 원래 있어야 정상동작해.
    만약 네 파일 어딘가에 endUltimate가 없다면 알려줘! */
 function performUltimateStrike(){
-  const target = getRandomAliveEnemy();
+  const target = getRandomVisibleAliveEnemy(); // ✅ 화면에 보이는 적만
   if(!target) { endUltimate(); return; }
 
   teleportTo(target);
   dealUltimateDamage();
 
-  // ✅ 궁극기 한 번 칠 때마다 즉시 정리 (멈춤 방지 핵심)
   pruneDeadEnemies();
-
   player.ultiCount++;
 }
 function dealUltimateDamage(){
@@ -1629,7 +1636,7 @@ function dealUltimateDamage(){
 
     if(e.type === "boss"){
       if(e.invul <= 0 && !e.dead){
-        e.hp -= ultiDamage * 2.5;
+        e.hp -= ultiDamage * 1.0;
         e.stun = 25;
         spawnHitBlood(e.x, e.y, 14);
         shake = Math.max(shake, 20);
@@ -2855,14 +2862,25 @@ function drawGameOver(){
 }
 
 function tryUltimate(){
+  // ✅ 이미 궁극기 중이면 막기
   if(player.ultiActive) return;
-  if(player.kiOrbs >= player.maxOrbs && enemies.length > 0){
-    player.kiOrbs = 0;
-    orbFlash = 0;
-    explosionActive = true;
+
+  // ✅ 기 1개 이상 + 적 존재
+  if(player.kiOrbs >= 1 && enemies.length > 0){
+
+    // ✅ 기 1개만 소모
+    player.kiOrbs -= 1;
+
+    // ✅ "한 번만" 발동하도록 카운트 세팅
     player.ultiActive = true;
-    player.ultiCount = 0;
     player.ultiTimer = 0;
+    player.ultiCount = 0;
+
+    // 바로 1타 실행
+    performUltimateStrike();
+
+    // 즉시 종료(연타/타이머 구조 안 타게)
+    endUltimate();
   }
 }
 
