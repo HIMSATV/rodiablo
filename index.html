@@ -373,6 +373,13 @@ let player={
   // ✅ buffs 기본값은 updateBuffs에서 매 프레임 세팅
   buffs: { dmgMul:1, spdMul:1, atkSpdMul:1 },
   activeBuffs: []
+// ✅ 무기 베이스 (POE 스타일)
+player.weapon = {
+  name: "Rusty Katana",
+  min: 14,
+  max: 20,
+  critChance: 0.06, // 6%
+  critMulti: 1.50   // 150%
 };
 
 let map = [];
@@ -477,11 +484,19 @@ const PREFIXES = [
   { name:"맹렬한", mod:(data)=>{ data.percent += 10; } },
   { name:"광폭한", mod:(data)=>{ data.percent += 15; } },
   { name:"견고한", mod:(data)=>{ data.flat += 8; } }
+ // ✅ 크리 접두
+{ name:"정밀한", mod:(data)=>{ data.critChanceAdd = (data.critChanceAdd ?? 0) + 0.02; } },  // +2%
+{ name:"예리한",  mod:(data)=>{ data.critChanceAdd = (data.critChanceAdd ?? 0) + 0.03; } },  // +3%
+{ name:"치명적인", mod:(data)=>{ data.critChanceMul = (data.critChanceMul ?? 1) * 1.25; } }, // 치확 25% 증가
 ];
+
 
 const SUFFIXES = [
   { name:"의 분노", mod:(data)=>{ data.percent += 5; } },
   { name:"의 거인", mod:(data)=>{ data.flat += 10; } }
+  // ✅ 크리 접미
+{ name:"의 암살자", mod:(data)=>{ data.critMultiAdd = (data.critMultiAdd ?? 0) + 0.25; } }, // +25%p (1.50->1.75)
+{ name:"의 도살자", mod:(data)=>{ data.critMultiAdd = (data.critMultiAdd ?? 0) + 0.35; } }, // +35%p
 ];
 // =============================
 // ✅ 전설 아이템(고유효과)
@@ -600,6 +615,10 @@ function pickUnique(list, n){
 // ✅ 에픽: 접두 1줄 + 접미 1줄 + (접두 또는 접미) 1줄  => 총 3줄
 function rollAffixesByRarity(baseItem, rarity){
   let data = baseItem.scale();
+    // ✅ 크리 관련 키 초기화(affix에서 더해질 수 있음)
+  data.critChanceAdd = data.critChanceAdd ?? 0;
+  data.critChanceMul = data.critChanceMul ?? 1;
+  data.critMultiAdd  = data.critMultiAdd  ?? 0;
   let prefixes = [];
   let suffixes = [];
 
@@ -872,6 +891,9 @@ player.gear = {
   armorAdd: 0,      // 방어력 가산
   maxHpAdd: 0,      // 최대체력 가산
   hpRegen: 0        // 초당 재생 가산
+  critChanceAdd: 0,   // ✅ +치명타 확률 (예: +0.02 = +2%)
+  critChanceMul: 1,   // ✅ 치명타 확률 증가(increased) 배수 (예: 1.3 = 30% 증가)
+  critMultiAdd: 0     // ✅ +치명타 피해 배율 (예: +0.3 = +30%p -> 1.8)
 };
 
 // ✅ gear 변경/레벨업 후 항상 이걸 호출해서 “파생 스탯” 재계산
@@ -1044,7 +1066,53 @@ attackBtn.addEventListener("touchend", ()=>{
 
 
 /* ===== 유틸 ===== */
+// ✅ 무기 데미지 롤
+function rollWeaponDamage(){
+  const w = player.weapon;
+  return w.min + Math.random() * (w.max - w.min);
+}
 
+// ✅ 최종 치명타 확률/배율 계산 (POE 느낌)
+function getCritChance(){
+  const w = player.weapon;
+  const g = player.gear || {};
+
+  // base(무기) + flat 추가
+  let chance = (w.critChance ?? 0);
+
+  chance += (g.critChanceAdd ?? 0);
+
+  // increased(배수)
+  chance *= (g.critChanceMul ?? 1);
+
+  // 안전 상한(95%)
+  return clamp(chance, 0, 0.95);
+}
+
+function getCritMulti(){
+  const w = player.weapon;
+  const g = player.gear || {};
+
+  // base(무기) + multi add
+  const multi = (w.critMulti ?? 1.5) + (g.critMultiAdd ?? 0);
+
+  // 최소 1.05배는 되게(안전)
+  return Math.max(1.05, multi);
+}
+
+// ✅ dmg에 크리 적용
+function applyCrit(dmg){
+  const chance = getCritChance();
+  const multi = getCritMulti();
+
+  const isCrit = (Math.random() < chance);
+  return {
+    dmg: isCrit ? dmg * multi : dmg,
+    isCrit,
+    chance,
+    multi
+  };
+}
 // ✅ 확장 가능한 기본 버프 스탯
 function defaultBuffStats(){
   return {
@@ -2464,7 +2532,7 @@ function performUltimateStrike(){
   player.ultiCount++;
 }
 function dealUltimateDamage(){
-  const radius = getUltiAoeRadius(); // ✅ 변경
+  const radius = getUltiAoeRadius();
   const r2 = radius * radius;
   let killedAny = false;
 
@@ -2474,16 +2542,31 @@ function dealUltimateDamage(){
     const dy = e.y - player.y;
     if(dx*dx + dy*dy > r2) continue;
 
-    const wasAlive = (e.hp > 0);
+    // 죽은 보스 연출 중이면 스킵
+    if(e.type === "boss" && e.dead) continue;
 
+    const wasAlive = (e.hp > 0);
+    if(!wasAlive) continue;
+
+    // ✅ 무기 기반 궁극기 데미지 + 크리 (POE식)
+    // 궁극기 기본 배율(취향으로 2.5~3.5 조절)
+    const weaponBase = rollWeaponDamage();
+    const raw =
+      weaponBase * 2.8 *
+      (player.gear?.ultiMul ?? 1) *
+      (player.buffs?.dmgMul ?? 1); // buffs에 ultiMul 따로 없으니 dmgMul로 묶음
+
+    const crit = applyCrit(raw);
+    const dealt = crit.dmg;
+
+    // 보스/일반 공통 데미지
     if(e.type === "boss"){
-      if(e.invul <= 0 && !e.dead){
-        e.hp -= ultiDamage * 1.0;
+      if(e.invul <= 0){
+        e.hp -= dealt;
         e.stun = 25;
-        spawnHitBlood(e.x, e.y, 14);
+        spawnHitBlood(e.x, e.y, crit.isCrit ? 26 : 14);
         shake = Math.max(shake, 20);
 
-        // ✅ 궁극기로 보스가 죽어도 사망연출/포탈 로직 타게
         if(e.hp <= 0){
           startBossDeath(e);
         }
@@ -2491,20 +2574,24 @@ function dealUltimateDamage(){
       continue;
     }
 
-    e.hp = 0;
-      // ✅ 드랍 생성
-    spawnLoot(e.x, e.y, "ulti");
+    // ✅ 일반몹: 즉사 삭제 -> 데미지로 처치 판정
+    e.hp -= dealt;
     e.stun = 30;
-    spawnHitBlood(e.x, e.y, 18);
+
+    spawnHitBlood(e.x, e.y, crit.isCrit ? 22 : 12);
 
     if(particles.length < 240){
-      for(let k=0;k<12;k++){
-        particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 40 });
+      for(let k=0;k<10;k++){
+        particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*9, vy: (Math.random()-0.5)*9, life: 34 });
       }
     }
 
-    if(wasAlive){
+    if(e.hp <= 0){
+      // ✅ 킬 이벤트/드랍/XP는 “죽었을 때만”
+      emitEvent("kill", { enemy:e, x:e.x, y:e.y, type:e.type });
+      spawnLoot(e.x, e.y, "ulti");
       giveXP(e);
+
       player.hp = Math.min(player.maxHp, player.hp + 1);
       slowMotion = 6;
       if(player.kiOrbs < player.maxOrbs) player.kiOrbs++;
@@ -2513,8 +2600,7 @@ function dealUltimateDamage(){
   }
 
   if(killedAny) hitSound();
-  shake = Math.max(shake, 35);
-    // ✅ 궁극기 광역 처치 후 죽은 몹 즉시 정리
+  shake = Math.max(shake, 30);
   pruneDeadEnemies();
 }
 
@@ -2983,7 +3069,16 @@ function checkHit(){
     const nx = dx / len;
     const ny = dy / len;
 
-    let dealt = baseDamage * (player.buffs?.dmgMul ?? 1);
+   // ✅ 무기 기반 평타 데미지 + 크리
+let weaponBase = rollWeaponDamage();
+
+let raw =
+  weaponBase
+  * (player.gear?.dmgMul ?? 1)
+  * (player.buffs?.dmgMul ?? 1);
+
+const crit = applyCrit(raw);
+let dealt = crit.dmg;
     const bossInvul = (e.type === "boss" && e.invul > 0);
 
     if(e.invul <= 0){
@@ -3957,6 +4052,9 @@ player.gear = {
   armorAdd: 0,
   maxHpAdd: 0,
   hpRegen: 0
+    critChanceAdd: 0,
+  critChanceMul: 1,
+  critMultiAdd: 0
 };
 
 recalcFromGear();
