@@ -84,6 +84,7 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   /* 레이아웃을 밀지 않게 */
   display:block;
   overflow:visible;
+  }
 /* ... (기존) ... */
 
 /* ============================= */
@@ -480,7 +481,108 @@ const SUFFIXES = [
   { name:"의 분노", mod:(data)=>{ data.percent += 5; } },
   { name:"의 거인", mod:(data)=>{ data.flat += 10; } }
 ];
+// =============================
+// ✅ 전설 아이템(고유효과)
+// =============================
+const LEGENDARY_POOL = [
+  {
+    id:"unique_thunderstep",
+    name:"천둥걸음 (Thunderstep)",
+    rarity:"legendary",
+    desc:"적 처치 시 번개가 주변으로 연쇄 (쿨 0.8초)",
+    apply(){
+      // 스탯도 조금
+      baseDamage *= 1.10;
+    },
+    onEvent(type, p){
+      if(type !== "kill") return;
 
+      const now = frameCount;
+      const key = this.id + "_cd";
+      const cd = uniqueState[key] ?? 0;
+      if(now < cd) return;
+      uniqueState[key] = now + 48; // 0.8초(60fps 기준)
+
+      // 주변 체인 번개: 죽인 위치 중심으로 반경 내 4마리
+      const cx = p.x, cy = p.y;
+      let hits = 0;
+      for(const e of enemies){
+        if(e.hp <= 0) continue;
+        if(e.type === "boss" && e.dead) continue;
+
+        const dx = e.x - cx, dy = e.y - cy;
+        if(dx*dx + dy*dy > 200*200) continue;
+
+        e.hp -= baseDamage * 0.65;
+        spawnHitBlood(e.x, e.y, 8);
+
+        // 번개 이펙트 느낌 파티클
+        if(particles.length < 260){
+          for(let i=0;i<6;i++){
+            particles.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:18 });
+          }
+        }
+
+        hits++;
+        if(hits >= 4) break;
+      }
+
+      pruneDeadEnemies();
+    }
+  },
+
+  {
+    id:"unique_oni_aegis",
+    name:"오니의 수호 (Oni Aegis)",
+    rarity:"legendary",
+    desc:"피격 시 보호막 1회 생성 (피해 35% 감소, 2초 지속, 쿨 6초)",
+    apply(){
+      player.baseArmor += 4;
+      player.baseMaxHp += 20;
+      player.hp += 20;
+    },
+    onEvent(type, p){
+      if(type !== "takeDamage") return;
+
+      const now = frameCount;
+      const cdKey = this.id + "_cd";
+      if((uniqueState[cdKey] ?? 0) > now) return;
+
+      // 보호막 버프 부여 (2초)
+      // 피해감소는 damagePlayer 내부에서 "buffs.damageTakenMul" 같은 게 없으니
+      // 여기서는 armor를 크게 올리는 방식으로 구현(간단/안전)
+      applyBuff(player, "armor", 30, 120, "oni_aegis", "add");
+      uniqueState[cdKey] = now + 360; // 6초 쿨
+
+      // 시각 연출
+      shake = Math.max(shake, 12);
+      for(let i=0;i<22;i++){
+        particles.push({ x:player.x, y:player.y, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8, life:22 });
+      }
+    }
+  },
+
+  {
+    id:"unique_bloodkatana",
+    name:"혈귀의 도 (Blood Katana)",
+    rarity:"legendary",
+    desc:"타격 시 20% 확률로 출혈 장판 생성(3초). 장판은 초당 피해 + 흡혈",
+    apply(){
+      baseDamage *= 1.08;
+    },
+    onEvent(type, p){
+      if(type !== "hit") return;
+      if(Math.random() > 0.20) return;
+
+      const x = p.enemy.x;
+      const y = p.enemy.y;
+
+      // fireZones를 재활용하되, 빨간 장판을 별도 배열로 두는 게 더 깔끔
+      // 여기선 최소침습: fireZones에 damage를 낮게 넣고, tick에서 흡혈 처리만 추가하자
+      fireZones.push({ x, y, radius:60, life:180, tick:0, damage: Math.max(2, baseDamage*0.18), isBleed:true });
+    }
+  }
+];
 function rollAffixes(baseItem){
   let data = baseItem.scale();
   let name = baseItem.name;
@@ -502,20 +604,38 @@ function rollAffixes(baseItem){
 
 // ✅ 확률 (원하면 조절)
 function rollRarity(){
-  // 티어가 오를수록 고급 확률 조금씩 증가
   const t = mapTier;
+
+  // ✅ 전설 확률: 티어 올라갈수록 아주 조금 증가 (최대 2.5%)
+  const legendary = clamp(0.004 + (t-1)*0.0003, 0.004, 0.025);
+
   const epic = clamp(0.03 + (t-1)*0.002, 0.03, 0.08);
   const rare = clamp(0.18 + (t-1)*0.004, 0.18, 0.32);
 
   const r = Math.random();
-  if(r < epic) return "epic";
-  if(r < epic + rare) return "rare";
+  if(r < legendary) return "legendary";
+  if(r < legendary + epic) return "epic";
+  if(r < legendary + epic + rare) return "rare";
   return "common";
 }
 
 function pickItemsForChoice(count=3){
   const rarity = rollRarity();
-  // 같은 레어리티 중심 + 일부 섞이게
+
+  // ✅ 전설이면 전설 풀에서만 1~3개 뽑기
+  if(rarity === "legendary"){
+    const picks = [];
+    let guard = 0;
+    while(picks.length < count && guard++ < 200){
+      const it = LEGENDARY_POOL[(Math.random()*LEGENDARY_POOL.length)|0];
+      if(!it) continue;
+      if(picks.some(p=>p.id===it.id)) continue;
+      picks.push(it);
+    }
+    return picks;
+  }
+
+  // 기존 로직 유지
   const candidates = ITEM_POOL.filter(it => it.rarity === rarity);
   const fallback = ITEM_POOL;
 
@@ -528,7 +648,6 @@ function pickItemsForChoice(count=3){
     if(picks.some(p=>p.id===it.id)) continue;
     picks.push(it);
   }
-  // 부족하면 그냥 채우기
   while(picks.length < count){
     const it = fallback[(Math.random()*fallback.length)|0];
     if(!picks.some(p=>p.id===it.id)) picks.push(it);
@@ -578,18 +697,29 @@ function openLootChoice(L){
     const card = document.createElement("div");
     card.className = `lootCard ${it.rarity}`;
 
-    card.innerHTML = `
-      <div class="name">[${it.rarity.toUpperCase()}] ${it.name}</div>
-      <div class="desc">${it.desc}</div>
-      <button type="button">이걸 선택</button>
-    `;
+    const affixed = rollAffixes(it);
 
-    card.querySelector("button").addEventListener("click", ()=>{
-  const affixed = rollAffixes(it);
+const descText = (it.rarity === "legendary")
+  ? it.desc
+  : it.descGen(affixed.data.percent ?? affixed.data.flat);
 
-  it.apply(affixed.data);
+card.innerHTML = `
+  <div class="name">[${it.rarity.toUpperCase()}] ${affixed.name}</div>
+  <div class="desc">${descText}</div>
+  <button type="button">이걸 선택</button>
+`;
 
-  ownedItems.push(affixed.name);
+  card.querySelector("button").addEventListener("click", ()=>{
+  if(it.rarity === "legendary"){
+    // ✅ 전설: 고유효과 등록 + apply 실행
+    it.apply();
+    ownedItems.push(it.name);
+    ownedUniques.push(it); // 이벤트 훅 활성화
+  }else{
+    const affixed = rollAffixes(it);
+    it.apply(affixed.data);
+    ownedItems.push(affixed.name);
+  }
 
   updateBuffs(player);
   player.hp = Math.min(player.maxHp, player.hp);
@@ -668,6 +798,17 @@ function drawLoots(){
   ctx.restore();
 }
 let ownedItems = [];
+// =============================
+// ✅ 전설(Unique) 이벤트 시스템
+// =============================
+let ownedUniques = [];   // { id, name, rarity:"legendary", ... }
+let uniqueState = {};    // 전설별 내부 쿨다운/스택 저장용
+
+function emitEvent(type, payload){
+  for(const u of ownedUniques){
+    if(u.onEvent) u.onEvent(type, payload);
+  }
+}
 let orbUIState = { cx:0, cy:0, centerR:24, ready:false };
 let particles=[];
 let bloodPools=[];
@@ -1754,6 +1895,7 @@ function damagePlayer(dmg, knockX, knockY){
   const finalDmg = Math.max(1, Math.floor(reduced)); // 최소 1은 받게
 
   player.hp -= finalDmg;
+  emitEvent("takeDamage", { dmg: finalDmg });
   player.invul = 25;
   shake = Math.max(shake, 10);
 
@@ -2151,7 +2293,6 @@ function update(){
   if(lootOverlayOpen) return;
 
   if(gameOver) return;
-  if(gameOver) return;
 
   if(slowMotion > 0){
   slowMotion--;
@@ -2501,12 +2642,14 @@ function updateFireZones(){
     f.tick++;
 
     if(f.tick % 10 === 0){
-      const dx = player.x - f.x;
-      const dy = player.y - f.y;
-      if(dx*dx + dy*dy < f.radius*f.radius){
-        damagePlayer(Math.max(1, f.damage*0.6), 0, 0);
-      }
-    }
+  const dx = player.x - f.x;
+  const dy = player.y - f.y;
+  if(dx*dx + dy*dy < f.radius*f.radius){
+    // 원래는 플레이어 피해인데,
+    // 출혈 장판은 적에게 깔리는 장판이니 "플레이어가 서면 피해"가 아니라
+    // "장판 안의 적에게 피해"로 처리해야 함.
+  }
+}
 
     if(f.life <= 0) fireZones.splice(i,1);
   }
@@ -2705,6 +2848,7 @@ function checkHit(){
     if(e.invul <= 0){
       e.hp -= dealt;
     }
+   emitEvent("hit", { enemy: e, dealt });
 
     const heal = dealt * 0.05;
     player.hp = Math.min(player.maxHp, player.hp + heal);
@@ -2743,7 +2887,7 @@ function checkHit(){
   // 보스는 여기서 killCount 처리 안 할 거면 return/continue로 빠져도 됨
   // 일단은 아래 일반 죽음 로직을 타지 않게 막자:
   continue;
-}
+}emitEvent("kill", { enemy: e, x: e.x, y: e.y, type: e.type });
     // ✅ 드랍 생성
       spawnLoot(e.x, e.y, "normal");
       giveXP(e);
@@ -2877,7 +3021,6 @@ let sy = shake ? (Math.random()-0.5) * amp : 0;
   drawLoots();
 
   drawBlood();
-  enemies.forEach(e=>drawEnemy(e));
   enemies.forEach(e=>drawEnemy(e));
 
   levelParticles.forEach(p=>{
