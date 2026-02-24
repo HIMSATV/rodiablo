@@ -4113,11 +4113,9 @@ function renderInventory(){
   renderEquipmentPanel();
   renderBag();
 
-  // 스탯 텍스트
+  const g = player.gear || {};
+
   invStats.textContent =
-`[캐릭터 스펙]
-const g = player.gear || {};
-invStats.textContent =
 `[캐릭터 스펙]
 HP: ${player.hp.toFixed(0)} / ${player.maxHp.toFixed(0)}
 Armor: ${(player.armor ?? 0).toFixed(1)}
