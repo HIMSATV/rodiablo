@@ -1243,21 +1243,37 @@ function openLootChoice(L){
       <button type="button">이걸 선택</button>
     `;
 
-    card.querySelector("button").addEventListener("click", ()=>{
-      if(pick.kind === "legendary"){
-        acquireLegendary(pick.it, pick.ilvl);
-      }else{
-        // 일반 아이템: 이제는 '먹으면 바로 적용'이 아니라 가방에 들어감(POE 장착 방식)
-        inventory.push(chosen);
-        // 인벤이 열려있으면 바로 갱신
-        if(invOpen) renderInventory();
-      }
-      }
+   card.querySelector("button").addEventListener("click", ()=>{
+  if(pick.kind === "legendary"){
+    acquireLegendary(pick.it, pick.ilvl);
+  } else {
+    // ✅ pick으로 실제 아이템 인스턴스 만들기
+    const chosen = {
+      id: pick.baseId,
+      baseId: pick.baseId,
+      baseName: pick.baseName,
+      name: pick.name,
+      rarity: pick.it.rarity,
+      slot: pick.it.slot,      // weapon/helm/chest/ring
+      ilvl: pick.ilvl,
 
-      L.taken = true;
-      closeLootChoice();
-      shake = Math.max(shake, 10);
-    });
+      isUnique: false,
+      data: pick.totalData,    // 호환용(기존 코드가 data도 참조함)
+      totalData: pick.totalData,
+      baseData: pick.baseData,
+      affixData: pick.affixData,
+      affixes: pick.affixes,
+      shownDesc: pick.shownDesc
+    };
+
+    inventory.push(chosen);
+    if(invOpen) renderInventory();
+  }
+
+  L.taken = true;
+  closeLootChoice();
+  shake = Math.max(shake, 10);
+});
 
     lootCardsEl.appendChild(card);
   });
@@ -4100,14 +4116,19 @@ function renderInventory(){
   // 스탯 텍스트
   invStats.textContent =
 `[캐릭터 스펙]
+const g = player.gear || {};
+invStats.textContent =
+`[캐릭터 스펙]
 HP: ${player.hp.toFixed(0)} / ${player.maxHp.toFixed(0)}
-Armor: ${player.armor.toFixed(1)}
-Regen: ${player.hpRegen.toFixed(2)}/s
-Damage: x${player.dmgMul.toFixed(2)}
-Attack Speed: x${player.spdMul.toFixed(2)}
-Range: x${player.rangeMul.toFixed(2)}
-Ulti: x${player.ultiMul.toFixed(2)}
-Crit: +${(player.critChance*100).toFixed(1)}% / +${(player.critMulti*100).toFixed(0)}%`;
+Armor: ${(player.armor ?? 0).toFixed(1)}
+Regen: ${(g.hpRegen ?? 0).toFixed(2)}/s
+DamageMul: x${(g.dmgMul ?? 1).toFixed(2)}
+AttackSpeedMul: x${(g.atkSpdMul ?? 1).toFixed(2)}
+MoveSpeedMul: x${(g.spdMul ?? 1).toFixed(2)}
+RangeMul: x${(g.rangeMul ?? 1).toFixed(2)}
+UltiMul: x${(g.ultiMul ?? 1).toFixed(2)}
+Crit: ${(getCritChance()*100).toFixed(1)}% / x${getCritMulti().toFixed(2)}
+Chaos: ${chaosOrbs}`;
 
   // 선택 정보
   if(!selected){
