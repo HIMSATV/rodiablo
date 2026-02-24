@@ -946,8 +946,30 @@ if(reachableMask && !reachableMask[ty][tx]) continue; // ✅ 도달 가능한 �
       const dx = px - player.x, dy = py - player.y;
       if(dx*dx + dy*dy < 260*260) continue;
 
-      const count = 14 + Math.floor(rng()*10) + Math.floor(tier*0.4);
-      createPack(px, py, count);
+// ===== POE식 자연스러운 마릿수 곡선 =====
+
+// 초반 최소/최대
+let min = 25;
+let max = 32;
+
+// 티어 6 이상부터 점점 증가
+if(tier >= 6){
+  min = 28 + Math.floor((tier-5) * 0.4);
+  max = 36 + Math.floor((tier-5) * 0.6);
+}
+
+// 티어 12 이상은 더 밀어줌
+if(tier >= 12){
+  min = 30 + Math.floor((tier-10) * 0.5);
+  max = 40 + Math.floor((tier-10) * 0.7);
+}
+
+// 상한 제한 (폭주 방지)
+max = Math.min(max, 45);
+
+const count = min + Math.floor(rng() * (max - min + 1));
+
+createPack(px, py, count);
       placed = true;
       break;
     }
@@ -1343,7 +1365,7 @@ function spawnEnemyAt(ex, ey, pack){
 
   if(!isFloorTile(tileX, tileY)) return;
   if(!isFloorTile(tileX-1, tileY) || !isFloorTile(tileX+1, tileY) || !isFloorTile(tileX, tileY-1) || !isFloorTile(tileX, tileY+1)) return;
-  if(enemies.length >= 200) return;
+  if(enemies.length >= 320) return;
 
   let rand = Math.random();
   let type = rand < 0.2 ? "mage" : rand < 0.5 ? "archer" : "melee";
