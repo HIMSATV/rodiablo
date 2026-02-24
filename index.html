@@ -899,12 +899,19 @@ function startNewMap(nextTier){
   player.x = mapSize * tileSize / 2;
   player.y = mapSize * tileSize / 2;
 
-  // 랜덤 지형 생성
+   // 랜덤 지형 생성
   mapRun.seed = generateRandomMapForTier(nextTier);
-reachableMask = buildReachableMaskFromPlayer();
+
+  // ✅ 보스룸 + 문 + 통로 강제 생성 (보스가 항상 갈 수 있게)
+  carveBossRoomAndCorridor();
+
+  // ✅ 통로까지 반영해서 도달 가능 마스크 다시 생성
+  reachableMask = buildReachableMaskFromPlayer();
+
   // 팩 생성(맵 전체에 배치)
   spawnMapPacks(nextTier);
-
+  // ✅ 보스는 항상 보스룸에 존재
+  spawnRandomBoss();
   // UI 맞춤
   resize();
 }
@@ -1555,7 +1562,7 @@ resolvePlayerEnemyOverlap(); // ✅ 추가
   updateEffectSystem();
   updateEnvironmentSystem();
     // ✅ 맵핑 진행도(팩 클리어 → 보스 스폰)
-  updateMapProgress();
+  
 
   // ✅ 보스 처치 후 포탈 진입 처리
   updatePortal();
@@ -1658,12 +1665,21 @@ function dealUltimateDamage(){
 }
 
 function updateEnemySystem(){
+  // ✅ 팩 활성화: "적이 화면에 보이면" → "플레이어가 팩 근처면"
   packs.forEach(pack=>{
     if(pack.activated) return;
-    for(let i=0;i<pack.enemies.length;i++){
-      if(isEnemyOnScreen(pack.enemies[i])){
-        pack.activated = true;
-        break;
+
+    const dx = pack.x - player.x;
+    const dy = pack.y - player.y;
+
+    // ✅ 이 거리 안으로 들어오면 활성화 (원하면 520 숫자만 조절)
+    if(dx*dx + dy*dy < 520*520){
+      pack.activated = true;
+
+      // ✅ 팩 스폰이 실패해서 비어있으면 진행 막히지 않게 즉시 클리어 처리
+      if(pack.enemies.length === 0 && !pack.cleared){
+        pack.cleared = true;
+        mapRun.clearedPacks++;
       }
     }
   });
@@ -2560,11 +2576,7 @@ function drawTextUI(){
   ctx.strokeText("TIER: " + mapTier, 20, 105);
   ctx.fillText("TIER: " + mapTier, 20, 105);
 
-  const need = mapRun.packsToClear;
-  const got = mapRun.clearedPacks;
-  ctx.strokeText("MAP: " + got + " / " + need, 20, 130);
-  ctx.fillText("MAP: " + got + " / " + need, 20, 130);
-
+  
   if(portal.active){
     ctx.strokeText("PORTAL OPEN!", 20, 155);
     ctx.fillText("PORTAL OPEN!", 20, 155);
