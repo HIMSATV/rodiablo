@@ -460,6 +460,35 @@ attackBtn.addEventListener("touchend", ()=>{
 
 
 /* ===== 유틸 ===== */
+function applyBuff(target, type, value, duration){
+  if(!target.activeBuffs) target.activeBuffs = [];
+
+  target.activeBuffs.push({
+    type,
+    value,
+    duration
+  });
+}
+
+function updateBuffs(target){
+  if(!target.activeBuffs) return;
+
+  target.buffs = { dmgMul:1, spdMul:1, atkSpdMul:1 };
+
+  for(let i = target.activeBuffs.length - 1; i >= 0; i--){
+    const b = target.activeBuffs[i];
+    b.duration--;
+
+    if(b.duration <= 0){
+      target.activeBuffs.splice(i,1);
+      continue;
+    }
+
+    if(b.type === "damage") target.buffs.dmgMul *= b.value;
+    if(b.type === "speed") target.buffs.spdMul *= b.value;
+    if(b.type === "atkSpeed") target.buffs.atkSpdMul *= b.value;
+  }
+}
   function pruneDeadEnemies(){
   // 일반 적: hp > 0만 유지
   // 보스: dead 연출 중이면 deathTimer 남아있을 때만 유지
@@ -1809,6 +1838,9 @@ function updateEnemySystem(){
     if(e.pack && !e.pack.activated) return;
     updateSingleEnemy(e);
   });
+ for(const e of enemies){
+  updateBuffs(e);
+}
 
   // ✅ 매 프레임 한 번 더 청소(연속 궁극기/대량 처치 대비)
   pruneDeadEnemies();
@@ -1933,6 +1965,22 @@ function updateBoss(e){
 }
 
 function updateSingleEnemy(e){
+  if(e.isLeader){
+  const radius = 100;
+  const r2 = radius * radius;
+
+  for(const other of enemies){
+    if(other === e) continue;
+
+    const dx = other.x - e.x;
+    const dy = other.y - e.y;
+
+    if(dx*dx + dy*dy <= r2){
+      applyBuff(other, "damage", 1.25, 15);
+      applyBuff(other, "atkSpeed", 1.2, 15);
+    }
+  }
+}
 if(e.type === "boss" && e.dead){
   e.deathTimer--;
 
