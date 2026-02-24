@@ -460,14 +460,19 @@ attackBtn.addEventListener("touchend", ()=>{
 
 
 /* ===== 유틸 ===== */
-function applyBuff(target, type, value, duration){
+function applyBuff(target, type, value, duration, source=""){
   if(!target.activeBuffs) target.activeBuffs = [];
 
-  target.activeBuffs.push({
-    type,
-    value,
-    duration
-  });
+  const key = type + "|" + source;
+  const b = target.activeBuffs.find(x => x.key === key);
+
+  if(b){
+    // 같은 버프면 "추가"가 아니라 "갱신"
+    b.value = value;
+    b.duration = Math.max(b.duration, duration);
+  }else{
+    target.activeBuffs.push({ key, type, value, duration });
+  }
 }
 
 function updateBuffs(target){
@@ -1332,20 +1337,24 @@ function enemyTryMeleeAttack(e){
     e.swingDir = dx < 0 ? -1 : 1;
   }
 
-  e.attackFrame++;
+  const atkMul = (e.buffs?.atkSpdMul ?? 1);
+e.attackFrame += atkMul;
 
-  if(e.attackFrame === 12){
-    const len = dist || 1;
-    const nx = dx / len;
-    const ny = dy / len;
-    const kb = e.type === "boss" ? 30 : 18;
-    damagePlayer(e.damage, nx*kb, ny*kb);
-    hitSound();
-  }
+ if(e.attackFrame >= 12 && !e.hitDone){
+  e.hitDone = true;
 
-  if(e.attackFrame >= 25){
-    e.attackFrame = 0;
-  }
+  const len = dist || 1;
+  const nx = dx / len;
+  const ny = dy / len;
+  const kb = e.type === "boss" ? 30 : 18;
+  damagePlayer(e.damage, nx*kb, ny*kb);
+  hitSound();
+}
+
+ if(e.attackFrame >= 25){
+  e.attackFrame = 0;
+  e.hitDone = false;
+}
 }
 
 /* ===== 아처 화살 발사 ===== */
@@ -1707,7 +1716,8 @@ resolvePlayerEnemyOverlap(); // ✅ 추가
   return;
 }
 
-  updatePlayerState();
+  updateBuffs(player); // ✅ 플레이어도 버프 업데이트
+updatePlayerState();
   updateUltimateSystem();
    updateEnemySystem();
   resolvePlayerEnemyOverlap(); // ✅ 추가
@@ -1976,8 +1986,8 @@ function updateSingleEnemy(e){
     const dy = other.y - e.y;
 
     if(dx*dx + dy*dy <= r2){
-      applyBuff(other, "damage", 1.25, 15);
-      applyBuff(other, "atkSpeed", 1.2, 15);
+      applyBuff(other, "damage",   1.25, 15, "leader");
+applyBuff(other, "atkSpeed", 1.2,  15, "leader");
     }
   }
 }
@@ -2070,16 +2080,17 @@ function updateCombatSystem(){
 }
 
 function updateMovement(){
+  const moveSpeed = player.speed * (player.buffs?.spdMul ?? 1);
   let dx = 0;
   let dy = 0;
 
-  if(keys["ArrowLeft"] || keys["a"]) dx -= player.speed;
-  if(keys["ArrowRight"] || keys["d"]) dx += player.speed;
-  if(keys["ArrowUp"] || keys["w"]) dy -= player.speed;
-  if(keys["ArrowDown"] || keys["s"]) dy += player.speed;
+  if(keys["ArrowLeft"] || keys["a"]) dx -= moveSpeed;
+if(keys["ArrowRight"] || keys["d"]) dx += moveSpeed;
+if(keys["ArrowUp"] || keys["w"]) dy -= moveSpeed;
+if(keys["ArrowDown"] || keys["s"]) dy += moveSpeed;
 
-  dx += joyDX * player.speed;
-  dy += joyDY * player.speed;
+dx += joyDX * moveSpeed;
+dy += joyDY * moveSpeed;
 
   if(Math.abs(dx) > Math.abs(dy)){
     if(dx > 0) player.dir = "right";
@@ -2215,7 +2226,7 @@ function checkHit(){
     const nx = dx / len;
     const ny = dy / len;
 
-    let dealt = baseDamage;
+    let dealt = baseDamage * (player.buffs?.dmgMul ?? 1);
     const bossInvul = (e.type === "boss" && e.invul > 0);
 
     if(e.invul <= 0){
@@ -2562,7 +2573,17 @@ function drawEnemy(e){
   }else{
     ctx.fillStyle = "#006600";
   }
-
+// ✅ 리더 오라 버프(leader) 받는 중이면 빨간 오로라
+if(e.activeBuffs && e.activeBuffs.some(b => b.key === "damage|leader" || b.key === "atkSpeed|leader")){
+  const pulse = 0.45 + 0.25*Math.sin(frameCount*0.2);
+  ctx.save();
+  ctx.globalAlpha = 0.25 + pulse;
+  ctx.fillStyle = "rgba(255,0,0,0.35)";
+  ctx.beginPath();
+  ctx.arc(e.x, e.y, e.radius + 12 + pulse*6, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
   ctx.fillRect(e.x-10,e.y-12,20,22);
 
   if(e.type === "archer") ctx.fillStyle = "#dddddd";
