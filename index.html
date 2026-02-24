@@ -1598,7 +1598,7 @@ function startBossDeath(boss){
 
   bossDeathSound();
 }
-}
+
 /* ===== 충돌/이동 가능 ===== */
 function canMoveTo(x,y){
   let left = Math.floor((x - player.radius) / tileSize);
@@ -2687,7 +2687,7 @@ function checkHit(){
           size: 10 + Math.random()*6,
           life: 600
         });
-      }#
+      
 
       slowMotion = 6;
 
@@ -3513,10 +3513,7 @@ canvas.addEventListener("touchstart", (e)=>{
   }
 },{passive:false});
   // 파란구슬(중앙) 터치면 궁극기
-  if(handleUltimateOrbPress(e.touches[0].clientX, e.touches[0].clientY)){
-    e.preventDefault();
-  }
-},{passive:false});
+  
 
 canvas.addEventListener("mousedown", (e)=>{
   if(gameOver){ resetGame(); return; }
