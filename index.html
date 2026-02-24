@@ -146,14 +146,22 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   font-weight:800;
   font-size:15px;
 }
-.lootCard.common{ border-color:#3a3a3a; }
-.lootCard.rare{ border-color:#2f7bff; }
-.lootCard.epic{ border-color:#b44dff; }
-.lootHint{
-  margin-top:10px;
-  font-size:12px;
-  color:#aaa;
-  text-align:center;
+.lootCard.common{
+  border-color:#3a3a3a;
+  box-shadow:0 0 8px rgba(255,255,255,0.1);
+}
+.lootCard.rare{
+  border-color:#2f7bff;
+  box-shadow:0 0 14px rgba(0,140,255,0.6);
+}
+.lootCard.epic{
+  border-color:#b44dff;
+  box-shadow:0 0 18px rgba(180,80,255,0.9);
+  animation:epicGlow 1.5s infinite alternate;
+}
+@keyframes epicGlow{
+  from{ box-shadow:0 0 10px rgba(180,80,255,0.6); }
+  to{ box-shadow:0 0 25px rgba(255,120,255,1); }
 }
 </style>
 </head>
@@ -400,47 +408,97 @@ const lootCardsEl = document.getElementById("lootCards");
 
 // ✅ 드랍 테이블(원하면 여기 계속 추가하면 됨)
 const ITEM_POOL = [
-  // 공격/속도
-  { id:"dmg_up",   name:"+데미지",        rarity:"common", desc:"평타 데미지 +12%", apply(){ baseDamage *= 1.12; } },
-  { id:"ulti_up",  name:"+궁극기 데미지", rarity:"common", desc:"궁극기 데미지 +15%", apply(){ ultiDamage *= 1.15; } },
-  { id:"atkspd",   name:"검술 숙련",      rarity:"rare",   desc:"공격속도 +20% (상시 버프)", apply(){
-      applyBuff(player, "atkSpeed", 1.20, 60*60*999, "item_atkspd", "mul");
-    } 
-  },
-  { id:"movespd",  name:"경쾌한 발걸음",  rarity:"common", desc:"이동속도 +10% (상시 버프)", apply(){
-      applyBuff(player, "speed", 1.10, 60*60*999, "item_movespd", "mul");
+
+  {
+    id:"dmg_up",
+    name:"강화된 일격",
+    rarity:"common",
+    type:"damage",
+    descGen:(v)=>`평타 데미지 +${v}%`,
+    scale(){
+      const value = Math.floor(8 + level * 1.2 + mapTier * 1.5);
+      return { percent:value };
+    },
+    apply(data){
+      baseDamage *= (1 + data.percent/100);
     }
   },
 
-  // 방어/체력
-  { id:"hp_base",  name:"강인함",         rarity:"common", desc:"최대 체력 +18 (영구)", apply(){
-      player.baseMaxHp += 18;
-      player.hp = Math.min(player.maxHp, player.hp + 18);
-    }
-  },
-  { id:"armor",    name:"철갑",           rarity:"rare",   desc:"방어력 +12 (영구)", apply(){
-      player.baseArmor += 12;
-    }
-  },
-  { id:"regen",    name:"재생",           rarity:"rare",   desc:"체력재생 +2/초 (상시)", apply(){
-      applyBuff(player, "hpRegen", 2, 60*60*999, "item_regen", "add");
+  {
+    id:"ulti_up",
+    name:"폭발 강화",
+    rarity:"common",
+    type:"ulti",
+    descGen:(v)=>`궁극기 데미지 +${v}%`,
+    scale(){
+      const value = Math.floor(12 + level * 1.5 + mapTier * 2);
+      return { percent:value };
+    },
+    apply(data){
+      ultiDamage *= (1 + data.percent/100);
     }
   },
 
-  // 범위
-  { id:"range",    name:"검 길이 증가",    rarity:"common", desc:"공용 범위 +12% (상시)", apply(){
-      applyBuff(player, "range", 1.12, 60*60*999, "item_range", "mul");
+  {
+    id:"hp",
+    name:"생명의 정수",
+    rarity:"rare",
+    type:"hp",
+    descGen:(v)=>`최대 체력 +${v}`,
+    scale(){
+      const value = Math.floor(15 + level*3 + mapTier*4);
+      return { flat:value };
+    },
+    apply(data){
+      player.baseMaxHp += data.flat;
+      player.hp += data.flat;
     }
   },
-  { id:"meleeR",   name:"근접 특화",       rarity:"rare",   desc:"평타 범위 +18% (상시)", apply(){
-      applyBuff(player, "meleeRange", 1.18, 60*60*999, "item_meleeR", "mul");
+
+  {
+    id:"armor",
+    name:"철벽 갑옷",
+    rarity:"rare",
+    type:"armor",
+    descGen:(v)=>`방어력 +${v}`,
+    scale(){
+      const value = Math.floor(5 + mapTier*2);
+      return { flat:value };
+    },
+    apply(data){
+      player.baseArmor += data.flat;
     }
-  },
-  { id:"ultiAoe",  name:"폭파 확장",       rarity:"epic",   desc:"궁극기 폭발 범위 +25% (상시)", apply(){
-      applyBuff(player, "ultiAoe", 1.25, 60*60*999, "item_ultiAoe", "mul");
-    }
-  },
+  }
 ];
+const PREFIXES = [
+  { name:"맹렬한", mod:(data)=>{ data.percent += 10; } },
+  { name:"광폭한", mod:(data)=>{ data.percent += 15; } },
+  { name:"견고한", mod:(data)=>{ data.flat += 8; } }
+];
+
+const SUFFIXES = [
+  { name:"의 분노", mod:(data)=>{ data.percent += 5; } },
+  { name:"의 거인", mod:(data)=>{ data.flat += 10; } }
+];
+
+function rollAffixes(baseItem){
+  let data = baseItem.scale();
+  let name = baseItem.name;
+
+  if(Math.random() < 0.4){
+    const p = PREFIXES[Math.floor(Math.random()*PREFIXES.length)];
+    p.mod(data);
+    name = p.name + " " + name;
+  }
+
+  if(Math.random() < 0.4){
+    const s = SUFFIXES[Math.floor(Math.random()*SUFFIXES.length)];
+    s.mod(data);
+    name = name + s.name;
+  }
+
+  return { name, data };
+}
 
 // ✅ 확률 (원하면 조절)
 function rollRarity(){
@@ -527,8 +585,20 @@ function openLootChoice(L){
     `;
 
     card.querySelector("button").addEventListener("click", ()=>{
-      // 적용
-      it.apply();
+  const affixed = rollAffixes(it);
+
+  it.apply(affixed.data);
+
+  ownedItems.push(affixed.name);
+
+  updateBuffs(player);
+  player.hp = Math.min(player.maxHp, player.hp);
+
+  L.taken = true;
+  closeLootChoice();
+
+  shake = Math.max(shake, 10);
+});
 
       // 버프/스탯 반영 즉시 업데이트 1회
       updateBuffs(player);
@@ -597,6 +667,7 @@ function drawLoots(){
   }
   ctx.restore();
 }
+let ownedItems = [];
 let orbUIState = { cx:0, cy:0, centerR:24, ready:false };
 let particles=[];
 let bloodPools=[];
@@ -3028,7 +3099,14 @@ function drawUI(){
   drawHpOrb();
   drawBossHpBar();
   drawMiniMap();
+ ctx.font = "12px Arial";
+ctx.fillStyle = "#ccc";
+
+let startY = 140;
+for(let i=0;i<ownedItems.length && i<8;i++){
+  ctx.fillText("• " + ownedItems[i], 20, startY + i*16);
 }
+
   
 function drawXPBar(){
 
