@@ -1,26 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>Oni Samurai</title>
-</style>
-:root{
-  --uiScale: 1.2; /* ✅ UI 20% 확대 */
-  /* ✅ 기기별 UI 자동 스케일 (아이폰12미니 포함) */
---uiH: clamp(calc(84px * var(--uiScale)),  calc(16vh * var(--uiScale)),  calc(120px * var(--uiScale)));
---pad: clamp(calc(66px * var(--uiScale)),  calc(12.5vw * var(--uiScale)), calc(90px  * var(--uiScale)));
---stick:clamp(calc(28px * var(--uiScale)),  calc(5.6vw * var(--uiScale)),  calc(40px  * var(--uiScale)));
---btn: clamp(calc(70px * var(--uiScale)),  calc(13vw * var(--uiScale)),   calc(90px  * var(--uiScale)));
-}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Oni Samurai</title>
 
-body{
-  margin:0;
-  background:black;
-  overflow:hidden;
-  touch-action:none;
-}
-canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
+  <style>
+    :root{
+      --uiScale: 1.2;
+      --uiH: clamp(calc(84px * var(--uiScale)),  calc(16vh * var(--uiScale)),  calc(120px * var(--uiScale)));
+      --pad: clamp(calc(66px * var(--uiScale)),  calc(12.5vw * var(--uiScale)), calc(90px  * var(--uiScale)));
+      --stick:clamp(calc(28px * var(--uiScale)),  calc(5.6vw * var(--uiScale)),  calc(40px  * var(--uiScale)));
+      --btn: clamp(calc(70px * var(--uiScale)),  calc(13vw * var(--uiScale)),   calc(90px  * var(--uiScale)));
+    }
+
+    body{ margin:0; background:black; overflow:hidden; touch-action:none; }
+    canvas{ position:fixed; top:0; left:0; image-rendering:pixelated; }
+
+    /* ... 너의 기존 CSS 전부 여기 안에 ... */
 
 #ui{
  position:fixed;bottom:0;width:100%;height:var(--uiH);
@@ -101,20 +98,7 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
   z-index:9999;
   font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
 }
-<!-- ✅ 인벤/장비창 UI -->
-<div id="invOverlay">
-  <div id="invPanel">
-    <div id="invTitle">장비 / 인벤토리</div>
-    <div id="invStats"></div>
-    <div id="invList"></div>
 
-    <div class="invBtns">
-      <button id="btnChaos" type="button">카오스 오브 (리롤)</button>
-      <button id="btnInvClose" type="button">닫기</button>
-    </div>
-    <div id="invHint"></div>
-  </div>
-</div>
 #lootPanel{
   width:min(92vw, 520px);
   background:#111;
@@ -191,7 +175,20 @@ canvas{position:fixed;top:0;left:0;image-rendering:pixelated;}
     <div class="lootHint">선택하면 즉시 적용됩니다.</div>
   </div>
 </div>
+<!-- ✅ 인벤/장비창 UI -->
+<div id="invOverlay">
+  <div id="invPanel">
+    <div id="invTitle">장비 / 인벤토리</div>
+    <div id="invStats"></div>
+    <div id="invList"></div>
 
+    <div class="invBtns">
+      <button id="btnChaos" type="button">카오스 오브 (리롤)</button>
+      <button id="btnInvClose" type="button">닫기</button>
+    </div>
+    <div id="invHint"></div>
+  </div>
+</div>
 <div id="ui">
   <div id="movePad"><div id="stick"></div></div>
 
