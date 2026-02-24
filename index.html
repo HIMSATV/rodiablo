@@ -682,67 +682,33 @@ function applyItemDataToGear(data){
 }
 // ✅ 드랍 테이블(원하면 여기 계속 추가하면 됨)
 const ITEM_POOL = [
-
   {
     id:"dmg_up",
+    slot:"weapon",
     name:"강화된 일격",
     rarity:"common",
-    type:"damage",
-    descGen:(v)=>`평타 데미지 +${v}%`,
-    scale(){
-      const value = Math.floor(8 + level * 1.2 + mapTier * 1.5);
-      return { percent:value };
-    },
-    apply(data){
-      // ✅ 영구: gear에 누적(곱)
-      applyGearDelta({ dmgMul: 1 + (data.percent/100) });
-    }
+    ...
   },
-
   {
     id:"ulti_up",
+    slot:"weapon",
     name:"폭발 강화",
     rarity:"common",
-    type:"ulti",
-    descGen:(v)=>`궁극기 데미지 +${v}%`,
-    scale(){
-      const value = Math.floor(12 + level * 1.5 + mapTier * 2);
-      return { percent:value };
-    },
-    apply(data){
-      applyGearDelta({ ultiMul: 1 + (data.percent/100) });
-    }
+    ...
   },
-
   {
     id:"hp",
+    slot:"chest",
     name:"생명의 정수",
     rarity:"rare",
-    type:"hp",
-    descGen:(v)=>`최대 체력 +${v}`,
-    scale(){
-      const value = Math.floor(15 + level*3 + mapTier*4);
-      return { flat:value };
-    },
-    apply(data){
-      applyGearDelta({ maxHpAdd: data.flat });
-      player.hp += data.flat;
-    }
+    ...
   },
-
   {
     id:"armor",
+    slot:"helm",
     name:"철벽 갑옷",
     rarity:"rare",
-    type:"armor",
-    descGen:(v)=>`방어력 +${v}`,
-    scale(){
-      const value = Math.floor(5 + mapTier*2);
-      return { flat:value };
-    },
-    apply(data){
-      applyGearDelta({ armorAdd: data.flat });
-    }
+    ...
   }
 ];
 const PREFIXES = [
@@ -1169,6 +1135,24 @@ function drawLoots(){
   ctx.restore();
 }
 // ✅ 인벤: 문자열 대신 “아이템 객체”로 저장
+// =============================
+// ✅ POE식 장비 슬롯
+// =============================
+const EQUIP_SLOTS = ["weapon","helm","chest","gloves","boots","ring1","ring2","amulet","belt"];
+
+// 슬롯에 장착된 아이템(없으면 null)
+// 아이템은 inventory에 있는 동일 객체를 "이동"시킬 거야.
+let equipment = {
+  weapon:null, helm:null, chest:null, gloves:null, boots:null,
+  ring1:null, ring2:null, amulet:null, belt:null
+};
+
+function getSlotLabel(slot){
+  return {
+    weapon:"무기", helm:"투구", chest:"갑옷", gloves:"장갑", boots:"신발",
+    ring1:"반지1", ring2:"반지2", amulet:"아뮬렛", belt:"벨트"
+  }[slot] || slot;
+}
 let inventory = [];   // { id, name, rarity, ilvl, data, affixes[], isUnique, uniqueRef? }
 let selectedInvIndex = -1;
 
@@ -4503,30 +4487,62 @@ btnChaos.addEventListener("click", ()=>{
   renderInventory();
 });
 
-function rebuildGearFromInventory(){
+function equipItemFromInventory(invIndex, preferredSlot=null){
+  const it = inventory[invIndex];
+  if(!it) return;
+
+  // 아이템이 슬롯을 가지고 있어야 함
+  const slot = preferredSlot || it.slot;
+  if(!slot) return;
+
+  // 링은 ring1/2 자동 배치
+  let finalSlot = slot;
+  if(slot === "ring"){
+    finalSlot = equipment.ring1 ? (equipment.ring2 ? "ring1" : "ring2") : "ring1";
+  }
+
+  // 기존 장비가 있으면 인벤으로 되돌림
+  if(equipment[finalSlot]){
+    inventory.push(equipment[finalSlot]);
+  }
+
+  // 인벤에서 제거 후 장착
+  inventory.splice(invIndex, 1);
+  equipment[finalSlot] = it;
+
+  rebuildGearFromEquipment();
+}
+
+function unequipToInventory(slot){
+  const it = equipment[slot];
+  if(!it) return;
+  equipment[slot] = null;
+  inventory.push(it);
+  rebuildGearFromEquipment();
+}
+
+// ✅ "장착된 장비"만으로 gear 재계산
+function rebuildGearFromEquipment(){
   // gear 초기화
   player.gear = {
-    dmgMul: 1,
-    ultiMul: 1,
-    spdMul: 1,
-    atkSpdMul: 1,
-    rangeMul: 1,
-    armorAdd: 0,
-    maxHpAdd: 0,
-    hpRegen: 0,
-    critChanceAdd: 0,
-    critChanceMul: 1,
-    critMultiAdd: 0
+    dmgMul: 1, ultiMul: 1, spdMul: 1, atkSpdMul: 1, rangeMul: 1,
+    armorAdd: 0, maxHpAdd: 0, hpRegen: 0,
+    critChanceAdd: 0, critChanceMul: 1, critMultiAdd: 0
   };
 
-  // 유니크는 apply()로 이미 반영되어 있어서 “추가 누적”이 되면 안 됨.
-  // ✅ 그래서: 유니크는 여기서 제외하고,
-  //    리셋Game/리빌드 때는 유니크도 다시 적용되게 만들면 더 완벽함.
-  //    지금은 간단하게: 유니크는 ‘카운트만’ 유지(중복 방지).
-  //    (유니크 리빌드까지 원하면 말해줘. 그럼 apply/undo 구조로 깔끔하게 정리해줄게)
+  // 장착 아이템 합산
+  for(const slot of EQUIP_SLOTS){
+    const it = equipment[slot];
+    if(!it) continue;
 
-  for(const it of inventory){
-    if(it.isUnique) continue;
+    // 유니크는 일단 스탯만 반영(이벤트는 기존 ownedUniques로 별도 처리 권장)
+    if(it.isUnique){
+      if(it.uniqueRef?.applyStat){
+        it.uniqueRef.applyStat(); // (아래에서 유니크 구조 개선할 때 씀)
+      }
+      continue;
+    }
+
     if(it.data) applyItemDataToGear(it.data);
   }
 
