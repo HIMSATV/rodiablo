@@ -1211,17 +1211,7 @@ let selectedInvIndex = -1;
 
 // ✅ 화폐(카오스 오브)
 let chaosOrbs = 2; // 시작 2개(취향)
-// =============================
-// ✅ 전설(Unique) 이벤트 시스템
-// =============================
-let ownedUniques = [];   // { id, name, rarity:"legendary", ... }
-let uniqueState = {};    // 전설별 내부 쿨다운/스택 저장용
 
-function emitEvent(type, payload){
-  for(const u of ownedUniques){
-    if(u.onEvent) u.onEvent(type, payload);
-  }
-}
 let orbUIState = { cx:0, cy:0, centerR:24, ready:false };
 let particles=[];
 let bloodPools=[];
