@@ -423,6 +423,46 @@
   </div>
 </div>
 
+let gamePaused = false;
+let pauseOpts = { dim: 0.60, blur: 2 };
+
+const pauseCanvas = document.createElement("canvas");
+const pauseCtx = pauseCanvas.getContext("2d");
+
+function capturePausedFrame(opts = pauseOpts){
+  pauseOpts = opts || pauseOpts;
+
+  // 현재 프레임을 1번 그린 다음
+  draw();
+
+  // 그 결과를 offscreen에 복사 + 블러 + 딤
+  pauseCanvas.width = canvas.width;
+  pauseCanvas.height = canvas.height;
+
+  pauseCtx.setTransform(1,0,0,1,0,0);
+  pauseCtx.globalAlpha = 1;
+  pauseCtx.filter = (pauseOpts.blur > 0) ? `blur(${pauseOpts.blur}px)` : "none";
+  pauseCtx.drawImage(canvas, 0, 0);
+  pauseCtx.filter = "none";
+
+  if(pauseOpts.dim > 0){
+    pauseCtx.globalAlpha = pauseOpts.dim;
+    pauseCtx.fillStyle = "#000";
+    pauseCtx.fillRect(0,0,pauseCanvas.width,pauseCanvas.height);
+    pauseCtx.globalAlpha = 1;
+  }
+}
+
+function pauseGame(opts){
+  if(gamePaused) return;
+  capturePausedFrame(opts);
+  gamePaused = true;
+}
+
+function resumeGame(){
+  gamePaused = false;
+}
+
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -435,6 +475,7 @@ function resize(){
   uiHeight = ui.getBoundingClientRect().height || 120;
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight - uiHeight;
+  if(gamePaused) capturePausedFrame(pauseOpts);
 }
 
 resize();
@@ -1219,6 +1260,7 @@ function getNearbyLoot(){
 
 function openLootChoice(L){
   if(!L || L.taken) return;
+   pauseGame({ dim: 0.60, blur: 2 }); 
   lootOverlayOpen = true;
   pendingLoot = L;
 
@@ -1309,6 +1351,7 @@ function closeLootChoice(){
   lootOverlayOpen = false;
   pendingLoot = null;
   lootOverlay.style.display = "none";
+  resumeGame();
 }
 
 function updateLoots(){
@@ -1650,14 +1693,14 @@ function updateBuffs(target){
     // ultiMul은 데미지 계산에서 직접 사용하지만, 여기서 따로 넣진 않음(혼동 방지)
     target.buffs.rangeMul *= (player.gear.rangeMul ?? 1);
     // add
-합산
-  target.buffs.spdMul    *= (player.gear.spdMul ?? 1);
-  target.buffs.atkSpdMul *= (player.gear.atkSpdMul ?? 1);
+    // add / mul (gear 합산)
+    target.buffs.spdMul    *= (player.gear.spdMul ?? 1);
+    target.buffs.atkSpdMul *= (player.gear.atkSpdMul ?? 1);
+
     target.buffs.armorAdd += (player.gear.armorAdd ?? 0);
     target.buffs.maxHpAdd += (player.gear.maxHpAdd ?? 0);
     target.buffs.hpRegen  += (player.gear.hpRegen ?? 0);
-  }
-
+}
   for(let i = target.activeBuffs.length - 1; i >= 0; i--){
     const b = target.activeBuffs[i];
     b.duration--;
@@ -4112,6 +4155,7 @@ function rebuildGearFromEquipment(){
 
 function openInventory(){
   invOpen = true;
+  pauseGame({ dim: 0.60, blur: 2 }); // blur:0 이면 딤만
   invOverlay.style.display = "flex";
   renderInventory();
 }
@@ -4120,6 +4164,7 @@ function closeInventory(){
   invOpen = false;
   selected = null;
   invOverlay.style.display = "none";
+  resumeGame();
 }
 
 function renderEquipmentPanel(){
@@ -4426,11 +4471,17 @@ function drawRuntimeError(e){
 
 function loop(){
   try{
-    if(!gameOver){
+    if(gameOver){
+      drawGameOver();
+    }else if(gamePaused){
+      // ✅ 정지 화면(딤/블러 캡쳐)을 계속 보여주기만
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.globalAlpha = 1;
+      ctx.filter = "none";
+      ctx.drawImage(pauseCanvas, 0, 0);
+    }else{
       update();
       draw();
-    }else{
-      drawGameOver();
     }
     lastErr = null;
   }catch(e){
