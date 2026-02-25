@@ -153,7 +153,12 @@
       from{ box-shadow:0 0 10px rgba(180,80,255,0.6); }
       to{ box-shadow:0 0 25px rgba(255,120,255,1); }
     }
-
+/* ✅ POE식 아이템 이름 색상 */
+.rName{ font-weight:900; }
+.r-common{ color:#ffffff; }
+.r-rare{ color:#2f7bff; }
+.r-epic{ color:#ffd166; }      /* 노란색 */
+.r-legendary{ color:#d6b300; } /* 유니크/전설 */
     /* ============================= */
     /* ✅ 장비/가방/카오스: 분리 창 UI */
     /* ============================= */
@@ -1266,11 +1271,13 @@ function openLootChoice(L){
       pick.shownDesc = it.descGen ? it.descGen(pick.totalData) : (it.desc || "");
     }
 
-    card.innerHTML = `
-      <div class="name">[${it.rarity.toUpperCase()}] ${pick.shownName}</div>
-      <div class="desc">${pick.shownDesc}</div>
-      <button type="button">이걸 선택</button>
-    `;
+    const rKey = (it.rarity === "legendary") ? "legendary" : (it.rarity || "common");
+
+card.innerHTML = `
+  <div class="name rName r-${rKey}">${pick.shownName}</div>
+  <div class="desc">${pick.shownDesc}</div>
+  <button type="button">이걸 선택</button>
+`;
 
     card.querySelector("button").addEventListener("click", ()=>{
       if(pick.kind === "legendary"){
@@ -3989,17 +3996,24 @@ function slotLabel(slot){
   if(slot==="ring")   return "반지";
   return slot;
 }
+function rarityKey(it){
+  if(!it) return "common";
+  if(it.isUnique || it.rarity === "legendary") return "legendary";
+  return (it.rarity || "common");
+}
 
+function rarityClass(it){
+  return "r-" + rarityKey(it);
+}
 function prettyItemText(it){
   if(!it) return "";
   if(it.isUnique){
-    return `[LEGENDARY] ${it.name}
+    return `${it.name}
 
 ${it.uniqueRef?.desc || it.desc || ""}`;
   }
   const lines = [];
-  const rarity = (it.rarity || "common").toUpperCase();
-  lines.push(`[${rarity}] ${it.name}`);
+  lines.push(`${it.name}`);
   if(Array.isArray(it.affixes) && it.affixes.length){
     lines.push("");
     for(const a of it.affixes){
@@ -4066,7 +4080,7 @@ function drawItemIcon(c, it){
   const r = (it?.isUnique ? "legendary" : (it?.rarity || "common"));
   g.lineWidth = 3;
   if(r==="legendary") g.strokeStyle = "#d6b300";
-  else if(r==="epic") g.strokeStyle = "#b44dff";
+  else if(r==="epic") g.strokeStyle = "#ffd166";
   else if(r==="rare") g.strokeStyle = "#2f7bff";
   else g.strokeStyle = "#777";
 
