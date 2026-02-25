@@ -291,26 +291,45 @@
       padding:10px;
     }
 
-    /* ===== 가방 패널 ===== */
-    #bagBody{
-      flex:1 1 auto;
-      display:flex;
-      gap:12px;
-      min-height:0;
-    }
-    #bagGrid{
-      flex:0 0 60%;
-      display:grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap:8px;
-      background:#101010;
-      border:1px solid #2b2b2b;
-      border-radius:12px;
-      padding:10px;
-      box-sizing:border-box;
-      align-content:start;
-      min-height:0;
-    }
+ /* ===== 가방 패널 ===== */
+#bagBody{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;   /* ✅ 위-아래 배치로 고정 */
+  gap:12px;
+  min-height:0;
+}
+
+/* ✅ 아이템 설명: 위 */
+#bagInfo{
+  flex:0 0 auto;
+  max-height:38vh;         /* ✅ 너무 커지지 않게 */
+  overflow:auto;
+  white-space:pre-line;
+  font-size:13px;
+  color:#ddd;
+  background:#101010;
+  border:1px solid #2b2b2b;
+  border-radius:12px;
+  padding:12px;
+  box-sizing:border-box;
+}
+
+/* ✅ 인벤 그리드: 아래 + 스크롤 */
+#bagGrid{
+  flex:1 1 auto;
+  overflow:auto;           /* ✅ 스크롤 */
+  display:grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap:8px;
+  background:#101010;
+  border:1px solid #2b2b2b;
+  border-radius:12px;
+  padding:10px;
+  box-sizing:border-box;
+  align-content:start;
+  min-height:0;
+}
     .bItem{
       border:1px solid #555;
       border-radius:12px;
@@ -439,8 +458,12 @@
 <div class="panelOverlay" id="bagOverlay">
   <div class="panel">
     <div class="panelTop">
+      <!-- ✅ 추가: 장착 버튼 -->
+      <button class="panelClose" id="btnBagEquip" type="button">장착</button>
+
       <button class="panelClose" id="btnBagClose" type="button">닫기</button>
     </div>
+
     <div id="bagBody">
       <div id="bagGrid"></div>
       <div id="bagInfo"></div>
@@ -4267,7 +4290,26 @@ document.getElementById("btnChaosWnd").addEventListener("click", (e)=>{ stopEvt(
 document.getElementById("btnEquipClose").addEventListener("click", closePanels);
 document.getElementById("btnBagClose").addEventListener("click", closePanels);
 document.getElementById("btnChaosClose").addEventListener("click", closePanels);
+const btnBagEquip = document.getElementById("btnBagEquip");
+if(btnBagEquip){
+  btnBagEquip.addEventListener("click", (e)=>{
+    stopEvt(e);
 
+    if(!selectedItem || selectedItem.from !== "bag") return;
+
+    const it = inventory[selectedItem.idx];
+    if(!it) return;
+    if(it.isUnique) return;
+
+    const slot = it.slot;
+    if(!slot) return;
+
+    equipFromBagToSlot(selectedItem.idx, slot);
+
+    selectedItem = { from:"equip", slot };
+    renderAllPanels();
+  });
+}
 // ESC closes
 window.addEventListener("keydown", (e)=>{
   if(e.key === "Escape" && panelOpen) closePanels();
