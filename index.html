@@ -4402,7 +4402,17 @@ document.getElementById("btnBagToEquip").addEventListener("click", (e)=>{
   stopEvt(e);
   openPanel("equip");
 });
+const equipToBagBtn = document.getElementById("btnEquipToBag");
 
+function goBag(e){
+  stopEvt(e);
+  openPanel("bag");
+}
+
+// ✅ iOS 포함 전부 확실하게 먹는 방식
+equipToBagBtn.addEventListener("pointerdown", goBag);
+equipToBagBtn.addEventListener("click", goBag);
+equipToBagBtn.style.touchAction = "manipulation";
 // ✅ 가방: 선택된 아이템을 해당 슬롯으로 장착
 document.getElementById("btnBagEquip").addEventListener("click", (e)=>{
   stopEvt(e);
