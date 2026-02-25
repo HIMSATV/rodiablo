@@ -345,10 +345,11 @@
     .bItem.selected{ outline:2px solid #6bf178; }
     .bItem.unique{ border-color:#b89b00; }
 
-    .iconCanvas{
-      width:40px;height:40px;
-      image-rendering:pixelated;
-    }
+  .iconCanvas{
+  display:block;               /* ✅ 중요: iOS에서 안 보이는 이슈 방지 */
+  background:rgba(255,255,255,0.06);
+  border-radius:10px;
+}
 
 
     /* ===== 카오스 패널 ===== */
@@ -429,8 +430,9 @@
 <!-- ✅ 장비/스펙 패널 -->
 <div class="panelOverlay" id="equipOverlay">
   <div class="panel">
-  <div class="panelTop">
+<div class="panelTop">
   <button class="panelClose" id="btnEquipToBag" type="button">가방</button>
+  <button class="panelClose" id="btnEquipUnequip" type="button">해제</button>
   <button class="panelClose" id="btnEquipClose" type="button">닫기</button>
 </div>
     <div id="equipPanelBody">
@@ -446,8 +448,9 @@
 <!-- ✅ 가방 패널 -->
 <div class="panelOverlay" id="bagOverlay">
   <div class="panel">
-   <div class="panelTop">
+  <div class="panelTop">
   <button class="panelClose" id="btnBagToEquip" type="button">장비</button>
+  <button class="panelClose" id="btnBagEquip" type="button">장착</button>
   <button class="panelClose" id="btnBagClose" type="button">닫기</button>
 </div>
 
@@ -4307,6 +4310,8 @@ function renderBagPanel(){
     c.className = "iconCanvas";
     cell.appendChild(c);
     drawItemIcon(c, it);
+    c.style.display = "block";
+c.style.background = "rgba(255,255,255,0.06)";
 
     cell.addEventListener("click", ()=>{
       if(!it){ selectedItem = null; bagInfoEl.textContent=""; renderAllPanels(); return; }
@@ -4385,12 +4390,39 @@ function closePanels(){
 document.getElementById("btnEquip").addEventListener("click", (e)=>{ stopEvt(e); openPanel("equip"); });
 document.getElementById("btnBag").addEventListener("click", (e)=>{ stopEvt(e); openPanel("bag"); });
 document.getElementById("btnChaosWnd").addEventListener("click", (e)=>{ stopEvt(e); openPanel("chaos"); });
-document.getElementById("btnEquipToBag").addEventListener("click", (e)=>{
- stopEvt(e);
-  openPanel("bag");
-});
+// 장비 -> 가방
 document.getElementById("btnEquipToBag").addEventListener("click", (e)=>{
   stopEvt(e);
+  openPanel("bag");
+});
+
+// 가방 -> 장비
+document.getElementById("btnBagToEquip").addEventListener("click", (e)=>{
+  stopEvt(e);
+  openPanel("equip");
+});
+
+// ✅ 가방: 선택된 아이템을 해당 슬롯으로 장착
+document.getElementById("btnBagEquip").addEventListener("click", (e)=>{
+  stopEvt(e);
+
+  if(!selectedItem || selectedItem.from !== "bag") return;
+  const it = inventory[selectedItem.idx];
+  if(!it || it.isUnique) return;
+
+  equipFromBagToSlot(selectedItem.idx, it.slot);
+  openPanel("equip"); // 결과 바로 확인
+});
+
+// ✅ 장비: 선택된 슬롯 해제
+document.getElementById("btnEquipUnequip").addEventListener("click", (e)=>{
+  stopEvt(e);
+
+  if(!selectedItem || selectedItem.from !== "equip") return;
+  const slot = selectedItem.slot;
+  if(!slot || !equipment[slot]) return;
+
+  unequipSlotToBag(slot);
   openPanel("bag");
 });
 // Close buttons
