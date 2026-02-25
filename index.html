@@ -433,6 +433,261 @@
       #bagBody{ flex-direction:column; }
       #bagGrid{ flex:0 0 auto; }
     }
+    /* ============================= */
+/* ✅ DIABLO STYLE UI SKIN (ADD) */
+/* ✅ <style> 맨 아래에 붙여넣기 */
+/* ============================= */
+
+:root{
+  --d-bg0:#050505;
+  --d-bg1:#0a0a0a;
+  --d-bg2:#111;
+  --d-panel:#0c0c0c;
+  --d-panel2:#101010;
+  --d-line:#2a2a2a;
+  --d-line2:#3a3a3a;
+  --d-gold:#b08a3a;
+  --d-gold2:#d9b35a;
+  --d-red:#7a0a0a;
+  --d-red2:#b01010;
+  --d-text:#e7e2d8;
+  --d-dim:#b9b2a6;
+  --d-shadow: rgba(0,0,0,0.65);
+}
+
+/* 전체 톤 다운 */
+body{
+  background: radial-gradient(1200px 800px at 50% 20%, #101010 0%, #050505 60%, #000 100%);
+}
+
+/* ============================= */
+/* 하단 UI 바 (가죽+철 테두리)   */
+/* ============================= */
+#ui{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.0) 22%),
+    linear-gradient(180deg, #0a0a0a, #050505 70%, #020202);
+  border-top: 2px solid rgba(176,139,58,0.35);
+  box-shadow:
+    0 -10px 30px rgba(0,0,0,0.75),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* ============================= */
+/* 왼쪽 이동패드 (무게감)        */
+/* ============================= */
+#movePad{
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.06), rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.55)),
+    linear-gradient(180deg, #0f0f0f, #050505);
+  border: 1px solid rgba(176,139,58,0.25);
+  box-shadow:
+    0 10px 22px rgba(0,0,0,0.55),
+    inset 0 2px 6px rgba(255,255,255,0.05),
+    inset 0 -8px 14px rgba(0,0,0,0.6);
+}
+
+#stick{
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.20), rgba(255,255,255,0.06) 35%, rgba(0,0,0,0.55) 75%),
+    linear-gradient(180deg, #1a1a1a, #070707);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 10px 18px rgba(0,0,0,0.55),
+    inset 0 2px 6px rgba(255,255,255,0.06),
+    inset 0 -8px 14px rgba(0,0,0,0.7);
+}
+
+/* ============================= */
+/* 오른쪽 공격 버튼 (핏빛+금속)  */
+/* ============================= */
+#attackBtn{
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.12), rgba(0,0,0,0.0) 35%),
+    radial-gradient(circle at 50% 60%, rgba(176,16,16,0.55), rgba(90,0,0,0.75) 55%, rgba(0,0,0,0.85)),
+    linear-gradient(180deg, #1a0a0a, #040000);
+  border: 2px solid rgba(176,139,58,0.45);
+  box-shadow:
+    0 14px 26px rgba(0,0,0,0.70),
+    inset 0 2px 10px rgba(255,255,255,0.07),
+    inset 0 -10px 18px rgba(0,0,0,0.8);
+}
+
+#attackBtn.active{
+  transform: scale(.90);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.16), rgba(0,0,0,0.0) 38%),
+    radial-gradient(circle at 50% 60%, rgba(255,60,60,0.55), rgba(130,0,0,0.8) 55%, rgba(0,0,0,0.9)),
+    linear-gradient(180deg, #2a0a0a, #050000);
+  box-shadow:
+    0 10px 18px rgba(0,0,0,0.75),
+    inset 0 2px 12px rgba(255,255,255,0.10),
+    inset 0 -10px 18px rgba(0,0,0,0.85);
+}
+
+/* ============================= */
+/* 상단 HUD 버튼(스펙/가방/카오스)*/
+/* ============================= */
+.hudBtn{
+  border-radius: 14px;
+  border: 1px solid rgba(176,139,58,0.22);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.0) 25%),
+    linear-gradient(180deg, #0e0e0e, #050505);
+  color: var(--d-text);
+  box-shadow:
+    0 12px 22px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 -10px 16px rgba(0,0,0,0.7);
+}
+.hudBtn:active{
+  transform: scale(0.96);
+}
+
+/* ============================= */
+/* 패널 오버레이/창(무겁게)       */
+/* ============================= */
+.panelOverlay{
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(2px);
+}
+
+.panel{
+  background:
+    radial-gradient(900px 420px at 50% 0%, rgba(255,255,255,0.05), rgba(0,0,0,0.0) 55%),
+    linear-gradient(180deg, #0f0f0f, #070707 70%, #040404);
+  border: 1px solid rgba(176,139,58,0.28);
+  box-shadow:
+    0 24px 60px rgba(0,0,0,0.75),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* 상단 버튼(닫기/장착/해제) */
+.panelClose{
+  border: 1px solid rgba(176,139,58,0.24);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.0) 30%),
+    linear-gradient(180deg, #121212, #070707);
+  color: var(--d-text);
+  box-shadow:
+    0 10px 18px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 -10px 16px rgba(0,0,0,0.65);
+}
+.panelClose:hover{
+  border-color: rgba(217,179,90,0.45);
+}
+
+/* ============================= */
+/* 슬롯/인벤 박스(디아 톤)        */
+/* ============================= */
+#equipSlots, #specBox, #bagGrid, #bagInfo, #chaosLeft, #chaosInfo, #specText, #equipInfo{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.0) 20%),
+    linear-gradient(180deg, #0d0d0d, #070707);
+  border: 1px solid rgba(176,139,58,0.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -12px 18px rgba(0,0,0,0.65);
+}
+
+/* 장비 슬롯 카드 */
+.eSlot{
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.05), rgba(0,0,0,0.0) 50%),
+    linear-gradient(180deg, #121212, #070707);
+  border: 1px solid rgba(176,139,58,0.16);
+  box-shadow:
+    0 10px 18px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 -10px 16px rgba(0,0,0,0.7);
+}
+.eSlot.selected{
+  outline: 2px solid rgba(217,179,90,0.80);
+  box-shadow:
+    0 0 0 2px rgba(217,179,90,0.12),
+    0 12px 22px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.eSlot .label{
+  color: rgba(217,179,90,0.75);
+}
+.eSlot .item{
+  color: var(--d-text);
+}
+
+/* 가방 아이템 칸 */
+.bItem{
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.05), rgba(0,0,0,0.0) 50%),
+    linear-gradient(180deg, #121212, #070707);
+  border: 1px solid rgba(176,139,58,0.12);
+  box-shadow:
+    0 10px 18px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -10px 16px rgba(0,0,0,0.75);
+}
+.bItem:hover{
+  border-color: rgba(217,179,90,0.35);
+}
+.bItem.selected{
+  outline: 2px solid rgba(110,241,120,0.70);
+}
+
+/* 아이콘 캔버스도 더 “철” 느낌 */
+.iconCanvas{
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.10), rgba(0,0,0,0.0) 40%),
+    linear-gradient(180deg, #0f0f0f, #050505);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -10px 14px rgba(0,0,0,0.7);
+}
+
+/* ============================= */
+/* 아이템 정보창(글/라인)         */
+/* ============================= */
+.itemInfoWrap{
+  color: var(--d-text);
+}
+.itemInfoLine{
+  color: rgba(231,226,216,0.92);
+}
+.itemInfoDim{
+  color: rgba(185,178,166,0.85);
+}
+.itemInfoTier{
+  opacity: 0.78;
+  font-size: 12px;
+  margin-left: 6px;
+  color: rgba(217,179,90,0.75);
+}
+
+/* 드롭 선택 패널(lootOverlay)도 톤 통일 */
+#lootPanel{
+  background:
+    radial-gradient(800px 340px at 50% 0%, rgba(255,255,255,0.05), rgba(0,0,0,0.0) 55%),
+    linear-gradient(180deg, #0f0f0f, #070707 70%, #040404);
+  border: 1px solid rgba(176,139,58,0.22);
+  box-shadow: 0 26px 70px rgba(0,0,0,0.8);
+}
+.lootCard{
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,0.05), rgba(0,0,0,0.0) 55%),
+    linear-gradient(180deg, #141414, #080808);
+  border-color: rgba(176,139,58,0.16);
+}
+.lootCard button{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.0) 35%),
+    linear-gradient(180deg, #1b3f9b, #10285f);
+  border: 1px solid rgba(217,179,90,0.18);
+  box-shadow:
+    0 12px 18px rgba(0,0,0,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -10px 16px rgba(0,0,0,0.75);
+}
   </style>
 </head>
 <body>
