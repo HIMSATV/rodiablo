@@ -1,0 +1,4608 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Oni Samurai</title>
+
+  
+  <style>
+    :root{
+      --uiScale: 1.2;
+      --uiH: clamp(calc(84px * var(--uiScale)),  calc(16vh * var(--uiScale)),  calc(120px * var(--uiScale)));
+      --pad: clamp(calc(66px * var(--uiScale)),  calc(12.5vw * var(--uiScale)), calc(90px  * var(--uiScale)));
+      --stick:clamp(calc(28px * var(--uiScale)),  calc(5.6vw * var(--uiScale)),  calc(40px  * var(--uiScale)));
+      --btn: clamp(calc(70px * var(--uiScale)),  calc(13vw * var(--uiScale)),   calc(90px  * var(--uiScale)));
+    }
+
+    body{ margin:0; background:black; overflow:hidden; touch-action:none; }
+    canvas{ position:fixed; top:0; left:0; image-rendering:pixelated; }
+
+    /* ============================= */
+    /* ✅ 하단 UI 바 */
+    /* ============================= */
+    #ui{
+      position:fixed;bottom:0;width:100%;height:var(--uiH);
+      background:#111;border-top:3px solid #550000;
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0 clamp(10px, 4vw, 25px);box-sizing:border-box;
+      z-index:50;
+    }
+
+    #movePad{
+      position:relative;
+      width:var(--pad);height:var(--pad);
+      border-radius:50%;
+      background:#222;
+    }
+    #stick{
+      position:absolute;
+      width:var(--stick);
+      height:var(--stick);
+      border-radius:50%;
+      background:#666;
+      left: calc(50% - (var(--stick) / 2));
+      top:  calc(50% - (var(--stick) / 2));
+    }
+
+    /* 오른쪽 버튼 영역 */
+    #rightBtns{
+      position:relative;
+      width:var(--btn);
+      height:var(--btn);
+      display:block;
+      overflow:visible;
+    }
+
+    #attackBtn{
+      position:absolute;
+      right:0;
+      bottom:0;
+      width:var(--btn);height:var(--btn);
+      border-radius:50%;
+      background:#990000;border:3px solid #ff4444;
+      display:flex;align-items:center;justify-content:center;
+      font-size:26px;color:white;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+    #attackBtn.active{background:red;transform:scale(.85);}
+
+    #attackIcon{
+      position:absolute;
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+    }
+
+    /* ============================= */
+    /* ✅ 아이템 선택 오버레이 UI     */
+    /* ============================= */
+    #lootOverlay{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(0,0,0,0.75);
+      z-index:9999;
+      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+
+    #lootPanel{
+      width:min(92vw, 520px);
+      background:#111;
+      border:2px solid #444;
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 0 30px rgba(0,0,0,0.6);
+    }
+    #lootTitle{
+      color:#fff;
+      font-weight:800;
+      font-size:18px;
+      margin:4px 2px 10px;
+      text-align:center;
+    }
+    .lootCards{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .lootCard{
+      background:#1a1a1a;
+      border:2px solid #333;
+      border-radius:12px;
+      padding:12px;
+      color:#eee;
+      line-height:1.25;
+    }
+    .lootCard .name{
+      font-weight:900;
+      margin-bottom:6px;
+    }
+    .lootCard .desc{
+      color:#cfcfcf;
+      font-size:14px;
+    }
+    .lootCard button{
+      margin-top:10px;
+      width:100%;
+      padding:10px 12px;
+      border:0;
+      border-radius:10px;
+      background:#2d6cff;
+      color:#fff;
+      font-weight:800;
+      font-size:15px;
+    }
+    .lootCard.common{
+      border-color:#3a3a3a;
+      box-shadow:0 0 8px rgba(255,255,255,0.1);
+    }
+    .lootCard.rare{
+      border-color:#2f7bff;
+      box-shadow:0 0 14px rgba(0,140,255,0.6);
+    }
+    .lootCard.epic{
+      border-color:#b44dff;
+      box-shadow:0 0 18px rgba(180,80,255,0.9);
+      animation:epicGlow 1.5s infinite alternate;
+    }
+    @keyframes epicGlow{
+      from{ box-shadow:0 0 10px rgba(180,80,255,0.6); }
+      to{ box-shadow:0 0 25px rgba(255,120,255,1); }
+    }
+
+    /* ============================= */
+    /* ✅ 인벤/장비창 UI             */
+    /* ✅ 인벤/장비창 UI (POE 스타일 단순 슬롯) */
+#invOverlay{
+  position: fixed;
+  left: 0; top: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  font-family: Arial, sans-serif;
+}
+
+#invWindow{
+  width: min(980px, 92vw);
+  height: min(720px, 86vh);
+  background: #141414;
+  border: 2px solid #3a3a3a;
+  border-radius: 12px;
+  padding: 14px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#invTop{
+  flex: 1 1 auto;
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+}
+
+#invEquip{
+  flex: 0 0 48%;
+  background: #101010;
+  border: 1px solid #2b2b2b;
+  border-radius: 10px;
+  padding: 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#invEquipTitle{
+  font-size: 14px;
+  color: #ddd;
+  opacity: 0.9;
+}
+
+.equipGrid{
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 10px;
+}
+
+.equipSlot{
+  border: 1px solid #444;
+  border-radius: 10px;
+  background: #1a1a1a;
+  padding: 10px;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 80px;
+}
+.equipSlot:hover{ border-color:#888; }
+
+.equipSlot .slotName{
+  font-size: 12px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.equipSlot .slotItem{
+  font-size: 14px;
+  color: #f2f2f2;
+  line-height: 1.2;
+}
+
+.equipSlot.selected{ outline: 2px solid #ffd166; }
+
+#invRight{
+  flex: 1 1 auto;
+  background: #101010;
+  border: 1px solid #2b2b2b;
+  border-radius: 10px;
+  padding: 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+#invStats{
+  flex: 0 0 auto;
+  white-space: pre-line;
+  font-size: 13px;
+  color: #eee;
+}
+
+#invItemInfo{
+  flex: 1 1 auto;
+  overflow: auto;
+  white-space: pre-line;
+  font-size: 13px;
+  color: #ddd;
+  border-top: 1px solid #2b2b2b;
+  padding-top: 10px;
+}
+
+#invBag{
+  flex: 0 0 auto;
+  background: #0f0f0f;
+  border: 1px solid #2b2b2b;
+  border-radius: 10px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+#invBagTitle{
+  font-size: 14px;
+  color: #ddd;
+  margin-bottom: 8px;
+  opacity: 0.9;
+}
+
+.bagGrid{
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.bagItem{
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  background: #1b1b1b;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 22px;
+  color: #f0f0f0;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.bagItem:hover{ border-color:#888; }
+.bagItem.selected{ outline: 2px solid #6bf178; }
+.bagItem.unique{ border-color:#b89b00; }
+
+#invFooter{
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.invBtn{
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #3a3a3a;
+  background: #202020;
+  color: #f0f0f0;
+  cursor: pointer;
+  font-size: 13px;
+}
+.invBtn:hover{ border-color:#888; }
+
+#invHint{
+  font-size: 12px;
+  color: #bbb;
+  opacity: 0.9;
+}
+
+
+/* ============================= */
+    /* ✅ (추가) 가방 모양 인벤 아이콘 */
+    /* ============================= */
+    #invBtn{
+      position:fixed;
+      top:10px;
+      left:10px;
+      width:40px;
+      height:40px;
+      border-radius:12px;
+      background:rgba(20,20,20,0.85);
+      border:1px solid rgba(255,255,255,0.15);
+      box-shadow:0 0 14px rgba(0,0,0,0.45);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:60; /* canvas 위 + ui 아래는 상관없음 */
+      user-select:none;
+      -webkit-user-select:none;
+      touch-action:manipulation;
+    }
+    #invBtn:active{ transform:scale(0.95); }
+    #invBtn svg{ width:22px; height:22px; opacity:0.95; }
+
+/* ============================= */
+/* 📱 모바일 전용 레이아웃 개선 */
+/* ============================= */
+@media (max-width: 768px){
+  #invWindow{
+    width: 96vw;
+    height: 92vh;
+    overflow-y: auto;
+  }
+  #invTop{
+    flex-direction: column;
+  }
+  #invEquip{
+    flex: none;
+  }
+  .equipGrid{
+    grid-template-columns: 1fr 1fr;
+  }
+  #invRight{
+    flex: none;
+  }
+  .bagGrid{
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- ✅ (추가) 가방 아이콘 인벤 버튼 -->
+<div id="invBtn" title="인벤토리">
+  <!-- 간단 가방 SVG -->
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="white" d="M8 7V6a4 4 0 0 1 8 0v1h2a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V9a2 2 0 0 1 2-2h4zm2 0h4V6a2 2 0 0 0-4 0v1zm-3 4a1 1 0 0 1 2 0v1a1 1 0 0 1-2 0v-1zm8 0a1 1 0 0 1 2 0v1a1 1 0 0 1-2 0v-1z"/>
+  </svg>
+</div>
+
+<!-- ✅ 아이템 선택 UI -->
+<div id="lootOverlay">
+  <div id="lootPanel">
+    <div id="lootTitle">아이템 선택 (1개만)</div>
+    <div class="lootCards" id="lootCards"></div>
+    <div class="lootHint" style="color:#aaa;font-size:12px;margin-top:10px;text-align:center;">선택하면 즉시 적용됩니다.</div>
+  </div>
+</div>
+
+<!-- ✅ 인벤/장비창 UI -->
+<div id="invOverlay">
+  <div id="invWindow">
+    <div id="invTop">
+      <div id="invEquip">
+        <div id="invEquipTitle">장비 (아이템 클릭 → 슬롯 클릭으로 장착)</div>
+        <div class="equipGrid" id="equipGrid"></div>
+      </div>
+
+      <div id="invRight">
+        <div id="invStats"></div>
+        <div id="invItemInfo">하단 가방에서 아이템을 누르면 상세가 여기 표시돼.</div>
+      </div>
+    </div>
+
+    <div id="invBag">
+      <div id="invBagTitle">가방</div>
+      <div class="bagGrid" id="bagGrid"></div>
+    </div>
+
+    <div id="invFooter">
+      <button class="invBtn" id="btnChaos">카오스(선택 아이템 랜덤옵션)</button>
+      <button class="invBtn" id="btnInvClose">닫기</button>
+    </div>
+
+    <div id="invHint">POE 방식: 가방 아이템 선택 → 장비 슬롯 클릭. 장착된 아이템은 슬롯을 다시 눌러 해제(가방으로).</div>
+  </div>
+</div>
+
+<div id="ui">
+  <div id="movePad"><div id="stick"></div></div>
+  <div id="rightBtns">
+    <div id="attackBtn">
+      <canvas id="attackIcon" width="60" height="60"></canvas>
+    </div>
+  </div>
+</div>
+
+let gamePaused = false;
+let pauseOpts = { dim: 0.60, blur: 2 };
+let resumeFade = 0;     // 0이면 없음, >0이면 페이드 중
+let resumeFadeMax = 10; // 10프레임(약 0.16초) 정도
+
+const pauseCanvas = document.createElement("canvas");
+const pauseCtx = pauseCanvas.getContext("2d");
+
+function capturePausedFrame(opts = pauseOpts){
+  pauseOpts = opts || pauseOpts;
+
+  // 현재 프레임을 1번 그린 다음
+  draw();
+
+  // 그 결과를 offscreen에 복사 + 블러 + 딤
+  pauseCanvas.width = canvas.width;
+  pauseCanvas.height = canvas.height;
+
+  pauseCtx.setTransform(1,0,0,1,0,0);
+  pauseCtx.globalAlpha = 1;
+  pauseCtx.filter = (pauseOpts.blur > 0) ? `blur(${pauseOpts.blur}px)` : "none";
+  pauseCtx.drawImage(canvas, 0, 0);
+  pauseCtx.filter = "none";
+
+  if(pauseOpts.dim > 0){
+    pauseCtx.globalAlpha = pauseOpts.dim;
+    pauseCtx.fillStyle = "#000";
+    pauseCtx.fillRect(0,0,pauseCanvas.width,pauseCanvas.height);
+    pauseCtx.globalAlpha = 1;
+  }
+}
+
+function pauseGame(opts){
+  if(gamePaused) return;
+  resumeFade = 0;
+  capturePausedFrame(opts);
+  gamePaused = true;
+}
+
+function resumeGame(){
+  // 이미 페이드 중이면 무시
+  if(resumeFade > 0) return;
+
+  // ✅ 페이드아웃 시작
+  resumeFade = resumeFadeMax;
+
+  // ✅ 게임은 바로 재개(뒤에서 update/draw가 돌기 시작)
+  gamePaused = false;
+}
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const ui = document.getElementById("ui");
+
+// ✅ drawOrbUI / drawHpOrb에서 쓰는 전역 uiHeight
+let uiHeight = 120;
+
+function resize(){
+  uiHeight = ui.getBoundingClientRect().height || 120;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight - uiHeight;
+  if(gamePaused) capturePausedFrame(pauseOpts);
+}
+
+resize();
+window.addEventListener("resize", ()=>requestAnimationFrame(resize));
+requestAnimationFrame(resize);
+
+
+/* ===== 사운드 ===== */
+const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+let audioUnlocked = false;
+
+function unlockAudio(){
+  if(audioUnlocked) return;
+  audioUnlocked = true;
+  audioCtx.resume().then(()=>{
+    if(!bgmOsc) bgmOsc = startBGM();
+  });
+}
+window.addEventListener("touchstart", unlockAudio, { once:true });
+window.addEventListener("mousedown", unlockAudio, { once:true });
+window.addEventListener("keydown", unlockAudio, { once:true });
+
+function startBGM(){
+  let isPlaying = true;
+
+  function getTempo(){
+    if(killCount >= 100) return 150;
+    if(killCount >= 50) return 130;
+    return 110;
+  }
+
+  function playBeat(){
+    if(!isPlaying) return;
+
+    let tempo = getTempo();
+    let beatTime = 60 / tempo;
+    let now = audioCtx.currentTime;
+
+    // 킥
+    let kick = audioCtx.createOscillator();
+    let kickGain = audioCtx.createGain();
+    kick.type = "triangle";
+    kick.frequency.setValueAtTime(90, now);
+    kick.frequency.exponentialRampToValueAtTime(50, now + 0.12);
+    kickGain.gain.setValueAtTime(0.18, now);
+    kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    kick.connect(kickGain);
+    kickGain.connect(audioCtx.destination);
+    kick.start(now);
+    kick.stop(now + 0.15);
+
+    // 하이톤
+    let tone = audioCtx.createOscillator();
+    let toneGain = audioCtx.createGain();
+    tone.type = "square";
+    tone.frequency.value = 220;
+    toneGain.gain.setValueAtTime(0.06, now + beatTime/2);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, now + beatTime/2 + 0.1);
+    tone.connect(toneGain);
+    toneGain.connect(audioCtx.destination);
+    tone.start(now + beatTime/2);
+    tone.stop(now + beatTime/2 + 0.1);
+
+    setTimeout(playBeat, beatTime * 1000);
+  }
+
+  playBeat();
+  return { stop: () => isPlaying = false };
+}
+
+let bgmOsc;
+
+function swingSound(){
+  let o=audioCtx.createOscillator();
+  let g=audioCtx.createGain();
+  o.type="sawtooth";
+  o.frequency.setValueAtTime(700,audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(200,audioCtx.currentTime+0.12);
+  g.gain.value=0.15;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime+0.12);
+}
+function bossUnsheatheSound(){
+  let now = audioCtx.currentTime;
+
+  let o1 = audioCtx.createOscillator();
+  let g1 = audioCtx.createGain();
+  o1.type = "sawtooth";
+  o1.frequency.setValueAtTime(120, now);
+  o1.frequency.exponentialRampToValueAtTime(600, now + 0.6);
+  g1.gain.setValueAtTime(0.4, now);
+  g1.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+  o1.connect(g1);
+  g1.connect(audioCtx.destination);
+  o1.start(now);
+  o1.stop(now + 0.6);
+
+  let o2 = audioCtx.createOscillator();
+  let g2 = audioCtx.createGain();
+  o2.type = "triangle";
+  o2.frequency.setValueAtTime(900, now);
+  o2.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+  g2.gain.setValueAtTime(0.3, now);
+  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+  o2.connect(g2);
+  g2.connect(audioCtx.destination);
+  o2.start(now);
+  o2.stop(now + 0.4);
+}
+function thudSound(){
+  let now = audioCtx.currentTime;
+
+  let o = audioCtx.createOscillator();
+  let g = audioCtx.createGain();
+  o.type = "sine";
+  o.frequency.setValueAtTime(120, now);
+  o.frequency.exponentialRampToValueAtTime(55, now + 0.14);
+  g.gain.setValueAtTime(0.32, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  o.connect(g);
+  g.connect(audioCtx.destination);
+  o.start(now);
+  o.stop(now + 0.18);
+
+  let o2 = audioCtx.createOscillator();
+  let g2 = audioCtx.createGain();
+  o2.type = "triangle";
+  o2.frequency.setValueAtTime(220, now);
+  o2.frequency.exponentialRampToValueAtTime(90, now + 0.08);
+  g2.gain.setValueAtTime(0.12, now);
+  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+  o2.connect(g2);
+  g2.connect(audioCtx.destination);
+  o2.start(now);
+  o2.stop(now + 0.09);
+}
+
+function hitSound(){
+  let o=audioCtx.createOscillator();
+  let g=audioCtx.createGain();
+  o.type="square";
+  o.frequency.value=100;
+  g.gain.value=0.25;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime+0.08);
+}
+
+/* ===== 플레이어 ===== */
+let player={
+  x:0,y:0,
+  dir:"left",
+  speed:5,
+  radius:14,
+
+  hp:100,
+  maxHp:100,
+  baseMaxHp:100,   // ✅ 추가: 레벨업/영구 증가용 베이스 체력
+
+  baseArmor:0,     // ✅ 추가: 기본 방어력(영구/레벨업/장비 기본값)
+  invul:0,
+  knockbackX:0,
+  knockbackY:0,
+
+  kiOrbs:0,
+  maxOrbs:5,
+  levelGlow:0,
+  ultiActive:false,
+  ultiCount:0,
+  ultiTimer:0,
+
+  // ✅ buffs 기본값은 updateBuffs에서 매 프레임 세팅
+  buffs: { dmgMul:1, spdMul:1, atkSpdMul:1 },
+  activeBuffs: []
+  };
+// ✅ 무기 베이스 (POE 스타일)
+player.weapon = {
+  name: "Rusty Katana",
+  min: 14,
+  max: 20,
+  critChance: 0.06, // 6%
+  critMulti: 1.50   // 150%
+};
+
+let map = [];
+let mapSize = 30;
+let tileSize = 48;
+
+for(let y=0; y<mapSize; y++){
+  let row = [];
+  for(let x=0; x<mapSize; x++){
+    if(x===0 || y===0 || x===mapSize-1 || y===mapSize-1) row.push(1);
+    else row.push(0);
+  }
+  map.push(row);
+}
+
+player.x = mapSize * tileSize / 2;
+player.y = mapSize * tileSize / 2;
+
+let reachableMask = null; // 플레이어 시작점에서 도달 가능한 바닥 타일 표시
+let hpWaveOffset = 0;
+let slowMotion = 0;
+let spawnTimer = 0;
+let spawnInterval = 90;
+let enemies=[];
+let packs = [];
+/* ============================= */
+/* ✅ 아이템 드랍/선택 시스템     */
+/* ============================= */
+let loots = [];            // 바닥에 떨어진 루트
+let lootOverlayOpen = false;
+let pendingLoot = null;    // 현재 선택 UI에 띄운 루트
+
+const lootOverlay = document.getElementById("lootOverlay");
+const lootCardsEl = document.getElementById("lootCards");
+
+/* ============================= */
+/* ✅ POE식 Affix/Tier/ilvl 시스템 */
+/* ============================= */
+
+// ✅ 아이템 레벨(ilvl): 맵티어/레벨 기반
+function getItemLevel(){
+  // 느낌: 맵티어가 핵심 + 레벨 조금 보정
+  return Math.floor(mapTier * 10 + level * 1.5);
+}
+
+// ✅ 가중치 랜덤 픽
+function weightedPick(list, weightKey="weight"){
+  let total = 0;
+  for(const it of list) total += (it[weightKey] ?? 0);
+  let r = Math.random() * total;
+  for(const it of list){
+    r -= (it[weightKey] ?? 0);
+    if(r <= 0) return it;
+  }
+  return list[list.length - 1];
+}
+
+// ✅ Affix DB (POE 느낌: group, tiers, weight, minIlvl)
+const AFFIX_DB = {
+  prefix: [
+    {
+      id:"p_phys",
+      name:"Brutal",
+      group:"dmgMul",
+      weight:100,
+      tiers:[
+        { t:1, minIlvl:70, min:0.22, max:0.30, w:20 }, // +22~30%
+        { t:2, minIlvl:50, min:0.16, max:0.21, w:35 },
+        { t:3, minIlvl:30, min:0.10, max:0.15, w:60 },
+        { t:4, minIlvl:1,  min:0.05, max:0.09, w:90 }
+      ],
+      apply:(data, roll)=>{ data.dmgMul *= (1 + roll); }
+    },
+    {
+      id:"p_ulti",
+      name:"Cataclysm",
+      group:"ultiMul",
+      weight:80,
+      tiers:[
+        { t:1, minIlvl:70, min:0.25, max:0.33, w:20 },
+        { t:2, minIlvl:45, min:0.18, max:0.24, w:40 },
+        { t:3, minIlvl:20, min:0.10, max:0.17, w:70 },
+        { t:4, minIlvl:1,  min:0.06, max:0.09, w:90 }
+      ],
+      apply:(data, roll)=>{ data.ultiMul *= (1 + roll); }
+    },
+    {
+      id:"p_range",
+      name:"Wide",
+      group:"rangeMul",
+      weight:70,
+      tiers:[
+        { t:1, minIlvl:60, min:0.18, max:0.24, w:25 },
+        { t:2, minIlvl:35, min:0.12, max:0.17, w:45 },
+        { t:3, minIlvl:1,  min:0.06, max:0.11, w:80 }
+      ],
+      apply:(data, roll)=>{ data.rangeMul *= (1 + roll); }
+    },
+    {
+      id:"p_crit",
+      name:"Keen",
+      group:"critChanceAdd",
+      weight:55,
+      tiers:[
+        { t:1, minIlvl:65, min:0.04, max:0.06, w:20 }, // +4~6%
+        { t:2, minIlvl:40, min:0.025, max:0.039, w:45 },
+        { t:3, minIlvl:1,  min:0.01, max:0.024, w:85 }
+      ],
+      apply:(data, roll)=>{ data.critChanceAdd += roll; }
+    }
+  ],
+
+  suffix: [
+    {
+      id:"s_hp",
+      name:"of Vitality",
+      group:"maxHpAdd",
+      weight:100,
+      tiers:[
+        { t:1, minIlvl:70, min:45, max:70, w:22 },
+        { t:2, minIlvl:45, min:30, max:44, w:40 },
+        { t:3, minIlvl:20, min:18, max:29, w:70 },
+        { t:4, minIlvl:1,  min:10, max:17, w:95 }
+      ],
+      apply:(data, roll)=>{ data.maxHpAdd += roll; }
+    },
+    {
+      id:"s_armor",
+      name:"of Fortitude",
+      group:"armorAdd",
+      weight:85,
+      tiers:[
+        { t:1, minIlvl:70, min:18, max:26, w:22 },
+        { t:2, minIlvl:45, min:12, max:17, w:40 },
+        { t:3, minIlvl:20, min:7,  max:11, w:70 },
+        { t:4, minIlvl:1,  min:3,  max:6,  w:95 }
+      ],
+      apply:(data, roll)=>{ data.armorAdd += roll; }
+    },
+    {
+      id:"s_regen",
+      name:"of Regeneration",
+      group:"hpRegen",
+      weight:60,
+      tiers:[
+        { t:1, minIlvl:65, min:2.2, max:3.4, w:22 }, // hp/sec
+        { t:2, minIlvl:35, min:1.4, max:2.1, w:45 },
+        { t:3, minIlvl:1,  min:0.6, max:1.3, w:85 }
+      ],
+      apply:(data, roll)=>{ data.hpRegen += roll; }
+    },
+    {
+      id:"s_critmulti",
+      name:"of the Assassin",
+      group:"critMultiAdd",
+      weight:55,
+      tiers:[
+        { t:1, minIlvl:70, min:0.35, max:0.55, w:20 }, // +35~55%p
+        { t:2, minIlvl:40, min:0.20, max:0.34, w:45 },
+        { t:3, minIlvl:1,  min:0.10, max:0.19, w:85 }
+      ],
+      apply:(data, roll)=>{ data.critMultiAdd += roll; }
+    }
+  ]
+};
+
+function rollTierValue(affix, ilvl){
+  const avail = affix.tiers.filter(t => ilvl >= t.minIlvl);
+  const picked = weightedPick(avail.map(t=>({ ...t, weight:t.w })));
+  const isInt = Number.isInteger(picked.min) && Number.isInteger(picked.max);
+  let v = picked.min + Math.random() * (picked.max - picked.min);
+  if(isInt) v = Math.floor(v);
+  else v = Math.round(v * 1000) / 1000;
+  return { tier:picked.t, value:v };
+}
+
+// ✅ rarity별 prefix/suffix 개수
+function affixCountsByRarity(r){
+  if(r === "common") return { pre:1, suf:0, total:1 };
+  if(r === "rare")   return { pre:1, suf:1, total:2 };
+  if(r === "epic")   return { pre:2, suf:1, total:3 };
+  return { pre:0, suf:0, total:0 };
+}
+
+// ✅ 실제 affix 굴리기(그룹 중복 방지)
+function rollAffixesPOE(rarity, ilvl){
+  const cnt = affixCountsByRarity(rarity);
+
+  const pickedPre = [];
+  const pickedSuf = [];
+  const usedGroups = new Set();
+
+  function pickFrom(pool, count){
+    const out = [];
+    let guard = 0;
+    while(out.length < count && guard++ < 500){
+      const cand = weightedPick(pool);
+      if(usedGroups.has(cand.group)) continue;
+      usedGroups.add(cand.group);
+      out.push(cand);
+    }
+    return out;
+  }
+
+  pickedPre.push(...pickFrom(AFFIX_DB.prefix, cnt.pre));
+  pickedSuf.push(...pickFrom(AFFIX_DB.suffix, cnt.suf));
+
+  // ✅ affix 결과(티어/롤 포함) 만들기
+  const rolled = [];
+  for(const a of pickedPre){
+    const rr = rollTierValue(a, ilvl);
+    rolled.push({ kind:"prefix", affix:a, tier:rr.tier, value:rr.value });
+  }
+  for(const a of pickedSuf){
+    const rr = rollTierValue(a, ilvl);
+    rolled.push({ kind:"suffix", affix:a, tier:rr.tier, value:rr.value });
+  }
+
+  return rolled;
+}
+
+// ✅ “장비/아이템 데이터” 기본 틀 (gearDelta로 합치기 쉬운 형태)
+function makeEmptyItemData(){
+  return {
+    dmgMul: 1,
+    ultiMul: 1,
+    rangeMul: 1,
+    spdMul: 1,          // ✅ 추가
+    armorAdd: 0,
+    maxHpAdd: 0,
+    hpRegen: 0,
+    critChanceAdd: 0,
+    critMultiAdd: 0
+  };
+}
+// ✅ baseData + affixData 합쳐서 최종 적용용 totalData 만들기
+function mergeItemData(baseData, affixData){
+  const out = makeEmptyItemData();
+
+  // mul 계열: 곱
+  out.dmgMul   = (baseData.dmgMul   ?? 1) * (affixData.dmgMul   ?? 1);
+  out.ultiMul  = (baseData.ultiMul  ?? 1) * (affixData.ultiMul  ?? 1);
+  out.rangeMul = (baseData.rangeMul ?? 1) * (affixData.rangeMul ?? 1);
+  out.spdMul   = (baseData.spdMul   ?? 1) * (affixData.spdMul   ?? 1); // ✅ 추가
+
+  // add 계열: 합
+  out.armorAdd      = (baseData.armorAdd      ?? 0) + (affixData.armorAdd      ?? 0);
+  out.maxHpAdd      = (baseData.maxHpAdd      ?? 0) + (affixData.maxHpAdd      ?? 0);
+  out.hpRegen       = (baseData.hpRegen       ?? 0) + (affixData.hpRegen       ?? 0);
+  out.critChanceAdd = (baseData.critChanceAdd ?? 0) + (affixData.critChanceAdd ?? 0);
+  out.critMultiAdd  = (baseData.critMultiAdd  ?? 0) + (affixData.critMultiAdd  ?? 0);
+
+  return out;
+}
+
+// ✅ 아이템 baseData 계산(카오스에서 base 유지하려고 분리)
+function buildBaseDataFromItemId(itemId){
+  const base = makeEmptyItemData();
+
+  if(itemId === "dmg_up"){
+    const v = Math.floor(8 + level * 1.2 + mapTier * 1.5);
+    base.dmgMul *= (1 + v/100);
+
+  }else if(itemId === "ulti_up"){
+    const v = Math.floor(12 + level * 1.5 + mapTier * 2);
+    base.ultiMul *= (1 + v/100);
+
+  }else if(itemId === "hp"){
+    const v = Math.floor(15 + level*3 + mapTier*4);
+    base.maxHpAdd += v;
+
+  }else if(itemId === "armor"){
+    const v = Math.floor(5 + mapTier*2);
+    base.armorAdd += v;
+
+  }else if(itemId === "ring_crit"){
+    // 치확/치피 링 베이스
+    const cc = (0.015 + mapTier*0.002 + level*0.0006);   // 대충 스케일
+    const cm = (0.10  + mapTier*0.01  + level*0.002);    // 대충 스케일
+    base.critChanceAdd += cc;
+    base.critMultiAdd  += cm;
+
+  }else if(itemId === "ring_regen"){
+    // 재생/체력 링 베이스
+    const r = (0.6 + mapTier*0.08 + level*0.03);
+    const hp = Math.floor(6 + mapTier*2 + level*1.2);
+    base.hpRegen += r;
+    base.maxHpAdd += hp;
+
+  }else if(itemId === "ring_speed"){
+    // 이속 링 베이스
+    const ms = Math.floor(6 + mapTier*1.2 + level*0.8); // %
+    base.spdMul *= (1 + ms/100);
+  }
+
+  return base;
+}
+
+// ✅ 아이템 적용(gear로 반영)
+function applyItemDataToGear(data){
+  // mul은 applyGearDelta에서 곱 처리됨
+  applyGearDelta({
+    dmgMul: data.dmgMul,
+    ultiMul: data.ultiMul,
+    rangeMul: data.rangeMul,
+    spdMul: data.spdMul,         // ✅ 추가
+    atkSpdMul: data.atkSpdMul,
+    armorAdd: data.armorAdd,
+    maxHpAdd: data.maxHpAdd,
+    hpRegen: data.hpRegen,
+    critChanceAdd: data.critChanceAdd,
+    critMultiAdd: data.critMultiAdd
+  });
+}
+// ✅ 드랍 테이블(POE식 base + affix 시스템용)
+const ITEM_POOL = [
+  {
+    id:"dmg_up",
+    slot:"weapon",
+    name:"강화된 일격",
+    rarity:"common",
+    descGen:(d)=>`평타 피해 +${Math.round(((d.dmgMul ?? 1)-1)*100)}%`,
+  },
+  {
+    id:"ulti_up",
+    slot:"weapon",
+    name:"폭발 강화",
+    rarity:"common",
+    descGen:(d)=>`궁극기 피해 +${Math.round(((d.ultiMul ?? 1)-1)*100)}%`,
+  },
+  {
+    id:"hp",
+    slot:"chest",
+    name:"생명의 정수",
+    rarity:"rare",
+    descGen:(d)=>`최대 체력 +${Math.floor(d.maxHpAdd ?? 0)}`,
+  },
+  {
+    id:"armor",
+    slot:"helm",
+    name:"철벽 갑옷",
+    rarity:"rare",
+    descGen:(d)=>`방어력 +${Math.floor(d.armorAdd ?? 0)}`,
+  },
+  {
+    id:"ring_crit",
+    slot:"ring",
+    name:"치명 반지",
+    rarity:"rare",
+    descGen:(d)=>`치확 +${Math.round((d.critChanceAdd ?? 0)*100)}% / 치피 +${Math.round((d.critMultiAdd ?? 0)*100)}%`,
+  },
+  {
+    id:"ring_regen",
+    slot:"ring",
+    name:"생명 반지",
+    rarity:"common",
+    descGen:(d)=>`재생 +${(d.hpRegen ?? 0).toFixed(2)}/s / 최대체력 +${Math.floor(d.maxHpAdd ?? 0)}`,
+  },
+  {
+    id:"ring_speed",
+    slot:"ring",
+    name:"질주 반지",
+    rarity:"common",
+    descGen:(d)=>`이속 +${Math.round(((d.spdMul ?? 1)-1)*100)}%`,
+  }
+];
+
+/* ============================= */
+/* ✅ 전설(Unique) 시스템         */
+/* ============================= */
+let ownedUniques = [];   // { id, name, desc, rarity, applyStat?, onEvent? }
+let uniqueState = {};    // 전설별 쿨/스택 등
+
+function emitEvent(type, payload){
+  for(const u of ownedUniques){
+    if(u.onEvent) u.onEvent(type, payload);
+  }
+}
+
+// ✅ 템플릿 -> 인스턴스 복제
+function cloneLegendary(template){
+  return {
+    id: template.id,
+    name: template.name,
+    rarity: template.rarity ?? "legendary",
+    desc: template.desc ?? "",
+    applyStat: template.applyStat,
+    onEvent: template.onEvent,
+  };
+}
+
+// ✅ 획득
+function acquireLegendary(template, ilvl){
+  if(ownedUniques.some(u => u.id === template.id)){
+    shake = Math.max(shake, 6);
+    return;
+  }
+
+  const u = cloneLegendary(template);
+
+  if(u.applyStat) u.applyStat();
+  ownedUniques.push(u);
+
+  inventory.push({
+    id: u.id,
+    slot: "unique",
+    name: u.name,
+    rarity: "legendary",
+    ilvl,
+    isUnique: true,
+    uniqueRef: u,
+    data: null,
+    affixes: []
+  });
+
+  recalcFromGear();
+}
+
+// ✅ 전설 템플릿 풀
+const LEGENDARY_POOL = [
+  {
+    id:"unique_thunderstep",
+    name:"천둥걸음 (Thunderstep)",
+    rarity:"legendary",
+    desc:"적 처치 시 번개가 주변으로 연쇄 (쿨 0.8초)",
+    applyStat(){
+      applyGearDelta({ dmgMul: 1.10 });
+    },
+    onEvent(type, p){
+      if(type !== "kill") return;
+
+      const now = frameCount;
+      const key = this.id + "_cd";
+      const cd = uniqueState[key] ?? 0;
+      if(now < cd) return;
+      uniqueState[key] = now + 48;
+
+      const cx = p.x, cy = p.y;
+      let hits = 0;
+
+      for(const e of enemies){
+        if(e.hp <= 0) continue;
+        if(e.type === "boss" && e.dead) continue;
+
+        const dx = e.x - cx, dy = e.y - cy;
+        if(dx*dx + dy*dy > 200*200) continue;
+
+        e.hp -= baseDamage * 0.65;
+        spawnHitBlood(e.x, e.y, 8);
+
+        if(particles.length < 260){
+          for(let i=0;i<6;i++){
+            particles.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:18 });
+          }
+        }
+
+        hits++;
+        if(hits >= 4) break;
+      }
+
+      pruneDeadEnemies();
+    }
+  },
+  {
+    id:"unique_oni_aegis",
+    name:"오니의 수호 (Oni Aegis)",
+    rarity:"legendary",
+    desc:"피격 시 보호막 1회 생성 (피해 35% 감소 느낌, 2초, 쿨 6초)",
+    applyStat(){
+      player.baseArmor += 4;
+      player.baseMaxHp += 20;
+      player.hp += 20;
+    },
+    onEvent(type, p){
+      if(type !== "takeDamage") return;
+
+      const now = frameCount;
+      const cdKey = this.id + "_cd";
+      if((uniqueState[cdKey] ?? 0) > now) return;
+
+      applyBuff(player, "armor", 30, 120, "oni_aegis", "add");
+      uniqueState[cdKey] = now + 360;
+
+      shake = Math.max(shake, 12);
+      for(let i=0;i<22;i++){
+        particles.push({ x:player.x, y:player.y, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8, life:22 });
+      }
+    }
+  },
+  {
+    id:"unique_bloodkatana",
+    name:"혈귀의 도 (Blood Katana)",
+    rarity:"legendary",
+    desc:"타격 시 20% 확률로 출혈 장판 생성(3초). 장판은 초당 피해 + 흡혈",
+    applyStat(){
+      baseDamageBase *= 1.08;
+      recalcFromGear();
+    },
+    onEvent(type, p){
+      if(type !== "hit") return;
+      if(Math.random() > 0.20) return;
+
+      const x = p.enemy.x;
+      const y = p.enemy.y;
+
+      fireZones.push({
+        x, y,
+        radius:60,
+        life:180,
+        tick:0,
+        damage: Math.max(2, baseDamage * 0.18),
+        isBleed:true
+      });
+    }
+  }
+];
+
+function pickUnique(list, n){
+  const out = [];
+  const copy = list.slice();
+  while(out.length < n && copy.length){
+    const idx = (Math.random() * copy.length) | 0;
+    out.push(copy.splice(idx,1)[0]);
+  }
+  return out;
+}
+
+// ✅ 확률
+function rollRarity(){
+  const t = mapTier;
+  const legendary = clamp(0.004 + (t-1)*0.0003, 0.004, 0.025);
+  const epic = clamp(0.03 + (t-1)*0.002, 0.03, 0.08);
+  const rare = clamp(0.18 + (t-1)*0.004, 0.18, 0.32);
+
+  const r = Math.random();
+  if(r < legendary) return "legendary";
+  if(r < legendary + epic) return "epic";
+  if(r < legendary + epic + rare) return "rare";
+  return "common";
+}
+
+function pickItemsForChoice(count=3){
+  const rarity = rollRarity();
+
+  if(rarity === "legendary"){
+    const picks = [];
+    let guard = 0;
+    while(picks.length < count && guard++ < 200){
+      const it = LEGENDARY_POOL[(Math.random()*LEGENDARY_POOL.length)|0];
+      if(!it) continue;
+      if(picks.some(p=>p.id===it.id)) continue;
+      picks.push(it);
+    }
+    return picks;
+  }
+
+  const candidates = ITEM_POOL.filter(it => it.rarity === rarity);
+  const fallback = ITEM_POOL;
+
+  let picks = [];
+  let guard = 0;
+  while(picks.length < count && guard++ < 200){
+    const src = (Math.random() < 0.85 ? candidates : fallback);
+    const it = src[(Math.random()*src.length)|0];
+    if(!it) continue;
+    if(picks.some(p=>p.id===it.id)) continue;
+    picks.push(it);
+  }
+  while(picks.length < count){
+    const it = fallback[(Math.random()*fallback.length)|0];
+    if(!picks.some(p=>p.id===it.id)) picks.push(it);
+  }
+  return picks;
+}
+
+// ✅ 몹 죽을 때 드랍 생성
+function spawnLoot(x, y, source="mob"){
+  if(loots.length > 25) loots.splice(0, loots.length-25);
+
+  const choices = pickItemsForChoice(3);
+  loots.push({
+    x, y,
+    r: 14,
+    ttl: 60*45,
+    choices,
+    taken: false,
+    source
+  });
+}
+
+function getNearbyLoot(){
+  for(const L of loots){
+    if(L.taken) continue;
+    const dx = L.x - player.x;
+    const dy = L.y - player.y;
+    const rr = (L.r + player.radius + 18);
+    if(dx*dx + dy*dy <= rr*rr) return L;
+  }
+  return null;
+}
+
+function openLootChoice(L){
+  if(!L || L.taken) return;
+   pauseGame({ dim: 0.60, blur: 2 }); 
+  lootOverlayOpen = true;
+  pendingLoot = L;
+
+  lootOverlay.style.display = "flex";
+  lootCardsEl.innerHTML = "";
+
+  L.choices.forEach((it)=>{
+    const card = document.createElement("div");
+    card.className = `lootCard ${it.rarity}`;
+
+    const ilvl = getItemLevel();
+    const pick = { it, ilvl };
+
+    if(it.rarity === "legendary"){
+      pick.kind = "legendary";
+      pick.shownName = it.name;
+      pick.shownDesc = it.desc;
+    }else{
+      pick.kind = "normal";
+      pick.baseData = buildBaseDataFromItemId(it.id);
+      pick.affixes = rollAffixesPOE(it.rarity, ilvl);
+
+      const affixData = makeEmptyItemData();
+      for(const a of pick.affixes){
+        a.affix.apply(affixData, a.value);
+      }
+
+      pick.affixData = affixData;
+      pick.totalData = mergeItemData(pick.baseData, pick.affixData);
+
+      const preNames = pick.affixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+      const sufNames = pick.affixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+
+      pick.baseName = it.name;
+        pick.baseId = it.id;
+      let nm = pick.baseName;
+      if(preNames.length) nm = preNames.join(" ") + " " + nm;
+      if(sufNames.length) nm = nm + " " + sufNames.join(" ");
+      pick.name = nm;
+
+      pick.shownName = pick.name;
+      pick.shownDesc = it.descGen ? it.descGen(pick.totalData) : (it.desc || "");
+    }
+
+    card.innerHTML = `
+      <div class="name">[${it.rarity.toUpperCase()}] ${pick.shownName}</div>
+      <div class="desc">${pick.shownDesc}</div>
+      <button type="button">이걸 선택</button>
+    `;
+
+   card.querySelector("button").addEventListener("click", ()=>{
+  if(pick.kind === "legendary"){
+    acquireLegendary(pick.it, pick.ilvl);
+  } else {
+    // ✅ pick으로 실제 아이템 인스턴스 만들기
+    const chosen = {
+      id: pick.baseId,
+      baseId: pick.baseId,
+      baseName: pick.baseName,
+      name: pick.name,
+      rarity: pick.it.rarity,
+      slot: pick.it.slot,      // weapon/helm/chest/ring
+      ilvl: pick.ilvl,
+
+      isUnique: false,
+      data: pick.totalData,    // 호환용(기존 코드가 data도 참조함)
+      totalData: pick.totalData,
+      baseData: pick.baseData,
+      affixData: pick.affixData,
+      affixes: pick.affixes,
+      shownDesc: pick.shownDesc
+    };
+
+    inventory.push(chosen);
+    if(invOpen) renderInventory();
+  }
+
+  L.taken = true;
+  closeLootChoice();
+  shake = Math.max(shake, 10);
+});
+
+    lootCardsEl.appendChild(card);
+  });
+}
+
+function closeLootChoice(){
+  lootOverlayOpen = false;
+  pendingLoot = null;
+  lootOverlay.style.display = "none";
+  resumeGame();
+}
+
+function updateLoots(){
+  for(let i=loots.length-1;i>=0;i--){
+    const L = loots[i];
+    if(L.taken){ loots.splice(i,1); continue; }
+    L.ttl--;
+    if(L.ttl <= 0) loots.splice(i,1);
+  }
+}
+
+function drawLoots(){
+  if(loots.length === 0) return;
+
+  ctx.save();
+  for(const L of loots){
+    if(L.taken) continue;
+
+    const pulse = 0.5 + 0.5*Math.sin(frameCount*0.15);
+    ctx.globalAlpha = 0.75 + pulse*0.25;
+
+    ctx.fillStyle = "rgba(80,140,255,0.25)";
+    ctx.beginPath();
+    ctx.arc(L.x, L.y, L.r + 10 + pulse*6, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = "rgba(40,120,255,0.9)";
+    ctx.beginPath();
+    ctx.arc(L.x, L.y, L.r, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 16px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("!", L.x, L.y+1);
+  }
+  ctx.restore();
+}
+
+/* ============================= */
+/* ✅ POE식 장비 슬롯 / 인벤토리  */
+/* ============================= */
+const EQUIP_SLOTS = ["weapon","helm","chest","ring"];
+let equipment = { weapon:null, helm:null, chest:null, ring:null };
+
+let inventory = [];
+let selectedInvIndex = -1;
+
+// ✅ 화폐(카오스 오브)
+let chaosOrbs = 2;
+
+let orbUIState = { cx:0, cy:0, centerR:24, ready:false };
+let particles=[];
+let bloodPools=[];
+let shake=0;
+let xp = 0;
+let xpToNext = 120;
+let level = 1;
+let gameOver = false;
+let orbFlash = 0;
+let flashEffect = 0;
+
+let baseDamageBase = 20;
+let ultiDamageBase = 40;
+
+let baseDamage = baseDamageBase;
+let ultiDamage = ultiDamageBase;
+
+player.gear = {
+  dmgMul: 1,
+  ultiMul: 1,
+  spdMul: 1,
+  atkSpdMul: 1,
+  rangeMul: 1,
+  armorAdd: 0,
+  maxHpAdd: 0,
+  hpRegen: 0,
+  critChanceAdd: 0,
+  critChanceMul: 1,
+  critMultiAdd: 0,
+};
+
+function recalcFromGear(){
+  baseDamage = baseDamageBase * (player.gear.dmgMul ?? 1);
+  ultiDamage = ultiDamageBase * (player.gear.ultiMul ?? 1);
+  updateBuffs(player);
+  player.hp = Math.min(player.maxHp, player.hp);
+}
+
+function applyGearDelta(delta){
+  for(const k in delta){
+    const v = delta[k];
+    if(typeof v !== "number") continue;
+    if(k.endsWith("Mul")){
+      player.gear[k] = (player.gear[k] ?? 1) * v;
+    }else{
+      player.gear[k] = (player.gear[k] ?? 0) + v;
+    }
+  }
+  recalcFromGear();
+}
+
+let levelParticles = [];
+let arrows = [];
+let bloodParticles = [];
+let fireZones = [];
+let frameCount = 0;
+
+// ✅ 누락 방지 전역
+let killCount = 0;
+let killsAtLevelStart = 0;
+let killsForNextLevel = 20;
+let explosionActive = false;
+let bossSpawned = false;
+let bossTimer = 0;
+let bossInterval = 45 * 60;
+
+/* ===== 맵티어 ===== */
+let mapTier = 1;
+let mapSeed = 0;
+let mapRun = {
+  tier: 1,
+  seed: 0,
+  packsToClear: 10,
+  clearedPacks: 0,
+  bossSpawned: false,
+  bossDefeated: false,
+};
+
+let portal = {
+  active: false,
+  x: 0,
+  y: 0,
+  r: 32,
+  hold: 0,
+  holdNeed: 25
+};
+let bossRoom = { x:0, y:0, w:0, h:0, cx:0, cy:0, doorX:0, doorY:0 };
+
+/* ===== 입력 ===== */
+let joyDX=0, joyDY=0;
+let attacking=false;
+let attackFrame=0;
+let keys = {};
+
+window.addEventListener("keydown", e=>{ keys[e.key] = true; });
+window.addEventListener("keyup", e=>{ keys[e.key] = false; });
+
+const pad = document.getElementById("movePad");
+const stick = document.getElementById("stick");
+const attackBtn = document.getElementById("attackBtn");
+const invBtn = document.getElementById("invBtn");
+
+let joyActive=false;
+
+function bossDeathSound(){
+  let now = audioCtx.currentTime;
+
+  let o1 = audioCtx.createOscillator();
+  let g1 = audioCtx.createGain();
+  o1.type = "sawtooth";
+  o1.frequency.setValueAtTime(220, now);
+  o1.frequency.exponentialRampToValueAtTime(45, now + 0.6);
+  g1.gain.setValueAtTime(0.25, now);
+  g1.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+  o1.connect(g1); g1.connect(audioCtx.destination);
+  o1.start(now); o1.stop(now + 0.65);
+
+  let o2 = audioCtx.createOscillator();
+  let g2 = audioCtx.createGain();
+  o2.type = "square";
+  o2.frequency.setValueAtTime(900, now + 0.05);
+  o2.frequency.exponentialRampToValueAtTime(180, now + 0.18);
+  g2.gain.setValueAtTime(0.12, now + 0.05);
+  g2.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+  o2.connect(g2); g2.connect(audioCtx.destination);
+  o2.start(now + 0.05); o2.stop(now + 0.22);
+}
+
+function setStickByVector(vx, vy){
+  const r = pad.getBoundingClientRect();
+  const max = Math.min(r.width, r.height) * 0.33;
+  let d = Math.hypot(vx, vy) || 1;
+  if(d > max){ vx *= max/d; vy *= max/d; }
+
+  const sw = stick.offsetWidth || 40;
+  const sh = stick.offsetHeight || 40;
+
+  stick.style.left = (r.width/2 - sw/2 + vx) + "px";
+  stick.style.top  = (r.height/2 - sh/2 + vy) + "px";
+
+  joyDX = vx / max;
+  joyDY = vy / max;
+
+  if(Math.abs(vx) > Math.abs(vy))
+    player.dir = vx > 0 ? "right" : "left";
+  else
+    player.dir = vy > 0 ? "down" : "up";
+}
+
+function handlePadMove(clientX, clientY){
+  const r = pad.getBoundingClientRect();
+  const cx = r.left + r.width/2;
+  const cy = r.top + r.height/2;
+  const vx = clientX - cx;
+  const vy = clientY - cy;
+  setStickByVector(vx, vy);
+}
+
+pad.addEventListener("touchstart", (e)=>{
+  joyActive = true;
+  handlePadMove(e.touches[0].clientX, e.touches[0].clientY);
+},{passive:false});
+
+pad.addEventListener("touchmove", (e)=>{
+  if(!joyActive) return;
+  handlePadMove(e.touches[0].clientX, e.touches[0].clientY);
+},{passive:false});
+
+pad.addEventListener("touchend", ()=>{
+  joyActive=false; joyDX=joyDY=0;
+  const r = pad.getBoundingClientRect();
+  const sw = stick.offsetWidth || 40;
+  const sh = stick.offsetHeight || 40;
+  stick.style.left = (r.width/2 - sw/2) + "px";
+  stick.style.top  = (r.height/2 - sh/2) + "px";
+});
+
+/* ===== attackBtn = 평타만 ===== */
+attackBtn.addEventListener("touchstart", ()=>{
+  attacking = true;
+  attackFrame = 0;
+  swingSound();
+  attackBtn.classList.add("active");
+},{passive:true});
+
+attackBtn.addEventListener("touchend", ()=>{
+  attackBtn.classList.remove("active");
+},{passive:true});
+
+/* ============================= */
+/* ✅ (추가) 인벤 버튼(가방 아이콘) */
+/* ============================= */
+function stopEvt(e){
+  if(!e) return;
+  if(e.preventDefault) e.preventDefault();
+  if(e.stopPropagation) e.stopPropagation();
+}
+invBtn.addEventListener("touchstart", (e)=>{ stopEvt(e); openInventory(); }, {passive:false});
+invBtn.addEventListener("mousedown", (e)=>{ stopEvt(e); openInventory(); });
+
+/* ===== 유틸 ===== */
+function rollWeaponDamage(){
+  const w = player.weapon;
+  return w.min + Math.random() * (w.max - w.min);
+}
+
+function getCritChance(){
+  const w = player.weapon;
+  const g = player.gear || {};
+
+  let chance = (w.critChance ?? 0);
+  chance += (g.critChanceAdd ?? 0);
+  chance *= (g.critChanceMul ?? 1);
+  return clamp(chance, 0, 0.95);
+}
+
+function getCritMulti(){
+  const w = player.weapon;
+  const g = player.gear || {};
+  const multi = (w.critMulti ?? 1.5) + (g.critMultiAdd ?? 0);
+  return Math.max(1.05, multi);
+}
+
+function applyCrit(dmg){
+  const chance = getCritChance();
+  const multi = getCritMulti();
+  const isCrit = (Math.random() < chance);
+  return { dmg: isCrit ? dmg * multi : dmg, isCrit, chance, multi };
+}
+
+function defaultBuffStats(){
+  return {
+    dmgMul: 1,
+    spdMul: 1,
+    atkSpdMul: 1,
+    rangeMul: 1,
+    meleeRangeMul: 1,
+    aoeMul: 1,
+    ultiAoeMul: 1,
+    armorAdd: 0,
+    armorMul: 1,
+    maxHpMul: 1,
+    maxHpAdd: 0,
+    hpRegen: 0,
+  };
+}
+
+function applyBuff(target, type, value, duration, source="", mode="mul"){
+  if(!target.activeBuffs) target.activeBuffs = [];
+  const key = type + "|" + source + "|" + mode;
+  const b = target.activeBuffs.find(x => x.key === key);
+
+  if(b){
+    b.value = value;
+    b.duration = Math.max(b.duration, duration);
+  }else{
+    target.activeBuffs.push({ key, type, value, duration, mode });
+  }
+}
+
+function mapBuffTypeToStat(type){
+  if(type === "damage")   return "dmgMul";
+  if(type === "speed")    return "spdMul";
+  if(type === "atkSpeed") return "atkSpdMul";
+  if(type === "range")        return "rangeMul";
+  if(type === "meleeRange")   return "meleeRangeMul";
+  if(type === "aoe")          return "aoeMul";
+  if(type === "ultiAoe")      return "ultiAoeMul";
+  if(type === "armor")        return "armorAdd";
+  if(type === "armorMul")     return "armorMul";
+  if(type === "maxHpMul")     return "maxHpMul";
+  if(type === "maxHp")        return "maxHpAdd";
+  if(type === "hpRegen")      return "hpRegen";
+  return null;
+}
+
+function updateBuffs(target){
+  if(!target.activeBuffs) target.activeBuffs = [];
+  target.buffs = defaultBuffStats();
+
+  // ✅ (중요) 플레이어는 "영구 gear"를 버프 기본값에 합쳐서 사용
+  if(target === player){
+    // mul
+    target.buffs.dmgMul   *= (player.gear.dmgMul ?? 1);
+    // ultiMul은 데미지 계산에서 직접 사용하지만, 여기서 따로 넣진 않음(혼동 방지)
+    target.buffs.rangeMul *= (player.gear.rangeMul ?? 1);
+    // add
+    // add / mul (gear 합산)
+    target.buffs.spdMul    *= (player.gear.spdMul ?? 1);
+    target.buffs.atkSpdMul *= (player.gear.atkSpdMul ?? 1);
+
+    target.buffs.armorAdd += (player.gear.armorAdd ?? 0);
+    target.buffs.maxHpAdd += (player.gear.maxHpAdd ?? 0);
+    target.buffs.hpRegen  += (player.gear.hpRegen ?? 0);
+}
+  for(let i = target.activeBuffs.length - 1; i >= 0; i--){
+    const b = target.activeBuffs[i];
+    b.duration--;
+    if(b.duration <= 0){
+      target.activeBuffs.splice(i,1);
+      continue;
+    }
+
+    const stat = mapBuffTypeToStat(b.type);
+    if(!stat) continue;
+
+    if(b.mode === "mul"){
+      if(target.buffs[stat] !== undefined) target.buffs[stat] *= b.value;
+    }else if(b.mode === "add"){
+      if(target.buffs[stat] !== undefined) target.buffs[stat] += b.value;
+    }
+  }
+
+  if(target === player){
+    const b = target.buffs;
+    const newMax = Math.max(1, Math.floor(target.baseMaxHp * (b.maxHpMul ?? 1) + (b.maxHpAdd ?? 0)));
+    target.maxHp = newMax;
+    if(target.hp > target.maxHp) target.hp = target.maxHp;
+    target.armor = Math.max(0, (target.baseArmor + (b.armorAdd ?? 0)) * (b.armorMul ?? 1));
+  }
+}
+
+function pruneDeadEnemies(){
+  enemies = enemies.filter(e =>
+    (e.hp > 0) ||
+    (e.type === "boss" && e.dead && e.deathTimer > 0)
+  );
+  for(const p of packs){
+    p.enemies = p.enemies.filter(e => e.hp > 0 || (e.type==="boss" && e.dead && e.deathTimer > 0));
+  }
+}
+
+function getRandomVisibleAliveEnemy(){
+  const visible = enemies.filter(e =>
+    e.hp > 0 &&
+    !(e.type === "boss" && e.dead) &&
+    isEnemyOnScreen(e)
+  );
+  if(visible.length === 0) return null;
+  return visible[(Math.random() * visible.length) | 0];
+}
+
+function getRandomAliveEnemy(){
+  const alive = enemies.filter(e => e.hp > 0 && !(e.type === "boss" && e.dead));
+  if(alive.length === 0) return null;
+  return alive[(Math.random() * alive.length) | 0];
+}
+
+function getLevelPenalty(playerLv, monsterLv){
+  const diff = monsterLv - playerLv;
+  if(diff >= 0) return 1 + diff * 0.04;
+  if(diff <= -6) return 0.1;
+  return 1 + diff * 0.12;
+}
+
+/* ===== POE 맵핑: 티어 스케일/맵 생성 ===== */
+function tierScale(t){
+  const hpMul  = 1 + (t-1) * 0.22;
+  const dmgMul = 1 + (t-1) * 0.16;
+  const spdMul = 1 + Math.min(0.25, (t-1) * 0.02);
+  const eliteChance = clamp(0.06 + (t-1) * 0.008, 0.06, 0.22);
+  const eliteHpMul = 2.4;
+  const eliteDmgMul = 1.9;
+  return { hpMul, dmgMul, spdMul, eliteChance, eliteHpMul, eliteDmgMul };
+}
+
+function giveXP(enemy){
+  let base = 0;
+  if(enemy.type === "mage") base = 14;
+  else if(enemy.type === "archer") base = 12;
+  else if(enemy.type === "melee") base = 10;
+  else if(enemy.type === "boss") base = 200 * mapTier;
+
+  if(enemy.isElite) base *= 3;
+  if(enemy.isLeader) base *= 4;
+
+  const levelMul = getLevelPenalty(level, mapTier);
+  const mapMul = 1 + (mapTier - 1) * 0.08;
+
+  const finalXP = Math.floor(base * levelMul * mapMul);
+  xp += finalXP;
+  checkLevelUp();
+}
+
+function makeEnemyStatsByTier(type, t){
+  const s = tierScale(t);
+
+  let baseHp, baseDmg, baseSpd;
+  if(type === "mage"){
+    baseHp  = 42;
+    baseDmg = 9;
+    baseSpd = 0.48;
+  }else if(type === "archer"){
+    baseHp  = 30;
+    baseDmg = 14;
+    baseSpd = 0.55;
+  }else{
+    baseHp  = 55;
+    baseDmg = 11;
+    baseSpd = 0.85;
+  }
+
+  return {
+    hp:  baseHp  * s.hpMul,
+    dmg: baseDmg * s.dmgMul,
+    spd: baseSpd * s.spdMul,
+    eliteChance: s.eliteChance,
+    eliteHpMul: s.eliteHpMul,
+    eliteDmgMul: s.eliteDmgMul
+  };
+}
+
+function makeBossStatsByTier(t){
+  const baseHp  = 900;
+  const baseDmg = 26;
+  const baseSpd = 0.62;
+
+  const bossHp  = baseHp  * (1 + (t-1)*0.28);
+  const bossDmg = baseDmg * (1 + (t-1)*0.18);
+  const bossSpd = baseSpd * (1 + Math.min(0.18, (t-1)*0.015));
+
+  return { bossHp, bossDmg, bossSpd };
+}
+
+function dist2(ax, ay, bx, by){
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx*dx + dy*dy;
+}
+
+function srand(seed){
+  let s = seed >>> 0;
+  return function(){
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function clearSpawnArea(cx, cy, radiusTiles=3){
+  const tx = Math.floor(cx / tileSize);
+  const ty = Math.floor(cy / tileSize);
+  for(let y=ty-radiusTiles; y<=ty+radiusTiles; y++){
+    for(let x=tx-radiusTiles; x<=tx+radiusTiles; x++){
+      if(x<=0||y<=0||x>=mapSize-1||y>=mapSize-1) continue;
+      map[y][x] = 0;
+    }
+  }
+}
+
+function carveBossRoomAndCorridor(){
+  const w = 7 + Math.floor(Math.random()*5);
+  const h = 7 + Math.floor(Math.random()*5);
+  const margin = 2;
+
+  const corner = (Math.random()*4)|0;
+  let x0, y0;
+
+  if(corner===0){ x0 = mapSize - margin - w; y0 = margin; }
+  if(corner===1){ x0 = margin; y0 = margin; }
+  if(corner===2){ x0 = margin; y0 = mapSize - margin - h; }
+  if(corner===3){ x0 = mapSize - margin - w; y0 = mapSize - margin - h; }
+
+  for(let y=y0; y<y0+h; y++){
+    for(let x=x0; x<x0+w; x++){
+      map[y][x] = 0;
+    }
+  }
+
+  const cx = Math.floor(mapSize/2), cy = Math.floor(mapSize/2);
+  const roomCx = x0 + (w>>1), roomCy = y0 + (h>>1);
+
+  let doorX = roomCx;
+  let doorY = roomCy;
+
+  if(Math.abs(roomCx - cx) > Math.abs(roomCy - cy)){
+    if(roomCx > cx){ doorX = x0;       doorY = roomCy; }
+    else           { doorX = x0+w-1;   doorY = roomCy; }
+  }else{
+    if(roomCy > cy){ doorY = y0;       doorX = roomCx; }
+    else           { doorY = y0+h-1;   doorX = roomCx; }
+  }
+
+  map[doorY][doorX] = 0;
+
+  const startX = Math.floor(player.x / tileSize);
+  const startY = Math.floor(player.y / tileSize);
+
+  let x = startX, y = startY;
+  const stepX = doorX > x ? 1 : -1;
+  while(x !== doorX){
+    map[y][x] = 0;
+    map[y-1] && (map[y-1][x] = 0);
+    map[y+1] && (map[y+1][x] = 0);
+    x += stepX;
+  }
+  const stepY = doorY > y ? 1 : -1;
+  while(y !== doorY){
+    map[y][x] = 0;
+    map[y][x-1] !== undefined && (map[y][x-1] = 0);
+    map[y][x+1] !== undefined && (map[y][x+1] = 0);
+    y += stepY;
+  }
+  map[doorY][doorX] = 0;
+
+  bossRoom = { x:x0, y:y0, w, h, cx:roomCx, cy:roomCy, doorX, doorY };
+}
+
+function buildEmptyMap(){
+  map = [];
+  for(let y=0; y<mapSize; y++){
+    let row = [];
+    for(let x=0; x<mapSize; x++){
+      if(x===0 || y===0 || x===mapSize-1 || y===mapSize-1) row.push(1);
+      else row.push(0);
+    }
+    map.push(row);
+  }
+}
+
+function placeRandomWalls(rng, wallCount){
+  for(let i=0;i<wallCount;i++){
+    const w = 2 + Math.floor(rng()*5);
+    const h = 2 + Math.floor(rng()*5);
+    const x0 = 1 + Math.floor(rng()*(mapSize-2-w));
+    const y0 = 1 + Math.floor(rng()*(mapSize-2-h));
+
+    const cx = Math.floor(mapSize/2);
+    const cy = Math.floor(mapSize/2);
+    if(Math.abs((x0 + (w>>1)) - cx) < 4 && Math.abs((y0 + (h>>1)) - cy) < 4){
+      continue;
+    }
+
+    for(let y=y0; y<y0+h; y++){
+      for(let x=x0; x<x0+w; x++){
+        if(x<=0||y<=0||x>=mapSize-1||y>=mapSize-1) continue;
+        map[y][x] = 1;
+      }
+    }
+  }
+}
+
+function buildReachableMaskFromPlayer(){
+  const startX = Math.floor(player.x / tileSize);
+  const startY = Math.floor(player.y / tileSize);
+
+  const vis = Array.from({length: mapSize}, ()=>Array(mapSize).fill(false));
+  if(!map[startY] || map[startY][startX] !== 0) return vis;
+
+  const q = [[startX, startY]];
+  vis[startY][startX] = true;
+
+  while(q.length){
+    const [x,y] = q.pop();
+    const nb = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+    for(const [nx,ny] of nb){
+      if(nx<=0||ny<=0||nx>=mapSize-1||ny>=mapSize-1) continue;
+      if(vis[ny][nx]) continue;
+      if(map[ny][nx] !== 0) continue;
+      vis[ny][nx] = true;
+      q.push([nx,ny]);
+    }
+  }
+  return vis;
+}
+
+function floodFillReachableFromPlayer(){
+  const startX = Math.floor(player.x / tileSize);
+  const startY = Math.floor(player.y / tileSize);
+  if(!map[startY] || map[startY][startX] !== 0) return 0;
+
+  const vis = Array.from({length: mapSize}, ()=>Array(mapSize).fill(false));
+  const q = [[startX,startY]];
+  vis[startY][startX] = true;
+  let count = 0;
+
+  while(q.length){
+    const [x,y] = q.pop();
+    count++;
+    const nb = [[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+    for(const [nx,ny] of nb){
+      if(nx<=0||ny<=0||nx>=mapSize-1||ny>=mapSize-1) continue;
+      if(vis[ny][nx]) continue;
+      if(map[ny][nx] !== 0) continue;
+      vis[ny][nx] = true;
+      q.push([nx,ny]);
+    }
+  }
+  return count;
+}
+
+function generateRandomMapForTier(tier){
+  const seed = (Date.now() ^ (tier*987654321)) >>> 0;
+  const rng = srand(seed);
+
+  for(let attempt=0; attempt<8; attempt++){
+    buildEmptyMap();
+
+    const wallCount = 22 + Math.floor(tier*2.2) + Math.floor(rng()*10);
+    placeRandomWalls(rng, wallCount);
+
+    clearSpawnArea(player.x, player.y, 3);
+
+    const reachable = floodFillReachableFromPlayer();
+    const totalFloor = (mapSize-2)*(mapSize-2);
+    if(reachable / totalFloor >= 0.55){
+      return seed;
+    }
+  }
+  buildEmptyMap();
+  clearSpawnArea(player.x, player.y, 4);
+  return seed;
+}
+
+function startNewMap(nextTier){
+  mapTier = nextTier;
+  mapRun.tier = nextTier;
+  mapRun.clearedPacks = 0;
+  mapRun.bossSpawned = false;
+  mapRun.bossDefeated = false;
+
+  mapRun.packsToClear = 8 + Math.floor(nextTier * 1.5);
+
+  portal.active = false;
+  portal.hold = 0;
+
+  enemies = [];
+  packs = [];
+  particles = [];
+  bloodPools = [];
+  bloodParticles = [];
+  arrows = [];
+  levelParticles = [];
+  fireZones = [];
+
+  spawnTimer = 0;
+  spawnInterval = 999999;
+  bossTimer = 0;
+
+  player.x = mapSize * tileSize / 2;
+  player.y = mapSize * tileSize / 2;
+
+  mapRun.seed = generateRandomMapForTier(nextTier);
+  carveBossRoomAndCorridor();
+  reachableMask = buildReachableMaskFromPlayer();
+
+  spawnMapPacks(nextTier);
+  spawnRandomBoss();
+
+  resize();
+}
+
+function spawnMapPacks(tier){
+  const rng = srand(mapRun.seed ^ 0xA53C9E1B);
+
+  const packCount = mapRun.packsToClear + 4 + Math.floor(tier*0.6);
+  for(let i=0;i<packCount;i++){
+    let placed = false;
+
+    for(let tries=0; tries<120; tries++){
+      const tx = 1 + Math.floor(rng()*(mapSize-2));
+      const ty = 1 + Math.floor(rng()*(mapSize-2));
+      if(map[ty][tx] !== 0) continue;
+      if(reachableMask && !reachableMask[ty][tx]) continue;
+
+      const px = tx*tileSize + tileSize/2;
+      const py = ty*tileSize + tileSize/2;
+
+      const dx = px - player.x, dy = py - player.y;
+      if(dx*dx + dy*dy < 260*260) continue;
+
+      let min = 25;
+      let max = 32;
+      if(tier >= 6){
+        min = 28 + Math.floor((tier-5) * 0.4);
+        max = 36 + Math.floor((tier-5) * 0.6);
+      }
+      if(tier >= 12){
+        min = 30 + Math.floor((tier-10) * 0.5);
+        max = 40 + Math.floor((tier-10) * 0.7);
+      }
+      max = Math.min(max, 45);
+
+      const count = min + Math.floor(rng() * (max - min + 1));
+      createPack(px, py, count);
+
+      placed = true;
+      break;
+    }
+    if(!placed){
+      // skip
+    }
+  }
+
+  for(const p of packs){
+    p.cleared = false;
+  }
+  linkNearbyPacks();
+}
+
+function linkNearbyPacks(){
+  const linkDist = 360;
+  const link2 = linkDist * linkDist;
+
+  const n = packs.length;
+  const parent = Array.from({length:n}, (_,i)=>i);
+  const find = (a)=>{ while(parent[a]!==a){ parent[a]=parent[parent[a]]; a=parent[a]; } return a; };
+  const union = (a,b)=>{ a=find(a); b=find(b); if(a!==b) parent[b]=a; };
+
+  for(let i=0;i<n;i++){
+    for(let j=i+1;j<n;j++){
+      const dx = packs[i].x - packs[j].x;
+      const dy = packs[i].y - packs[j].y;
+      if(dx*dx + dy*dy <= link2) union(i,j);
+    }
+  }
+
+  const rootToG = new Map();
+  let gid = 0;
+
+  for(let i=0;i<n;i++){
+    const r = find(i);
+    if(!rootToG.has(r)) rootToG.set(r, gid++);
+    packs[i].groupId = rootToG.get(r);
+    packs[i].groupCleared = false;
+  }
+}
+
+function activatePackGroup(groupId){
+  for(const p of packs){
+    if(p.groupId === groupId){
+      p.activated = true;
+      if(p.enemies.length === 0 && !p.cleared){
+        p.cleared = true;
+      }
+    }
+  }
+}
+
+function spawnPortal(x, y){
+  portal.active = true;
+  portal.x = x;
+  portal.y = y;
+  portal.hold = 0;
+
+  for(let i=0;i<90;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = 1 + Math.random()*5;
+    particles.push({
+      x: x + (Math.random()-0.5)*10,
+      y: y + (Math.random()-0.5)*10,
+      vx: Math.cos(a)*sp,
+      vy: Math.sin(a)*sp,
+      life: 30 + Math.floor(Math.random()*25)
+    });
+  }
+}
+
+function updatePortal(){
+  if(!portal.active) return;
+
+  const dx = player.x - portal.x;
+  const dy = player.y - portal.y;
+  const rr = (portal.r + player.radius + 8);
+  if(dx*dx + dy*dy < rr*rr){
+    portal.hold++;
+    if(portal.hold >= portal.holdNeed){
+      startNewMap(mapTier + 1);
+      return;
+    }
+  }else{
+    portal.hold = 0;
+  }
+}
+
+function drawPortal(){
+  if(!portal.active) return;
+
+  const pulse = 0.6 + 0.4*Math.sin(frameCount*0.15);
+  const r = portal.r + pulse*6;
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+
+  ctx.strokeStyle = "rgba(120,180,255,0.85)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(portal.x, portal.y, r, 0, Math.PI*2);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(80,140,255,0.18)";
+  ctx.beginPath();
+  ctx.arc(portal.x, portal.y, r-6, 0, Math.PI*2);
+  ctx.fill();
+
+  if(portal.hold > 0){
+    const t = clamp(portal.hold / portal.holdNeed, 0, 1);
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(portal.x, portal.y, r+8, -Math.PI/2, -Math.PI/2 + Math.PI*2*t);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+function spawnHitBlood(x, y, amount=10){
+  if(bloodParticles.length > 320) return;
+
+  for(let i=0;i<amount;i++){
+    bloodParticles.push({
+      x: x + (Math.random()-0.5)*6,
+      y: y + (Math.random()-0.5)*6,
+      vx: (Math.random()-0.5) * 6,
+      vy: (Math.random()-0.5) * 6,
+      size: Math.random()*3 + 1.5,
+      life: 22
+    });
+  }
+
+  if(bloodPools.length < 140){
+    bloodPools.push({
+      x: x + (Math.random()-0.5)*8,
+      y: y + (Math.random()-0.5)*8,
+      size: 5 + Math.random()*4,
+      life: 280
+    });
+  }
+}
+
+function startBossDeath(boss){
+  if(boss.dead) return;
+  if(!boss.xpGiven){
+    boss.xpGiven = true;
+    giveXP(boss);
+  }
+  boss.dead = true;
+  boss.deathTimer = 60;
+  boss.deathMax = 60;
+
+  shake = Math.max(shake, 60);
+  slowMotion = Math.max(slowMotion, 10);
+
+  spawnHitBlood(boss.x, boss.y, 40);
+
+  for(let i=0;i<140;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = 2 + Math.random()*8;
+    particles.push({
+      x: boss.x + (Math.random()-0.5)*10,
+      y: boss.y + (Math.random()-0.5)*10,
+      vx: Math.cos(a)*sp,
+      vy: Math.sin(a)*sp - (Math.random()*2),
+      life: 45 + Math.floor(Math.random()*25)
+    });
+  }
+
+  if(bloodPools.length < 140){
+    bloodPools.push({
+      x: boss.x,
+      y: boss.y,
+      size: 26,
+      life: 900
+    });
+  }
+
+  spawnLoot(boss.x, boss.y, "boss");
+  chaosOrbs++;
+  bossDeathSound();
+}
+
+function canMoveTo(x,y){
+  let left = Math.floor((x - player.radius) / tileSize);
+  let right = Math.floor((x + player.radius) / tileSize);
+  let top = Math.floor((y - player.radius) / tileSize);
+  let bottom = Math.floor((y + player.radius) / tileSize);
+
+  return (
+    map[top] && map[top][left] === 0 &&
+    map[top] && map[top][right] === 0 &&
+    map[bottom] && map[bottom][left] === 0 &&
+    map[bottom] && map[bottom][right] === 0
+  );
+}
+function canEnemyMoveTo(enemy, x, y){
+  let left = Math.floor((x - enemy.radius) / tileSize);
+  let right = Math.floor((x + enemy.radius) / tileSize);
+  let top = Math.floor((y - enemy.radius) / tileSize);
+  let bottom = Math.floor((y + enemy.radius) / tileSize);
+
+  return (
+    map[top] && map[top][left] === 0 &&
+    map[top] && map[top][right] === 0 &&
+    map[bottom] && map[bottom][left] === 0 &&
+    map[bottom] && map[bottom][right] === 0
+  );
+}
+function isFloorTile(tx, ty){ return !!(map[ty] && map[ty][tx] === 0); }
+function canSpawnEnemyAt(enemy, x, y){ return canEnemyMoveTo(enemy, x, y); }
+
+function resolvePlayerEnemyOverlap(){
+  const pad = 2;
+  for(const e of enemies){
+    if(e.type === "boss" && e.dead) continue;
+    if(e.hp <= 0) continue;
+    if(e.pack && !e.pack.activated) continue;
+
+    let dx = e.x - player.x;
+    let dy = e.y - player.y;
+    let dist = Math.hypot(dx, dy);
+
+    const minDist = player.radius + e.radius + pad;
+
+    if(dist === 0){
+      dx = (Math.random() - 0.5) * 0.01;
+      dy = (Math.random() - 0.5) * 0.01;
+      dist = Math.hypot(dx, dy);
+    }
+
+    if(dist < minDist){
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const push = (minDist - dist);
+
+      const ex = e.x + nx * push;
+      const ey = e.y + ny * push;
+
+      if(canEnemyMoveTo(e, ex, ey)){
+        e.x = ex; e.y = ey;
+      }else{
+        const px = player.x - nx * push;
+        const py = player.y - ny * push;
+        if(canMoveTo(px, player.y)) player.x = px;
+        if(canMoveTo(player.x, py)) player.y = py;
+      }
+    }
+  }
+}
+
+function damagePlayer(dmg, knockX, knockY){
+  if(player.invul > 0 || gameOver) return;
+
+  const armor = (player.armor ?? 0);
+  const reduced = dmg * (50 / (50 + Math.max(0, armor)));
+  const finalDmg = Math.max(1, Math.floor(reduced));
+
+  player.hp -= finalDmg;
+  emitEvent("takeDamage", { dmg: finalDmg });
+  player.invul = 25;
+  shake = Math.max(shake, 10);
+
+  let nx = player.x + knockX;
+  let ny = player.y + knockY;
+
+  if(canMoveTo(nx, player.y)) player.x = nx;
+  if(canMoveTo(player.x, ny)) player.y = ny;
+
+  if(player.hp <= 0) handleGameOver();
+}
+
+function enemyTryMeleeAttack(e){
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+  const reach = e.type === "boss" ? 70 : 42;
+
+  if(dist > reach){
+    e.attackFrame = 0;
+    return;
+  }
+
+  if(e.attackFrame === 0){
+    e.swingDir = dx < 0 ? -1 : 1;
+  }
+
+  const atkMul = (e.buffs?.atkSpdMul ?? 1);
+  e.attackFrame += atkMul;
+
+  if(e.attackFrame >= 12 && !e.hitDone){
+    e.hitDone = true;
+    const len = dist || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+    const kb = e.type === "boss" ? 30 : 18;
+    damagePlayer(e.damage, nx*kb, ny*kb);
+    hitSound();
+  }
+
+  if(e.attackFrame >= 25){
+    e.attackFrame = 0;
+    e.hitDone = false;
+  }
+}
+
+function spawnArrow(fromX, fromY, toX, toY, damage){
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const dist = Math.hypot(dx, dy) || 1;
+  const speed = 7.5;
+
+  arrows.push({
+    x: fromX,
+    y: fromY,
+    dx: dx/dist * speed,
+    dy: dy/dist * speed,
+    damage,
+    life: 240
+  });
+}
+
+function spawnFireZone(x, y, damage){
+  fireZones.push({ x, y, radius:55, life:180, tick:0, damage });
+}
+
+function spawnEnemyAt(ex, ey, pack){
+  let tileX = Math.floor(ex / tileSize);
+  let tileY = Math.floor(ey / tileSize);
+
+  if(!isFloorTile(tileX, tileY)) return;
+  if(!isFloorTile(tileX-1, tileY) || !isFloorTile(tileX+1, tileY) || !isFloorTile(tileX, tileY-1) || !isFloorTile(tileX, tileY+1)) return;
+  if(enemies.length >= 320) return;
+
+  let rand = Math.random();
+  let type = rand < 0.2 ? "mage" : rand < 0.5 ? "archer" : "melee";
+
+  const st = makeEnemyStatsByTier(type, mapTier);
+
+  let enemy = {
+    x: ex, y: ey,
+    radius: 14,
+    stun: 0,
+    invul: 0,
+    attackFrame: 0,
+    swingDir: 1,
+    type,
+    hp: st.hp,
+    speed: st.spd,
+    damage: st.dmg,
+    shootCooldown: 0,
+    castCooldown: 120,
+    pack
+  };
+
+  if(!canSpawnEnemyAt(enemy, ex, ey)) return;
+
+  if(Math.random() < st.eliteChance * 0.85){
+    enemy.isElite = true;
+    enemy.eliteColor = Math.random() < 0.5 ? "yellow" : "blue";
+    enemy.speed *= 1.5;
+    enemy.damage *= st.eliteDmgMul;
+    enemy.radius *= 1.2;
+    enemy.hp *= st.eliteHpMul;
+  }
+
+  enemies.push(enemy);
+  pack.enemies.push(enemy);
+}
+
+function spawnPackLeaderAt(ex, ey, pack){
+  const st = makeEnemyStatsByTier("melee", mapTier);
+
+  let leader = {
+    x: ex, y: ey,
+    radius: 18,
+    stun: 0,
+    invul: 0,
+    attackFrame: 0,
+    swingDir: 1,
+    type: "melee",
+    hp: st.hp * 3.2,
+    speed: st.spd * 1.08,
+    damage: st.dmg * 1.6,
+    shootCooldown: 0,
+    castCooldown: 120,
+    pack,
+    isLeader: true
+  };
+
+  if(!canSpawnEnemyAt(leader, ex, ey)) return;
+
+  enemies.push(leader);
+  pack.enemies.push(leader);
+}
+
+function spawnRandomBoss(){
+  if(enemies.some(e => e.type === "boss")) return;
+
+  const bx = bossRoom.cx * tileSize + tileSize/2;
+  const by = bossRoom.cy * tileSize + tileSize/2;
+
+  const tempBoss = { radius: 30 };
+  if(!canEnemyMoveTo(tempBoss, bx, by)) return;
+
+  const bst = makeBossStatsByTier(mapTier);
+
+  enemies.push({
+    x: bx, y: by,
+    radius: 30,
+    type: "boss",
+    maxHp: bst.bossHp,
+    hp: bst.bossHp,
+    speed: bst.bossSpd,
+    damage: bst.bossDmg,
+    stun: 0,
+    attackFrame: 0,
+    swordPulled: false,
+    phase2Used: false,
+    dashCooldown: 120,
+    cleaveCooldown: 160,
+    invul: 0,
+    phaseLock: 0
+  });
+}
+
+function createPack(cx, cy, count){
+  let pack = {
+    x: cx, y: cy,
+    enemies: [],
+    activated: false,
+    cleared: false,
+    groupId: -1,
+    groupCleared: false
+  };
+
+  spawnPackLeaderAt(cx, cy, pack);
+
+  const normalCount = Math.max(0, count - 1);
+  let tries = 0;
+
+  while(pack.enemies.length < (normalCount + 1) && tries < count * 8){
+    tries++;
+    let angle = Math.random()*Math.PI*2;
+    let radius = Math.random()*140;
+    let ex = cx + Math.cos(angle)*radius;
+    let ey = cy + Math.sin(angle)*radius;
+    spawnEnemyAt(ex, ey, pack);
+  }
+
+  packs.push(pack);
+}
+
+/* ===== 궁극기 ===== */
+function teleportTo(target){
+  spawnHitBlood(player.x, player.y, 18);
+  if(particles.length < 220){
+    for(let i=0;i<10;i++){
+      particles.push({ x: player.x, y: player.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 22 });
+    }
+  }
+
+  if(canMoveTo(target.x, target.y)){
+    player.x = target.x;
+    player.y = target.y;
+  }
+
+  spawnHitBlood(player.x, player.y, 22);
+  if(particles.length < 220){
+    for(let i=0;i<12;i++){
+      particles.push({ x: player.x, y: player.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 26 });
+    }
+  }
+
+  shake = Math.max(shake, 10);
+}
+
+/* ===== 보스 스킬 ===== */
+function bossEnterPhase2(boss){
+  boss.swordPulled = true;
+  boss.phase2Used = true;
+  boss.speed *= 1.25;
+  boss.damage *= 1.2;
+
+  boss.invul = 120;
+  boss.phaseLock = 36;
+
+  shake = 30;
+  bossUnsheatheSound();
+
+  for(let i=0;i<80;i++){
+    particles.push({ x: boss.x, y: boss.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 50 });
+  }
+}
+
+function bossDash(boss){
+  const dx = player.x - boss.x;
+  const dy = player.y - boss.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const nx = dx / dist;
+  const ny = dy / dist;
+
+  const dashDist = 220;
+  const steps = 18;
+  let hit = false;
+
+  for(let i=0;i<steps;i++){
+    let px = boss.x + nx * (dashDist/steps);
+    let py = boss.y + ny * (dashDist/steps);
+
+    if(canEnemyMoveTo(boss, px, py)){
+      boss.x = px; boss.y = py;
+    }else break;
+
+    if(!hit){
+      const d = Math.hypot(player.x - boss.x, player.y - boss.y);
+      if(d < boss.radius + player.radius + 10){
+        damagePlayer(boss.damage*1.2, nx*34, ny*34);
+        hit = true;
+      }
+    }
+  }
+  shake = Math.max(shake, 16);
+}
+
+function bossCleave(boss){
+  const radius = 140;
+
+  for(let i=0;i<70;i++){
+    const a = Math.random()*Math.PI*2;
+    const r = Math.random()*radius;
+    particles.push({
+      x: boss.x + Math.cos(a)*r,
+      y: boss.y + Math.sin(a)*r,
+      vx: Math.cos(a)*2 + (Math.random()-0.5)*2,
+      vy: Math.sin(a)*2 + (Math.random()-0.5)*2,
+      life: 35
+    });
+  }
+
+  const dist = Math.hypot(player.x - boss.x, player.y - boss.y);
+  if(dist < radius){
+    const dx = player.x - boss.x;
+    const dy = player.y - boss.y;
+    const len = Math.hypot(dx, dy) || 1;
+    damagePlayer(boss.damage*1.6, (dx/len)*42, (dy/len)*42);
+  }
+  shake = Math.max(shake, 22);
+}
+
+function isEnemyOnScreen(e){
+  const camX = player.x - canvas.width/2;
+  const camY = player.y - canvas.height/2;
+
+  const screenLeft   = camX - 50;
+  const screenRight  = camX + canvas.width + 50;
+  const screenTop    = camY - 50;
+  const screenBottom = camY + canvas.height + 50;
+
+  return (
+    e.x > screenLeft &&
+    e.x < screenRight &&
+    e.y > screenTop &&
+    e.y < screenBottom
+  );
+}
+
+/* ===== 업데이트 ===== */
+function update(){
+  frameCount++;
+
+  if(lootOverlayOpen) return;
+  if(gameOver) return;
+
+  if(slowMotion > 0){
+    slowMotion--;
+    updateEnemySystem();
+    resolvePlayerEnemyOverlap();
+    updateEffectSystem();
+    return;
+  }
+
+  updateBuffs(player);
+  updatePlayerState();
+  updateUltimateSystem();
+  updateEnemySystem();
+  resolvePlayerEnemyOverlap();
+  updateCombatSystem();
+  updateProjectileSystem();
+  updateEffectSystem();
+  updateEnvironmentSystem();
+
+  updatePortal();
+}
+
+function updatePlayerState(){
+  if(player.hp <= 0){ handleGameOver(); return; }
+  updateMovement();
+  updateInvulnerability();
+  updateLevelGlow();
+
+  const regen = (player.buffs?.hpRegen ?? 0) / 60;
+  if(regen > 0) player.hp = Math.min(player.maxHp, player.hp + regen);
+}
+function handleGameOver(){
+  gameOver = true;
+  document.getElementById("ui").style.display = "none";
+}
+function updateLevelGlow(){
+  if(player.levelGlow > 0) player.levelGlow--;
+}
+
+function updateUltimateSystem(){
+  if(!player.ultiActive) return;
+
+  player.ultiTimer++;
+  if(player.ultiTimer % 10 === 0) performUltimateStrike();
+  if(player.ultiCount >= 5) endUltimate();
+}
+function endUltimate(){
+  player.ultiActive = false;
+  player.ultiTimer = 0;
+  player.ultiCount = 0;
+  explosionActive = false;
+}
+function performUltimateStrike(){
+  const target = getRandomVisibleAliveEnemy();
+  if(!target) { endUltimate(); return; }
+
+  teleportTo(target);
+  dealUltimateDamage();
+
+  pruneDeadEnemies();
+  player.ultiCount++;
+}
+
+function dealUltimateDamage(){
+  const radius = getUltiAoeRadius();
+  const r2 = radius * radius;
+  let killedAny = false;
+
+  for(let i=0; i<enemies.length; i++){
+    const e = enemies[i];
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    if(dx*dx + dy*dy > r2) continue;
+
+    if(e.type === "boss" && e.dead) continue;
+
+    const wasAlive = (e.hp > 0);
+    if(!wasAlive) continue;
+
+    const weaponBase = rollWeaponDamage();
+    const raw =
+      weaponBase * 2.8 *
+      (player.gear?.ultiMul ?? 1) *
+      (player.buffs?.dmgMul ?? 1);
+
+    const crit = applyCrit(raw);
+    const dealt = crit.dmg;
+
+    if(e.type === "boss"){
+      if(e.invul <= 0){
+        e.hp -= dealt;
+        e.stun = 25;
+        spawnHitBlood(e.x, e.y, crit.isCrit ? 26 : 14);
+        shake = Math.max(shake, 20);
+        if(e.hp <= 0){
+          startBossDeath(e);
+        }
+      }
+      continue;
+    }
+
+    e.hp -= dealt;
+    e.stun = 30;
+
+    spawnHitBlood(e.x, e.y, crit.isCrit ? 22 : 12);
+
+    if(particles.length < 240){
+      for(let k=0;k<10;k++){
+        particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*9, vy: (Math.random()-0.5)*9, life: 34 });
+      }
+    }
+
+    if(e.hp <= 0){
+      emitEvent("kill", { enemy:e, x:e.x, y:e.y, type:e.type });
+      spawnLoot(e.x, e.y, "ulti");
+      giveXP(e);
+
+      player.hp = Math.min(player.maxHp, player.hp + 1);
+      slowMotion = 6;
+      if(player.kiOrbs < player.maxOrbs) player.kiOrbs++;
+      killedAny = true;
+    }
+  }
+
+  if(killedAny) hitSound();
+  shake = Math.max(shake, 30);
+  pruneDeadEnemies();
+}
+
+function updateEnemySystem(){
+  packs.forEach(pack=>{
+    if(pack.activated) return;
+    const dx = pack.x - player.x;
+    const dy = pack.y - player.y;
+    if(dx*dx + dy*dy < 520*520){
+      activatePackGroup(pack.groupId);
+      shake = Math.max(shake, 8);
+      slowMotion = Math.max(slowMotion, 1);
+    }
+  });
+
+  enemies.forEach(e=>{
+    if(e.pack && !e.pack.activated) return;
+    updateSingleEnemy(e);
+  });
+  for(const e of enemies){
+    updateBuffs(e);
+  }
+  pruneDeadEnemies();
+}
+
+function updateLevelParticles(){
+  for(let i = levelParticles.length - 1; i >= 0; i--){
+    const p = levelParticles[i];
+    p.ox += p.vx;
+    p.oy -= p.vy;
+    p.vy *= 0.97;
+    p.life--;
+    if(p.life <= 0) levelParticles.splice(i,1);
+  }
+  if(levelParticles.length > 200){
+    levelParticles.splice(0, levelParticles.length - 200);
+  }
+}
+
+function updateParticles(){
+  for(let i = particles.length - 1; i >= 0; i--){
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.life--;
+    if(p.life <= 0) particles.splice(i,1);
+  }
+  if(particles.length > 260){
+    particles.splice(0, particles.length - 260);
+  }
+}
+
+function updateMelee(e){
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+
+  if(dist > 0){
+    let moveX = dx / dist * e.speed;
+    let moveY = dy / dist * e.speed;
+
+    let newX = e.x + moveX;
+    let newY = e.y + moveY;
+
+    if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
+    if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
+  }
+
+  enemyTryMeleeAttack(e);
+}
+
+function updateArcher(e){
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+
+  const desired = 240;
+  if(dist < desired - 40){
+    const len = dist || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+
+    const newX = e.x - nx * e.speed * 1.2;
+    const newY = e.y - ny * e.speed * 1.2;
+
+    if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
+    if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
+  }else if(dist > desired + 80){
+    updateMelee(e);
+  }
+
+  e.shootCooldown--;
+  if(e.shootCooldown <= 0 && dist < 520){
+    spawnArrow(e.x, e.y, player.x, player.y, e.damage);
+    e.shootCooldown = 80 + Math.floor(Math.random()*40);
+  }
+}
+
+function updateMage(e){
+  const dx = player.x - e.x;
+  const dy = player.y - e.y;
+  const dist = Math.hypot(dx, dy);
+
+  if(dist < 180){
+    const len = dist || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+
+    const newX = e.x - nx * e.speed * 1.4;
+    const newY = e.y - ny * e.speed * 1.4;
+
+    if(canEnemyMoveTo(e, newX, e.y)) e.x = newX;
+    if(canEnemyMoveTo(e, e.x, newY)) e.y = newY;
+  }else{
+    updateMelee(e);
+  }
+
+  e.castCooldown--;
+  if(e.castCooldown <= 0 && dist < 520){
+    spawnFireZone(player.x, player.y, e.damage);
+    e.castCooldown = 140 + Math.floor(Math.random()*50);
+  }
+}
+
+function updateBoss(e){
+  if(!e.phase2Used && e.hp <= e.maxHp * 0.5) bossEnterPhase2(e);
+  updateMelee(e);
+
+  if(e.swordPulled){
+    e.dashCooldown--;
+    e.cleaveCooldown--;
+
+    const dist = Math.hypot(player.x - e.x, player.y - e.y);
+
+    if(e.dashCooldown <= 0 && dist > 160 && dist < 520){
+      bossDash(e);
+      e.dashCooldown = 160 + Math.floor(Math.random()*70);
+    }
+    if(e.cleaveCooldown <= 0 && dist < 220){
+      bossCleave(e);
+      e.cleaveCooldown = 200 + Math.floor(Math.random()*80);
+    }
+  }
+}
+
+function updateSingleEnemy(e){
+  if(e.isLeader){
+    const radius = 50;
+    const r2 = radius * radius;
+
+    for(const other of enemies){
+      if(other === e) continue;
+      const dx = other.x - e.x;
+      const dy = other.y - e.y;
+      if(dx*dx + dy*dy <= r2){
+        applyBuff(other, "damage",   1.25, 15, "leader");
+        applyBuff(other, "atkSpeed", 1.2,  15, "leader");
+      }
+    }
+  }
+
+  if(e.type === "boss" && e.dead){
+    e.deathTimer--;
+
+    if(e.deathTimer % 10 === 0){
+      shake = Math.max(shake, 10);
+      spawnHitBlood(
+        e.x + (Math.random()-0.5)*12,
+        e.y + (Math.random()-0.5)*12,
+        10
+      );
+    }
+
+    if(e.deathTimer === 1 && !mapRun.bossDefeated){
+      mapRun.bossDefeated = true;
+      spawnPortal(e.x, e.y);
+    }
+
+    return;
+  }
+
+  if(e.invul > 0) e.invul--;
+
+  if(e.phaseLock > 0){
+    e.phaseLock--;
+    return;
+  }
+
+  if(e.stun > 0){
+    e.stun--;
+    return;
+  }
+
+  switch(e.type){
+    case "archer": updateArcher(e); break;
+    case "mage": updateMage(e); break;
+    case "boss": updateBoss(e); break;
+    default: updateMelee(e);
+  }
+}
+
+function updateProjectileSystem(){
+  updateArrows();
+  updateFireZones();
+}
+
+function updateFireZones(){
+  for(let i = fireZones.length - 1; i >= 0; i--){
+    const f = fireZones[i];
+    f.life--;
+    f.tick++;
+
+    if(f.tick % 10 === 0){
+
+      if(f.isBleed){
+        let hitCount = 0;
+
+        for(const e of enemies){
+          if(e.hp <= 0) continue;
+          if(e.type === "boss" && e.dead) continue;
+
+          const dx = e.x - f.x;
+          const dy = e.y - f.y;
+          if(dx*dx + dy*dy > f.radius*f.radius) continue;
+
+          const dealt = f.damage;
+
+          if(e.type === "boss"){
+            if(e.invul <= 0 && !e.dead){
+              e.hp -= dealt;
+              if(e.hp <= 0) startBossDeath(e);
+            }
+          }else{
+            e.hp -= dealt;
+            if(e.hp <= 0){
+              emitEvent("kill", { enemy:e, x:e.x, y:e.y, type:e.type });
+              spawnLoot(e.x, e.y, "bleed");
+              giveXP(e);
+            }
+          }
+
+          player.hp = Math.min(player.maxHp, player.hp + dealt * 0.12);
+          spawnHitBlood(e.x, e.y, 3);
+
+          hitCount++;
+          if(hitCount >= 10) break;
+        }
+
+        pruneDeadEnemies();
+
+      }else{
+        const dx = player.x - f.x;
+        const dy = player.y - f.y;
+        if(dx*dx + dy*dy < f.radius*f.radius){
+          damagePlayer(f.damage, 0, 0);
+        }
+      }
+    }
+
+    if(f.life <= 0){
+      fireZones.splice(i,1);
+    }
+  }
+}
+
+function updateEffectSystem(){
+  updateParticles();
+  updateBlood();
+  updateLevelParticles();
+
+  for(let i=bloodPools.length-1;i>=0;i--){
+    bloodPools[i].life--;
+    if(bloodPools[i].life <= 0) bloodPools.splice(i,1);
+  }
+  if(bloodPools.length > 120) bloodPools.splice(0, bloodPools.length-120);
+
+  updateLoots();
+}
+
+function updateCombatSystem(){
+  if(attacking){
+    attackFrame++;
+    if(attackFrame === 3) checkHit();
+    if(attackFrame > 8){
+      attacking = false;
+      attackFrame = 0;
+    }
+  }
+}
+
+function updateMovement(){
+  const moveSpeed = player.speed * (player.buffs?.spdMul ?? 1);
+  let dx = 0;
+  let dy = 0;
+
+  if(keys["ArrowLeft"] || keys["a"]) dx -= moveSpeed;
+  if(keys["ArrowRight"] || keys["d"]) dx += moveSpeed;
+  if(keys["ArrowUp"] || keys["w"]) dy -= moveSpeed;
+  if(keys["ArrowDown"] || keys["s"]) dy += moveSpeed;
+
+  dx += joyDX * moveSpeed;
+  dy += joyDY * moveSpeed;
+
+  if(Math.abs(dx) > Math.abs(dy)){
+    if(dx > 0) player.dir = "right";
+    else if(dx < 0) player.dir = "left";
+  }else{
+    if(dy > 0) player.dir = "down";
+    else if(dy < 0) player.dir = "up";
+  }
+
+  let newX = player.x + dx;
+  let newY = player.y + dy;
+
+  if(canMoveTo(newX, player.y)) player.x = newX;
+  if(canMoveTo(player.x, newY)) player.y = newY;
+}
+
+function updateInvulnerability(){
+  if(player.invul > 0) player.invul--;
+}
+
+function updateEnvironmentSystem(){ updateShake(); }
+function updateShake(){ if(shake > 0) shake--; }
+
+function updateArrows(){
+  for(let i = arrows.length - 1; i >= 0; i--){
+    const a = arrows[i];
+    a.x += a.dx;
+    a.y += a.dy;
+    a.life--;
+
+    const tx = Math.floor(a.x / tileSize);
+    const ty = Math.floor(a.y / tileSize);
+    if(!map[ty] || map[ty][tx] === 1){
+      arrows.splice(i,1);
+      continue;
+    }
+
+    const px = player.x, py = player.y;
+    const dxp = a.x - px;
+    const dyp = a.y - py;
+    const rr = (player.radius + 4);
+    if(dxp*dxp + dyp*dyp < rr*rr){
+      const dx = px - a.x;
+      const dy = py - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      damagePlayer(a.damage, (dx/len)*14, (dy/len)*14);
+      arrows.splice(i,1);
+      continue;
+    }
+
+    if(a.life <= 0){
+      arrows.splice(i,1);
+      continue;
+    }
+  }
+}
+
+/* ===== 레벨업 ===== */
+function levelUpSound(){
+  let o = audioCtx.createOscillator();
+  let g = audioCtx.createGain();
+
+  o.type = "triangle";
+  o.frequency.setValueAtTime(400, audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.3);
+
+  g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+  o.connect(g);
+  g.connect(audioCtx.destination);
+
+  o.start();
+  o.stop(audioCtx.currentTime + 0.3);
+}
+
+function checkLevelUp(){
+  if(xp >= xpToNext){
+    xp -= xpToNext;
+    level++;
+
+    xpToNext = Math.floor(100 + level * level * 20);
+
+    player.baseMaxHp += 12;
+    updateBuffs(player);
+    player.hp = player.maxHp;
+
+    baseDamageBase *= 1.08;
+    ultiDamageBase *= 1.1;
+    recalcFromGear();
+
+    player.levelGlow = 60;
+
+    for(let i=0;i<60;i++){
+      levelParticles.push({
+        ox:(Math.random()-0.5)*40,
+        oy:-40+(Math.random()-0.5)*10,
+        vx:(Math.random()-0.5)*2,
+        vy:Math.random()*3+2,
+        life:60
+      });
+    }
+
+    levelUpSound();
+  }
+}
+
+/* ===== 공격 범위 ===== */
+const BASE_MELEE_RANGE = 40;
+const BASE_ULTI_AOE    = 40;
+
+function getMeleeRange(){
+  const b = player.buffs || defaultBuffStats();
+  return BASE_MELEE_RANGE * (b.rangeMul ?? 1);
+}
+function getUltiAoeRadius(){
+  const b = player.buffs || defaultBuffStats();
+  return BASE_ULTI_AOE * (b.rangeMul ?? 1);
+}
+
+/* ===== 공격 ===== */
+function checkHit(){
+  const range = getMeleeRange();
+  const hitLimit = 12;
+  let hitDone = 0;
+
+  for(let i=0;i<enemies.length;i++){
+    const e = enemies[i];
+
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+
+    const r = range + e.radius;
+    if(dx*dx + dy*dy > r*r) continue;
+
+    if(player.dir === "up" && dy >= 0) continue;
+    if(player.dir === "down" && dy <= 0) continue;
+    if(player.dir === "right" && dx <= 0) continue;
+    if(player.dir === "left" && dx >= 0) continue;
+
+    hitDone++;
+    if(hitDone > hitLimit) break;
+
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = dx / len;
+    const ny = dy / len;
+
+    let weaponBase = rollWeaponDamage();
+    let raw =
+      weaponBase
+      * (player.gear?.dmgMul ?? 1)
+      * (player.buffs?.dmgMul ?? 1);
+
+    const crit = applyCrit(raw);
+    let dealt = crit.dmg;
+
+    const bossInvul = (e.type === "boss" && e.invul > 0);
+
+    if(e.invul <= 0){
+      e.hp -= dealt;
+    }
+    emitEvent("hit", { enemy: e, dealt });
+
+    const heal = dealt * 0.05;
+    player.hp = Math.min(player.maxHp, player.hp + heal);
+
+    if(Math.random() < 0.2 && player.kiOrbs < player.maxOrbs){
+      player.kiOrbs++;
+    }
+
+    if(bossInvul){
+      spawnHitBlood(e.x, e.y, 14);
+    }else{
+      e.stun = 15;
+      let ex = e.x + nx*18;
+      let ey = e.y + ny*18;
+      if(canEnemyMoveTo(e, ex, e.y)) e.x = ex;
+      if(canEnemyMoveTo(e, e.x, ey)) e.y = ey;
+    }
+
+    if(bossInvul) thudSound();
+    else hitSound();
+
+    shake = 12;
+
+    if(particles.length < 220){
+      particles.push({
+        x: e.x, y: e.y,
+        vx: nx*4 + (Math.random()-0.5)*4,
+        vy: ny*4 + (Math.random()-0.5)*4,
+        life: 30
+      });
+    }
+
+    if(e.hp <= 0){
+      if(e.type === "boss"){
+        startBossDeath(e);
+        continue;
+      }
+      emitEvent("kill", { enemy: e, x: e.x, y: e.y, type: e.type });
+      spawnLoot(e.x, e.y, "normal");
+      giveXP(e);
+      killCount++;
+
+      player.hp = Math.min(player.maxHp, player.hp + 1);
+
+      if(bloodPools.length < 140){
+        bloodPools.push({
+          x: e.x, y: e.y,
+          size: 10 + Math.random()*6,
+          life: 600
+        });
+      }
+
+      slowMotion = 6;
+
+      if(player.kiOrbs < player.maxOrbs){
+        player.kiOrbs++;
+      }
+    }
+  }
+
+  enemies = enemies.filter(e => (e.hp > 0) || (e.type === "boss" && e.dead && e.deathTimer > 0));
+  packs.forEach(pack=>{
+    pack.enemies = pack.enemies.filter(e=>e.hp>0);
+  });
+}
+
+function updateBlood(){
+  for(let i = bloodParticles.length - 1; i >= 0; i--){
+    const p = bloodParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.25;
+    p.life--;
+    if(p.life <= 0) bloodParticles.splice(i,1);
+  }
+  if(bloodParticles.length > 260){
+    bloodParticles.splice(0, bloodParticles.length - 260);
+  }
+}
+
+function drawBlood(){
+  if(bloodParticles.length === 0) return;
+
+  ctx.save();
+  ctx.fillStyle = "#8b0000";
+  ctx.beginPath();
+
+  for(let i=0;i<bloodParticles.length;i++){
+    const p = bloodParticles[i];
+    const a = p.life / 30;
+    if(a > 0.66) ctx.globalAlpha = 0.9;
+    else if(a > 0.33) ctx.globalAlpha = 0.6;
+    else ctx.globalAlpha = 0.35;
+
+    ctx.fillRect(p.x - p.size*0.5, p.y - p.size*0.5, p.size, p.size);
+  }
+  ctx.restore();
+}
+
+/* ===== 렌더 ===== */
+function draw(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+  ctx.filter = "none";
+
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  let camX = player.x - canvas.width/2;
+  let camY = player.y - canvas.height/2;
+
+  let amp = shake ? (6 + shake * 0.45) : 0;
+  let sx = shake ? (Math.random()-0.5) * amp : 0;
+  let sy = shake ? (Math.random()-0.5) * amp : 0;
+
+  ctx.save();
+  ctx.translate(-camX+sx, -camY+sy);
+
+  for(let y = 0; y < map.length; y++){
+    for(let x = 0; x < map[y].length; x++){
+      let tile = map[y][x];
+      if(tile === 0) ctx.fillStyle = "#222";
+      if(tile === 1) ctx.fillStyle = "#555";
+      ctx.fillRect(x*tileSize, y*tileSize, tileSize, tileSize);
+    }
+  }
+
+  ctx.fillStyle = "#550000";
+  for(let i=0;i<bloodPools.length;i++){
+    const b = bloodPools[i];
+    const a = b.life / 600;
+    if(a <= 0.05) continue;
+    ctx.globalAlpha = a;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.size, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  fireZones.forEach(f=>{
+    ctx.save();
+    for(let i=0;i<6;i++){
+      let flameHeight = 10 + Math.sin(frameCount*0.2 + i)*6;
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = "orange";
+      ctx.beginPath();
+      ctx.moveTo(f.x - 6 + i*2, f.y);
+      ctx.lineTo(f.x - 3 + i*2, f.y - flameHeight);
+      ctx.lineTo(f.x + i*2, f.y);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  ctx.fillStyle = "red";
+  for(let i=0;i<particles.length;i++){
+    const p = particles[i];
+    ctx.fillRect(p.x, p.y, 3, 3);
+  }
+
+  drawPortal();
+  drawLoots();
+  drawBlood();
+  enemies.forEach(e=>drawEnemy(e));
+
+  levelParticles.forEach(p=>{
+    ctx.fillStyle = "gold";
+    ctx.fillRect(player.x + p.ox, player.y + p.oy, 4, 4);
+  });
+
+  arrows.forEach(a=>{
+    ctx.fillStyle = "white";
+    ctx.fillRect(a.x-2, a.y-2, 4, 4);
+  });
+
+  ctx.restore();
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawPlayer(canvas.width/2, canvas.height/2);
+  drawUI();
+}
+
+function drawPlayer(x,y){
+  if(player.levelGlow > 0){
+    ctx.shadowColor = "gold";
+    ctx.shadowBlur = player.levelGlow * 0.5;
+  }
+
+  ctx.fillStyle="#880000";
+  ctx.fillRect(x-10,y-12,20,22);
+
+  ctx.fillStyle="#aa0000";
+  ctx.fillRect(x-7,y-20,14,8);
+
+  ctx.fillStyle="#ffffcc";
+  ctx.fillRect(x-8,y-26,4,8);
+  ctx.fillRect(x+4,y-26,4,8);
+
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(x-3,y-14,2,2);
+  ctx.fillRect(x+1,y-14,2,2);
+
+  ctx.shadowBlur = 0;
+
+  if(player.ultiActive){
+    ctx.save();
+    ctx.shadowColor = "#ff6600";
+    ctx.shadowBlur = 25;
+    ctx.fillStyle = "#ffaa00";
+    ctx.fillRect(x-3,y-14,2,2);
+    ctx.fillRect(x+1,y-14,2,2);
+    ctx.restore();
+  }
+
+  drawSword(x,y);
+}
+
+function drawSword(x, y){
+  ctx.save();
+  ctx.translate(x, y);
+
+  var offsetX = 0;
+  var offsetY = 0;
+  var angle = 0;
+  var t = attackFrame / 8;
+
+  if (player.dir === "right") { offsetX = 18; if (attacking) angle = 1.5 * t; }
+  else if (player.dir === "left") { offsetX = -18; if (attacking) angle = -1.5 * t; }
+  else if (player.dir === "up") { offsetY = -18; if (attacking) offsetY -= 25 * t; }
+  else if (player.dir === "down") { offsetY = 6; angle = Math.PI; if (attacking) offsetY += 25 * t; }
+
+  ctx.translate(offsetX, offsetY);
+  ctx.rotate(angle);
+  drawSwordShape(ctx);
+  ctx.restore();
+}
+
+function drawSwordShape(c){
+  c.fillStyle = "#552200";
+  c.fillRect(-2, 6, 4, 8);
+
+  c.fillStyle = "#bbbbbb";
+  c.fillRect(-8, 6, 16, 3);
+
+  c.fillStyle = "#dddddd";
+  c.fillRect(-2, -20, 4, 26);
+
+  c.beginPath();
+  c.moveTo(-2, -20);
+  c.lineTo(0, -32);
+  c.lineTo(2, -20);
+  c.fill();
+}
+
+function drawEnemy(e){
+  if(e.type === "boss"){
+    if(e.dead){
+      const t = (e.deathTimer / e.deathMax);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, t);
+
+      ctx.fillStyle = "rgba(255,60,60,0.25)";
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius + (1-t)*35, 0, Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = "#777777";
+      ctx.fillRect(e.x-20, e.y-25, 40, 50);
+
+      if(Math.floor(frameCount/3)%2===0){
+        ctx.fillStyle = "rgba(255,0,0,0.8)";
+        ctx.fillRect(e.x-6, e.y-15, 4,4);
+        ctx.fillRect(e.x+2, e.y-15, 4,4);
+      }
+
+      ctx.restore();
+      return;
+    }
+
+    if(e.invul > 0){
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = "red";
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius + 10, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.fillStyle = "#777777";
+    ctx.fillRect(e.x-20, e.y-25, 40, 50);
+
+    ctx.fillStyle = "#999999";
+    ctx.fillRect(e.x-15, e.y-35, 30, 15);
+
+    ctx.fillStyle = "red";
+    ctx.fillRect(e.x-6, e.y-15, 4,4);
+    ctx.fillRect(e.x+2, e.y-15, 4,4);
+
+    ctx.save();
+    ctx.translate(e.x+28, e.y);
+    ctx.rotate(0.2);
+    drawSwordShape(ctx);
+    ctx.restore();
+    return;
+  }
+
+  if(e.isLeader){
+    ctx.fillStyle = "#ffd000";
+    ctx.fillRect(e.x-6, e.y-24, 12, 3);
+    ctx.fillRect(e.x-4, e.y-28, 3, 4);
+    ctx.fillRect(e.x+1, e.y-28, 3, 4);
+  }
+  if(e.isElite){
+    ctx.fillStyle = (e.eliteColor === "yellow") ? "#ffcc00" : "#00aaff";
+  }else if(e.type === "archer"){
+    ctx.fillStyle = "#cccccc";
+  }else if(e.type === "mage"){
+    ctx.fillStyle = "#550088";
+  }else{
+    ctx.fillStyle = "#006600";
+  }
+
+  if(e.activeBuffs && e.activeBuffs.some(b => b.key === "damage|leader|mul" || b.key === "atkSpeed|leader|mul")){
+    const pulse = 0.45 + 0.25*Math.sin(frameCount*0.2);
+    ctx.save();
+    ctx.globalAlpha = 0.25 + pulse;
+    ctx.fillStyle = "rgba(255,0,0,0.35)";
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.radius + 12 + pulse*6, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.fillRect(e.x-10,e.y-12,20,22);
+
+  if(e.type === "archer") ctx.fillStyle = "#dddddd";
+  else if(e.type === "mage") ctx.fillStyle = "#550088";
+  else ctx.fillStyle = "#00aa00";
+  ctx.fillRect(e.x-7,e.y-20,14,8);
+
+  ctx.fillStyle="red";
+  ctx.fillRect(e.x-4,e.y-14,3,3);
+  ctx.fillRect(e.x+1,e.y-14,3,3);
+}
+
+/* ===== UI ===== */
+function drawUI(){
+  drawTextUI();
+  drawXPBar();
+  drawOrbUI();
+  drawHpOrb();
+  drawBossHpBar();
+  drawMiniMap();
+
+  // (디버그) 인벤 일부 표시
+  ctx.font = "12px Arial";
+  ctx.fillStyle = "#ccc";
+  let startY = 140;
+  for(let i=0;i<inventory.length && i<8;i++){
+    ctx.fillText("• " + inventory[i].name, 20, startY + i*16);
+  }
+}
+
+function drawXPBar(){
+  const barW = canvas.width * 0.6;
+  const barH = 10;
+  const x = canvas.width/2 - barW/2;
+  const y = canvas.height - 20;
+  const percent = xp / xpToNext;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(x, y, barW, barH);
+  ctx.fillStyle = "#33ccff";
+  ctx.fillRect(x, y, barW * percent, barH);
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.strokeRect(x, y, barW, barH);
+  ctx.restore();
+}
+
+function drawMiniMap(){
+  const w = 60;
+  const h = 60;
+  const margin = 12;
+  const x0 = canvas.width - w - margin;
+  const y0 = margin;
+
+  const radarRange = 700;
+  const scale = w / (radarRange * 2);
+
+  const cx = x0 + w/2;
+  const cy = y0 + h/2;
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(x0, y0, w, h);
+
+  ctx.beginPath();
+  ctx.rect(x0+1, y0+1, w-2, h-2);
+  ctx.clip();
+
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = "#888";
+  ctx.lineWidth = 1;
+
+  const minTX = Math.max(0, Math.floor((player.x - radarRange) / tileSize));
+  const maxTX = Math.min(mapSize-1, Math.floor((player.x + radarRange) / tileSize));
+  const minTY = Math.max(0, Math.floor((player.y - radarRange) / tileSize));
+  const maxTY = Math.min(mapSize-1, Math.floor((player.y + radarRange) / tileSize));
+
+  for(let ty=minTY; ty<=maxTY; ty++){
+    for(let tx=minTX; tx<=maxTX; tx++){
+      if(map[ty][tx] !== 1) continue;
+      const wx = tx * tileSize;
+      const wy = ty * tileSize;
+      const dx = wx - player.x;
+      const dy = wy - player.y;
+      const mx = cx + dx * scale;
+      const my = cy + dy * scale;
+      const size = tileSize * scale;
+      ctx.strokeRect(mx, my, size, size);
+    }
+  }
+
+  const boss = enemies.find(e => e.type === "boss");
+  if(boss){
+    const dx = boss.x - player.x;
+    const dy = boss.y - player.y;
+    if(dx*dx + dy*dy <= radarRange*radarRange){
+      const mx = cx + dx * scale;
+      const my = cy + dy * scale;
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(mx-3, my-3, 6, 6);
+    }
+  }
+
+  ctx.globalAlpha = 0.95;
+  for(const e of enemies){
+    if(e.hp <= 0) continue;
+    if(e.type === "boss") continue;
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    if(dx*dx + dy*dy > radarRange*radarRange) continue;
+    const mx = cx + dx * scale;
+    const my = cy + dy * scale;
+    if(e.type === "mage") ctx.fillStyle = "#aa55ff";
+    else if(e.type === "archer") ctx.fillStyle = "#dddddd";
+    else ctx.fillStyle = "#00ff66";
+    ctx.fillRect(mx-1.5, my-1.5, 3, 3);
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#ff4444";
+  ctx.fillRect(cx-2, cy-2, 4, 4);
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = "#444";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x0+1, y0+1, w-2, h-2);
+  ctx.restore();
+}
+
+function drawTextUI(){
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.font = "bold 18px Arial";
+  ctx.fillStyle = "white";
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 4;
+
+  ctx.strokeText("Level: " + level, 20, 55);
+  ctx.fillText("Level: " + level, 20, 55);
+
+  ctx.strokeText("TIER: " + mapTier, 20, 105);
+  ctx.fillText("TIER: " + mapTier, 20, 105);
+
+  if(portal.active){
+    ctx.strokeText("PORTAL OPEN!", 20, 155);
+    ctx.fillText("PORTAL OPEN!", 20, 155);
+  }
+
+  ctx.restore();
+}
+
+function drawOrbUI(){
+  const btnRect = document.getElementById("attackBtn").getBoundingClientRect();
+  const centerScreenX = btnRect.left + btnRect.width * 0.5;
+  const centerScreenY = btnRect.top  + btnRect.height * 0.5;
+
+  let cx = centerScreenX;
+  let cy = centerScreenY - uiHeight;
+
+  cx = Math.max(60, Math.min(canvas.width - 60, cx));
+  cy = Math.max(60, Math.min(canvas.height - 60, cy));
+
+  const orbR = 10;
+  const ringR = 34;
+  const startAngle = -Math.PI/2;
+
+  const centerR = 24;
+  const ready = (player.kiOrbs >= 1 && enemies.length > 0 && !player.ultiActive);
+
+  orbUIState.cx = cx;
+  orbUIState.cy = cy;
+  orbUIState.centerR = centerR;
+  orbUIState.ready = ready;
+
+  ctx.save();
+
+  for(let i=0;i<player.maxOrbs;i++){
+    const a = startAngle + (i * (Math.PI * 2 / player.maxOrbs));
+    const x = cx + Math.cos(a) * ringR;
+    const y = cy + Math.sin(a) * ringR;
+
+    ctx.beginPath();
+    ctx.arc(x, y, orbR, 0, Math.PI*2);
+
+    if(orbFlash > 0){
+      ctx.fillStyle = "#00ff88";
+      ctx.shadowColor = "#00ff88";
+      ctx.shadowBlur = 35;
+    }
+    else if(i < player.kiOrbs){
+      ctx.fillStyle = "#00ff55";
+      ctx.shadowColor = "#00ff55";
+      ctx.shadowBlur = 15;
+    }
+    else{
+      ctx.fillStyle = "#002211";
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fill();
+  }
+
+  ctx.shadowBlur = ready ? 25 : 10;
+  ctx.shadowColor = ready ? "rgba(120,180,255,0.95)" : "rgba(120,180,255,0.4)";
+  ctx.fillStyle = ready ? "rgba(40,120,255,0.95)" : "rgba(40,120,255,0.45)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, centerR, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = "rgba(170,210,255,0.75)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, centerR+1, 0, Math.PI*2);
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = "white";
+  ctx.font = "bold 18px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("U", cx, cy+1);
+
+  ctx.restore();
+}
+
+function drawHpOrb(){
+  const uiH = ui.getBoundingClientRect().height || 120;
+  const padRect = document.getElementById("movePad").getBoundingClientRect();
+  let x = padRect.left + padRect.width * 0.5;
+
+  const btnRect = document.getElementById("attackBtn").getBoundingClientRect();
+  let y = (btnRect.top + btnRect.height * 0.5) - uiH;
+
+  x = Math.max(40, Math.min(canvas.width - 40, x));
+  y = Math.max(40, Math.min(canvas.height - 40, y));
+
+  ctx.save();
+
+  let radius = 25;
+  hpWaveOffset += 0.07;
+
+  let hpPercent = player.hp / player.maxHp;
+  let liquidHeight = radius * 2 * hpPercent;
+  let topY = y + radius - liquidHeight;
+
+  let metal = ctx.createRadialGradient(x, y, radius-10, x, y, radius+12);
+  metal.addColorStop(0, "#2a0000");
+  metal.addColorStop(0.5, "#550000");
+  metal.addColorStop(1, "#110000");
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius+10, 0, Math.PI*2);
+  ctx.fillStyle = metal;
+  ctx.fill();
+
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#000";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius+6, 0, Math.PI*2);
+  ctx.strokeStyle = "#aa0000";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI*2);
+  ctx.clip();
+
+  let innerShadow = ctx.createRadialGradient(x, y+15, 10, x, y, radius);
+  innerShadow.addColorStop(0, "#330000");
+  innerShadow.addColorStop(1, "#000000");
+  ctx.fillStyle = innerShadow;
+  ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+
+  ctx.beginPath();
+  ctx.moveTo(x-radius, y+radius);
+  for(let i=0;i<=radius*2;i++){
+    let wave = Math.sin(i*0.12 + hpWaveOffset) * 4;
+    ctx.lineTo(x-radius+i, topY + wave);
+  }
+  ctx.lineTo(x+radius, y+radius);
+  ctx.closePath();
+
+  let blood = ctx.createLinearGradient(0, topY, 0, y+radius);
+  blood.addColorStop(0, "#ff2a2a");
+  blood.addColorStop(1, "#8b0000");
+  ctx.fillStyle = blood;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(x-15, y-20, 18, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fill();
+
+  let glass = ctx.createRadialGradient(x-10, y-15, 5, x, y, radius);
+  glass.addColorStop(0, "rgba(255,255,255,0.25)");
+  glass.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glass;
+  ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+
+  if(hpPercent < 0.3){
+    if(Math.floor(Date.now()/200)%2===0){
+      ctx.beginPath();
+      ctx.arc(x, y, radius+14, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(255,0,0,0.25)";
+      ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = "white";
+  ctx.font = "bold 16px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(Math.floor(player.hp), x, y+6);
+
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawBossHpBar(){
+  const boss = enemies.find(e => e.type === "boss");
+  if(!boss) return;
+
+  let camX = player.x - canvas.width/2;
+  let camY = player.y - canvas.height/2;
+
+  const screenX = boss.x - camX;
+  const screenY = boss.y - camY;
+
+  if(screenX < -100 || screenX > canvas.width + 100 || screenY < -100 || screenY > canvas.height + 100) return;
+
+  const barW = 70;
+  const barH = 7;
+  const x = screenX - barW/2;
+  const y = screenY - boss.radius - 18;
+
+  let percent = boss.hp / boss.maxHp;
+  percent = Math.max(0, Math.min(1, percent));
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(x, y, barW, barH);
+  ctx.fillStyle = "#ff4444";
+  ctx.fillRect(x, y, barW * percent, barH);
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, barW - 1, barH - 1);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.font = "10px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(Math.ceil(boss.hp), screenX, y - 2);
+  ctx.restore();
+}
+
+function drawGameOver(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="rgba(0,0,0,0.6)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle="white";
+  ctx.font="bold 40px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+
+  ctx.font="bold 18px Arial";
+  ctx.fillText("Tap to Restart", canvas.width/2, canvas.height/2 + 40);
+}
+
+function tryUltimate(){
+  if(player.ultiActive) return;
+  if(player.kiOrbs >= 1 && enemies.length > 0){
+    player.kiOrbs -= 1;
+    player.ultiActive = true;
+    player.ultiTimer = 0;
+    player.ultiCount = 0;
+    performUltimateStrike();
+    endUltimate();
+  }
+}
+
+function handleUltimateOrbPress(clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  const tx = clientX - rect.left;
+  const ty = clientY - rect.top;
+
+  const dx = tx - orbUIState.cx;
+  const dy = ty - orbUIState.cy;
+  const r = orbUIState.centerR;
+
+  if(dx*dx + dy*dy <= r*r){
+    tryUltimate();
+    return true;
+  }
+  return false;
+}
+
+/* ============================= */
+/* ✅ 인벤/카오스 UI 로직          */
+/* ============================= */
+const invOverlay = document.getElementById("invOverlay");
+const invStats   = document.getElementById("invStats");
+const invItemInfo= document.getElementById("invItemInfo");
+const equipGrid  = document.getElementById("equipGrid");
+const bagGrid    = document.getElementById("bagGrid");
+const btnInvClose= document.getElementById("btnInvClose");
+const btnChaos   = document.getElementById("btnChaos");
+
+let invOpen = false;
+// 선택 상태: POE처럼 "가방 아이템 선택 → 슬롯 클릭"
+let selected = null; // {type:"bag", idx:number} | {type:"equip", slot:string}
+function itemEmoji(it){
+  if(!it) return "";
+  if(it.isUnique) return "⭐";
+
+  const slot = it.slot;
+  if(slot==="weapon") return "🗡";
+  if(slot==="helm")   return "🪖";
+  if(slot==="chest")  return "🛡️";
+  if(slot==="ring")   return "💍";
+  return "📦";
+}
+
+function rarityBorderClass(r){
+  if(r==="epic") return "epic";
+  if(r==="rare") return "rare";
+  if(r==="legendary") return "unique";
+  return "";
+}
+function slotLabel(slot){
+  if(slot==="weapon") return "무기";
+  if(slot==="helm")   return "투구";
+  if(slot==="chest")  return "갑옷";
+  if(slot==="ring")   return "반지";
+  return slot;
+}
+
+function itemTitle(it){
+  if(!it) return "(비어있음)";
+  return it.name || "(이름없음)";
+}
+
+function itemLines(it){
+  if(!it) return [];
+  const lines = [];
+  lines.push(`${it.name}`);
+  lines.push(`종류: ${slotLabel(it.slot || "기타")}`);
+  if(it.isUnique) lines.push("유니크: (장착 불가/기능 미구현)");
+  const stats = it.totalData || it.data;
+  if(stats){
+    for(const k in stats){
+      const v = stats[k];
+      if(typeof v !== "number") continue;
+      if(k.endsWith("Mul")){
+        lines.push(`${k}: x${v.toFixed(2)}`);
+      }else{
+        const sign = v>=0 ? "+" : "";
+        lines.push(`${k}: ${sign}${v.toFixed(2)}`);
+      }
+    }
+  }
+  return lines;
+}
+function formatPct(x){ return (x*100).toFixed(1) + "%"; }
+function fmtNum(x){ return Number.isInteger(x) ? String(x) : x.toFixed(2); }
+
+function prettyItemText(it){
+  if(!it) return "빈 칸";
+
+  const lines = [];
+  const rarity = (it.rarity || (it.isUnique?"legendary":"common")).toUpperCase();
+  lines.push(`[${rarity}] ${it.name || "(이름없음)"}`);
+  lines.push(`슬롯: ${slotLabel(it.slot || "기타")}  |  iLvl: ${it.ilvl ?? "-"}`);
+
+  if(it.isUnique){
+    lines.push("");
+    lines.push(it.uniqueRef?.desc || it.desc || "유니크 효과");
+    return lines.join("\n");
+  }
+
+  // ✅ affix 상세
+  if(Array.isArray(it.affixes) && it.affixes.length){
+    lines.push("");
+    lines.push("[옵션]");
+    for(const a of it.affixes){
+      if(!a || !a.affix) continue;
+      const kind = a.kind === "prefix" ? "접두" : "접미";
+      const tier = a.tier ? `T${a.tier}` : "";
+      // 숫자 보기: 퍼센트/정수 혼합이라 그냥 value 출력
+      lines.push(`- ${kind} ${a.affix.name} ${tier} : ${fmtNum(a.value)}`);
+    }
+  }
+
+  // ✅ 최종 스탯(적용값)
+  const d = it.totalData || it.data;
+  if(d){
+    lines.push("");
+    lines.push("[최종 적용 스탯]");
+    for(const k of Object.keys(d)){
+      const v = d[k];
+      if(typeof v !== "number") continue;
+
+      if(k.endsWith("Mul")){
+        lines.push(`- ${k}: x${v.toFixed(2)}`);
+      }else{
+        const sign = v>=0 ? "+" : "";
+        lines.push(`- ${k}: ${sign}${fmtNum(v)}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function showHint(msg){
+  const el = document.getElementById("invHint");
+  if(!el) return;
+  el.textContent = msg;
+}
+
+function rebuildGearFromEquipment(){
+  // gear 초기화
+  player.gear = {
+    dmgMul: 1, ultiMul: 1, spdMul: 1, atkSpdMul: 1, rangeMul: 1,
+    armorAdd: 0, maxHpAdd: 0, hpRegen: 0,
+    critChanceAdd: 0, critChanceMul: 1, critMultiAdd: 0,
+  };
+
+  for(const slot of EQUIP_SLOTS){
+    const it = equipment[slot];
+    if(!it) continue;
+    if(it.isUnique) continue;
+    const d = it.totalData || it.data;
+    if(!d) continue;
+    for(const k in d){
+      const v = d[k];
+      if(typeof v !== "number") continue;
+      if(k.endsWith("Mul")){
+        player.gear[k] *= v;
+      }else{
+        player.gear[k] += v;
+      }
+    }
+  }
+
+  recalcFromGear();
+  player.hp = Math.min(player.hp, player.maxHp);
+}
+
+function openInventory(){
+  invOpen = true;
+  pauseGame({ dim: 0.60, blur: 2 }); // blur:0 이면 딤만
+  invOverlay.style.display = "flex";
+  renderInventory();
+}
+
+function closeInventory(){
+  invOpen = false;
+  selected = null;
+  invOverlay.style.display = "none";
+  resumeGame();
+}
+
+function renderEquipmentPanel(){
+  equipGrid.innerHTML = "";
+  for(const slot of EQUIP_SLOTS){
+    const it = equipment[slot];
+    const slotDiv = document.createElement("div");
+    slotDiv.className = "equipSlot";
+    if(selected && selected.type==="equip" && selected.slot===slot) slotDiv.classList.add("selected");
+
+    const name = document.createElement("div");
+    name.className = "slotName";
+    name.textContent = slotLabel(slot);
+
+    const item = document.createElement("div");
+    item.className = "slotItem";
+    item.textContent = it ? itemTitle(it) : "(비어있음)";
+
+    slotDiv.appendChild(name);
+    slotDiv.appendChild(item);
+
+    slotDiv.addEventListener("click", ()=>{
+      // 1) 가방 선택 상태면 → 장착 시도
+      if(selected && selected.type==="bag"){
+        equipFromBagToSlot(selected.idx, slot);
+        return;
+      }
+      // 2) 선택 없으면 → 이 슬롯 선택/해제
+      if(!selected || selected.type!=="equip" || selected.slot!==slot){
+        selected = {type:"equip", slot};
+        renderInventory();
+        return;
+      }
+      // 3) 같은 슬롯 다시 누르면 → 해제(장착된 것만)
+      if(equipment[slot]){
+        unequipSlotToBag(slot);
+      }else{
+        selected = null;
+        renderInventory();
+      }
+    });
+
+    equipGrid.appendChild(slotDiv);
+  }
+}
+
+function renderBag(){
+  bagGrid.innerHTML = "";
+  for(let i=0;i<inventory.length;i++){
+    const it = inventory[i];
+    const d = document.createElement("div");
+    d.className = "bagItem";
+    if(it && it.isUnique) d.classList.add("unique");
+   d.classList.add(rarityBorderClass(it.rarity));
+     if(selected && selected.type==="bag" && selected.idx===i) d.classList.add("selected");
+    d.textContent = it ? itemEmoji(it) : "";
+d.title = it ? it.name : ""; // 길게 누르거나 마우스오버 시 이름
+
+    d.addEventListener("click", ()=>{
+      selected = {type:"bag", idx:i};
+      invItemInfo.textContent = prettyItemText(it);
+      showHint("가방 아이템 선택됨 → 장비 슬롯을 눌러 장착 (또는 다시 눌러 선택 해제).");
+      renderInventory();
+    });
+
+    d.addEventListener("dblclick", ()=>{
+      if(!it) return;
+      if(it.isUnique) { showHint("유니크는 아직 장착 불가!"); return; }
+      const slot = it.slot;
+      if(!EQUIP_SLOTS.includes(slot)) { showHint("이 아이템은 장착 슬롯이 없어."); return; }
+      equipFromBagToSlot(i, slot);
+    });
+
+    bagGrid.appendChild(d);
+  }
+
+  // 빈칸 몇 개 채워서 POE 느낌(선택사항)
+  const fillTo = Math.max(18, Math.ceil((inventory.length+1)/6)*6);
+  for(let i=inventory.length;i<fillTo;i++){
+    const d = document.createElement("div");
+    d.className = "bagItem";
+    d.style.opacity = "0.35";
+    d.textContent = "";
+    bagGrid.appendChild(d);
+  }
+}
+
+function renderInventory(){
+  renderEquipmentPanel();
+  renderBag();
+
+  const g = player.gear || {};
+
+  invStats.textContent =
+`[캐릭터 스펙]
+HP: ${player.hp.toFixed(0)} / ${player.maxHp.toFixed(0)}
+Armor: ${(player.armor ?? 0).toFixed(1)}
+Regen: ${(g.hpRegen ?? 0).toFixed(2)}/s
+DamageMul: x${(g.dmgMul ?? 1).toFixed(2)}
+AttackSpeedMul: x${(g.atkSpdMul ?? 1).toFixed(2)}
+MoveSpeedMul: x${(g.spdMul ?? 1).toFixed(2)}
+RangeMul: x${(g.rangeMul ?? 1).toFixed(2)}
+UltiMul: x${(g.ultiMul ?? 1).toFixed(2)}
+Crit: ${(getCritChance()*100).toFixed(1)}% / x${getCritMulti().toFixed(2)}
+Chaos: ${chaosOrbs}`;
+
+  // 선택 정보
+  // 선택 정보
+if(!selected){
+  invItemInfo.textContent =
+    "하단 가방에서 아이템을 누르면 상세가 여기 표시돼.";
+}
+else if(selected.type === "equip"){
+  const it = equipment[selected.slot];
+  invItemInfo.textContent =
+    it
+      ? itemLines(it).join("\n")
+      : `${slotLabel(selected.slot)} 슬롯 비어있음`;
+}
+else if(selected.type === "bag"){
+  const it = inventory[selected.idx];
+  invItemInfo.textContent =
+    it
+      ? itemLines(it).join("\n")
+      : "빈 칸";
+}
+
+function equipFromBagToSlot(invIndex, slot){
+  const it = inventory[invIndex];
+  if(!it) return;
+  if(it.isUnique){ showHint("유니크는 아직 장착 불가!"); return; }
+  if(it.slot !== slot){
+    showHint(`이 아이템은 ${slotLabel(it.slot)} 전용이야. (${slotLabel(slot)}에 못낌)`);
+    return;
+  }
+
+  // 기존 장비 있으면 가방으로
+  if(equipment[slot]){
+    inventory.push(equipment[slot]);
+  }
+
+  // 가방에서 제거 후 장착
+  inventory.splice(invIndex, 1);
+  equipment[slot] = it;
+
+  selected = {type:"equip", slot};
+  rebuildGearFromEquipment();
+  showHint(`${slotLabel(slot)}에 장착 완료! (더블클릭으로도 장착 가능)`);
+  renderInventory();
+}
+
+function unequipSlotToBag(slot){
+  const it = equipment[slot];
+  if(!it) return;
+  equipment[slot] = null;
+  inventory.push(it);
+  selected = null;
+  rebuildGearFromEquipment();
+  showHint(`${slotLabel(slot)} 해제 → 가방으로 이동`);
+  renderInventory();
+}
+
+// 카오스: 선택된 아이템(가방/장비) 랜덤 옵션 재부여
+btnChaos.addEventListener("click", ()=>{
+  if(!selected){
+    showHint("먼저 가방 아이템(또는 장비 슬롯)을 선택해줘.");
+    return;
+  }
+
+  if(chaosOrbs <= 0){
+    showHint("카오스 오브가 없어!");
+    return;
+  }
+
+  let it = null;
+  let equippedSlot = null;
+
+  if(selected.type==="bag"){
+    it = inventory[selected.idx];
+  }else{
+    equippedSlot = selected.slot;
+    it = equipment[equippedSlot];
+  }
+
+  if(!it){ showHint("선택된 아이템이 없어."); return; }
+  if(it.isUnique){ showHint("유니크는 카오스 불가!"); return; }
+
+  // ✅ 베이스 템플릿 찾기 (descGen 재생성용)
+  const baseId = it.baseId || it.id; // 안전
+  const tmpl = ITEM_POOL.find(x => x.id === baseId);
+
+  if(!tmpl){
+    showHint("이 아이템의 베이스 템플릿을 못 찾았어. (ITEM_POOL 확인)");
+    return;
+  }
+
+  // ✅ 비용 소비
+  chaosOrbs--;
+
+  const rarity = it.rarity || tmpl.rarity || "common";
+  const ilvl = it.ilvl || getItemLevel();
+
+  // ✅ 베이스는 유지, affix만 새로
+  const baseData = buildBaseDataFromItemId(baseId);
+  const newAffixes = rollAffixesPOE(rarity, ilvl); // ✅ 배열로 옴
+
+  // ✅ affixData 재구성 (apply 함수로 누적)
+  const affixData = makeEmptyItemData();
+  for(const a of newAffixes){
+    if(a && a.affix && typeof a.affix.apply === "function"){
+      a.affix.apply(affixData, a.value);
+    }
+  }
+
+  const totalData = mergeItemData(baseData, affixData);
+
+  // ✅ 이름 재구성 (prefix/suffix)
+  const preNames = newAffixes.filter(x=>x.kind==="prefix").map(x=>x.affix.name);
+  const sufNames = newAffixes.filter(x=>x.kind==="suffix").map(x=>x.affix.name);
+
+  let nm = tmpl.name;
+  if(preNames.length) nm = preNames.join(" ") + " " + nm;
+  if(sufNames.length) nm = nm + " " + sufNames.join(" ");
+
+  // ✅ 아이템에 반영
+  it.baseId = baseId;
+  it.baseName = tmpl.name;
+  it.ilvl = ilvl;
+
+  it.baseData = baseData;
+  it.affixes = newAffixes;     // ✅ 단일 배열
+  it.affixData = affixData;
+  it.totalData = totalData;
+  it.data = totalData;         // ✅ 기존 호환
+
+  it.name = nm;
+  it.shownName = nm;
+  it.shownDesc = tmpl.descGen ? tmpl.descGen(totalData) : (tmpl.desc || "");
+
+  // ✅ 장비에 걸려있으면 스탯 재계산
+  if(equippedSlot){
+    equipment[equippedSlot] = it;
+    rebuildGearFromEquipment();
+  }
+
+  showHint("카오스 완료!");
+  renderInventory();
+});
+
+btnInvClose.addEventListener("click", closeInventory);
+
+// 가방 아이콘 버튼
+document.getElementById("invBtn").addEventListener("click", ()=>{
+  if(invOpen) closeInventory();
+  else openInventory();
+});
+
+// ESC로 닫기
+window.addEventListener("keydown", (e)=>{
+  if(e.key === "Escape" && invOpen) closeInventory();
+});
+
+
+/* ==== 캔버스 터치 ===== */
+canvas.addEventListener("touchstart", (e)=>{
+  if(gameOver){ resetGame(); return; }
+
+  if(!e.touches || !e.touches[0]) return;
+
+  const near = getNearbyLoot();
+  if(near){
+    openLootChoice(near);
+    e.preventDefault();
+    return;
+  }
+
+  if(handleUltimateOrbPress(e.touches[0].clientX, e.touches[0].clientY)){
+    e.preventDefault();
+  }
+},{passive:false});
+
+canvas.addEventListener("mousedown", (e)=>{
+  if(gameOver){ resetGame(); return; }
+
+  const near = getNearbyLoot();
+  if(near){ openLootChoice(near); return; }
+
+  handleUltimateOrbPress(e.clientX, e.clientY);
+});
+
+let lastErr = null;
+
+function drawRuntimeError(e){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="rgba(0,0,0,0.75)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#fff";
+  ctx.font="bold 16px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("RUNTIME ERROR (F12 Console 확인)", canvas.width/2, canvas.height/2 - 10);
+  ctx.font="14px Arial";
+  ctx.fillText(String(e && e.message ? e.message : e), canvas.width/2, canvas.height/2 + 18);
+}
+
+function loop(){
+  try{
+    if(gameOver){
+      drawGameOver();
+    }else if(gamePaused){
+      // ✅ 정지 화면(딤/블러 캡쳐)을 계속 보여주기만
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.globalAlpha = 1;
+      ctx.filter = "none";
+      ctx.drawImage(pauseCanvas, 0, 0);
+        }else{
+      update();
+      draw();
+
+      if(resumeFade > 0){
+        const a = resumeFade / resumeFadeMax;
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.globalAlpha = a;
+        ctx.filter = "none";
+        ctx.drawImage(pauseCanvas, 0, 0);
+        ctx.globalAlpha = 1;
+        resumeFade--;
+      }
+    }
+    lastErr = null;
+  }catch(e){
+    console.error(e);
+    lastErr = e;
+    drawRuntimeError(e);
+  }finally{
+    requestAnimationFrame(loop);
+  }
+}
+
+/* ===== 공격 아이콘 ===== */
+const iconCanvas = document.getElementById("attackIcon");
+const iconCtx = iconCanvas.getContext("2d");
+iconCtx.clearRect(0, 0, 60, 60);
+iconCtx.save();
+iconCtx.translate(30, 34);
+iconCtx.scale(1.4, 1.4);
+drawSwordShape(iconCtx);
+iconCtx.restore();
+
+function resetGame(){
+  mapTier = 1;
+
+  if(audioUnlocked && !bgmOsc){
+    bgmOsc = startBGM();
+  }
+
+  player.baseMaxHp = 100;
+  player.maxHp = 100;
+  player.hp = 100;
+
+  player.baseArmor = 0;
+  player.armor = 0;
+  player.invul = 0;
+  player.kiOrbs = 0;
+  player.ultiActive = false;
+  player.ultiCount = 0;
+  player.ultiTimer = 0;
+  player.levelGlow = 0;
+
+  killCount = 0;
+  level = 1;
+  killsAtLevelStart = 0;
+  killsForNextLevel = 20;
+  baseDamageBase = 20;
+  ultiDamageBase = 40;
+
+  player.gear = {
+    dmgMul: 1, ultiMul: 1, spdMul: 1, atkSpdMul: 1, rangeMul: 1,
+    armorAdd: 0, maxHpAdd: 0, hpRegen: 0,
+    critChanceAdd: 0, critChanceMul: 1, critMultiAdd: 0
+  };
+
+  recalcFromGear();
+
+  shake = 0;
+  slowMotion = 0;
+  gameOver = false;
+  document.getElementById("ui").style.display = "flex";
+
+  startNewMap(1);
+
+  resize();
+
+  // 루트/UI 리셋
+  loots = [];
+  lootOverlayOpen = false;
+  pendingLoot = null;
+  lootOverlay.style.display = "none";
+  invOverlay.style.display = "none";
+}
+
+resetGame();
+loop();
+</script>
+</body>
+</html>
