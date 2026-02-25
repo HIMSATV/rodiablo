@@ -4046,10 +4046,10 @@ function prettyItemHTML(it){
   const rCls = rarityClass(it);
   let html = `<div class="itemInfoWrap">`;
 
-  // 이름(등급 색)
+  // 1) 아이템 이름(등급 색)
   html += `<div class="itemInfoName ${rCls}">${escHtml(it.name || "")}</div>`;
 
-  // 유니크(전설)
+  // 유니크(전설)는 예외 처리: 설명만 깔끔히
   if(it.isUnique){
     const desc = it.uniqueRef?.desc || it.desc || "";
     if(desc){
@@ -4058,6 +4058,67 @@ function prettyItemHTML(it){
     html += `</div>`;
     return html;
   }
+
+  // 2) 베이스
+  const baseName = it.baseName || it.baseId || it.id || "";
+  if(baseName){
+    html += `<div class="itemInfoLine itemInfoDim">베이스: ${escHtml(baseName)}</div>`;
+  }
+
+  // 3) 베이스 옵션(= 베이스의 기본 효과 1줄)
+  // - it.shownDesc가 있으면 그걸 우선 사용
+  // - 없으면 baseData/totalData로 간단히 만들기(최소한으로)
+  let baseOpt = it.shownDesc || "";
+
+  if(!baseOpt){
+    const d = it.baseData || null;
+    if(d){
+      // baseData에 들어있는 것만 1줄 요약(가장 의미있는 1~2개만)
+      const parts = [];
+      if(typeof d.maxHpAdd === "number" && d.maxHpAdd !== 0) parts.push(`최대 체력 +${Math.floor(d.maxHpAdd)}`);
+      if(typeof d.armorAdd === "number" && d.armorAdd !== 0) parts.push(`방어력 +${Math.floor(d.armorAdd)}`);
+      if(typeof d.hpRegen === "number" && d.hpRegen !== 0) parts.push(`재생 +${d.hpRegen.toFixed(2)}/s`);
+      if(typeof d.dmgMul === "number" && d.dmgMul !== 1) parts.push(`평타 피해 +${Math.round((d.dmgMul-1)*100)}%`);
+      if(typeof d.ultiMul === "number" && d.ultiMul !== 1) parts.push(`궁극기 피해 +${Math.round((d.ultiMul-1)*100)}%`);
+      if(typeof d.spdMul === "number" && d.spdMul !== 1) parts.push(`이속 +${Math.round((d.spdMul-1)*100)}%`);
+      if(typeof d.rangeMul === "number" && d.rangeMul !== 1) parts.push(`범위 +${Math.round((d.rangeMul-1)*100)}%`);
+
+      baseOpt = parts.slice(0, 2).join(" / "); // 너무 길면 2개까지만
+    }
+  }
+
+  if(baseOpt){
+    html += `<div class="itemInfoLine">${escHtml(baseOpt)}</div>`;
+  }
+
+  // 4) 접두 / 접미 옵션만 표시
+  const aff = Array.isArray(it.affixes) ? it.affixes : [];
+  const prefixes = aff.filter(a => a && a.affix && a.kind === "prefix");
+  const suffixes = aff.filter(a => a && a.affix && a.kind === "suffix");
+
+  if(prefixes.length){
+    html += `<div class="itemInfoGap"></div>`;
+    html += `<div class="itemInfoLine itemInfoDim">접두</div>`;
+    for(const a of prefixes){
+      const tier = a.tier ? ` T${a.tier}` : "";
+      const v = (Number.isInteger(a.value) ? String(a.value) : Number(a.value).toFixed(3));
+      html += `<div class="itemInfoLine">- ${escHtml(a.affix.name)}${escHtml(tier)} : ${escHtml(v)}</div>`;
+    }
+  }
+
+  if(suffixes.length){
+    html += `<div class="itemInfoGap"></div>`;
+    html += `<div class="itemInfoLine itemInfoDim">접미</div>`;
+    for(const a of suffixes){
+      const tier = a.tier ? ` T${a.tier}` : "";
+      const v = (Number.isInteger(a.value) ? String(a.value) : Number(a.value).toFixed(3));
+      html += `<div class="itemInfoLine">- ${escHtml(a.affix.name)}${escHtml(tier)} : ${escHtml(v)}</div>`;
+    }
+  }
+
+  html += `</div>`;
+  return html;
+}
 
   // 접두/접미(affix)
   if(Array.isArray(it.affixes) && it.affixes.length){
@@ -4614,7 +4675,10 @@ document.getElementById("chaosBtn").addEventListener("click", ()=>{
   it.data = totalData;
   it.name = nm;
 
-  if(sel.from === "equip"){
+// ✅ 베이스 옵션 1줄(설명) 갱신
+it.shownDesc = (tmpl.descGen ? tmpl.descGen(totalData) : (it.shownDesc || ""));
+
+if(sel.from === "equip"){
     equipment[sel.slot] = it;
     rebuildGearFromEquipment();
   }
