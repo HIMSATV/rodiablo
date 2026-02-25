@@ -4694,7 +4694,6 @@ function formatAffixReadable(a){
   const raw = (Number.isInteger(v) ? String(v) : fmtNum(Number(v), 3));
   return `${a.affix.name}${tier} : ${raw}`;
 }
-/* ✅ 아이템 정보: POE식 (이름만 컬러) */
 function prettyItemHTML(it){
   if(!it) return "";
 
@@ -4720,34 +4719,27 @@ function prettyItemHTML(it){
     html += `<div class="itemInfoLine itemInfoDim">베이스: ${escHtml(baseName)}</div>`;
   }
 
-  // 3) 베이스 옵션 (통일 출력)
-html += `<div class="itemInfoGap"></div>`;
-html += `<div class="itemInfoLine itemInfoDim">베이스 옵션</div>`;
+  // 3) 베이스 옵션
+  html += `<div class="itemInfoGap"></div>`;
+  html += `<div class="itemInfoLine itemInfoDim">베이스 옵션</div>`;
 
-if(it.slot === "weapon"){
-  html += `<div class="itemInfoLine">- 기본 무기 피해 +${Math.floor(it.baseDamage)}</div>`;
-}
+  if(it.slot === "weapon" && typeof it.baseDamage === "number"){
+    html += `<div class="itemInfoLine">- 기본 무기 피해 +${Math.floor(it.baseDamage)}</div>`;
+  }
 
-if(it.baseData){
-  const d = it.baseData;
-
-  if(d.maxHpAdd){
-    html += `<div class="itemInfoLine">- 최대 체력 +${Math.floor(d.maxHpAdd)}</div>`;
+  if(it.baseData){
+    const d = it.baseData;
+    if(d.maxHpAdd) html += `<div class="itemInfoLine">- 최대 체력 +${Math.floor(d.maxHpAdd)}</div>`;
+    if(d.armorAdd) html += `<div class="itemInfoLine">- 방어력 +${Math.floor(d.armorAdd)}</div>`;
+    if(d.hpRegen)  html += `<div class="itemInfoLine">- 재생 +${d.hpRegen.toFixed(2)}/s</div>`;
   }
-  if(d.armorAdd){
-    html += `<div class="itemInfoLine">- 방어력 +${Math.floor(d.armorAdd)}</div>`;
-  }
-  if(d.hpRegen){
-    html += `<div class="itemInfoLine">- 재생 +${d.hpRegen.toFixed(2)}/s</div>`;
-  }
-}
 
   // 4) 접두 / 접미 옵션만 표시
   const aff = Array.isArray(it.affixes) ? it.affixes : [];
   const prefixes = aff.filter(a => a && a.affix && a.kind === "prefix");
   const suffixes = aff.filter(a => a && a.affix && a.kind === "suffix");
 
-    if(prefixes.length){
+  if(prefixes.length){
     html += `<div class="itemInfoGap"></div>`;
     html += `<div class="itemInfoLine itemInfoDim">접두</div>`;
     for(const a of prefixes){
@@ -4769,74 +4761,6 @@ if(it.baseData){
 
   html += `</div>`;
   return html;
-}
-
-  // 접두/접미(affix)
-  if(Array.isArray(it.affixes) && it.affixes.length){
-    html += `<div class="itemInfoGap"></div>`;
-    for(const a of it.affixes){
-      if(!a || !a.affix) continue;
-      const kind = (a.kind === "prefix") ? "접두" : "접미";
-      const tier = a.tier ? `T${a.tier}` : "";
-      const v = (Number.isInteger(a.value) ? String(a.value) : Number(a.value).toFixed(3));
-      html += `<div class="itemInfoLine">- ${escHtml(kind)} ${escHtml(a.affix.name)} ${escHtml(tier)} : ${escHtml(v)}</div>`;
-    }
-  }
-
-  // 스탯(총합)
-  const d = it.totalData || it.data;
-  if(d){
-    html += `<div class="itemInfoGap"></div>`;
-    for(const k of Object.keys(d)){
-      const v = d[k];
-      if(typeof v !== "number") continue;
-
-      if(k.endsWith("Mul")){
-        html += `<div class="itemInfoLine">${escHtml(k)}: x${escHtml(v.toFixed(2))}</div>`;
-      }else{
-        const sign = v >= 0 ? "+" : "";
-        const vv = Number.isInteger(v) ? String(v) : v.toFixed(2);
-        html += `<div class="itemInfoLine">${escHtml(k)}: ${escHtml(sign + vv)}</div>`;
-      }
-    }
-  }
-
-  html += `</div>`;
-  return html;
-}
-function prettyItemText(it){
-  if(!it) return "";
-  if(it.isUnique){
-    return `${it.name}
-
-${it.uniqueRef?.desc || it.desc || ""}`;
-  }
-  const lines = [];
-  lines.push(`${it.name}`);
-  if(Array.isArray(it.affixes) && it.affixes.length){
-    lines.push("");
-    for(const a of it.affixes){
-      if(!a || !a.affix) continue;
-      const kind = a.kind === "prefix" ? "접두" : "접미";
-      const tier = a.tier ? `T${a.tier}` : "";
-      const v = (Number.isInteger(a.value) ? String(a.value) : a.value.toFixed(3));
-      lines.push(`- ${kind} ${a.affix.name} ${tier} : ${v}`);
-    }
-  }
-  const d = it.totalData || it.data;
-  if(d){
-    lines.push("");
-    for(const k of Object.keys(d)){
-      const v = d[k];
-      if(typeof v !== "number") continue;
-      if(k.endsWith("Mul")) lines.push(`${k}: x${v.toFixed(2)}`);
-      else{
-        const sign = v>=0 ? "+" : "";
-        lines.push(`${k}: ${sign}${(Number.isInteger(v)?v:v.toFixed(2))}`);
-      }
-    }
-  }
-  return lines.join("\n");
 }
 
 function rebuildGearFromEquipment(){
