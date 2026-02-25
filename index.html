@@ -167,6 +167,11 @@
   font-size: 13px;
   color: #ddd;
 }
+.itemInfoTier{
+  opacity:0.75;
+  font-size:12px;
+  margin-left:6px;
+}
 .itemInfoDim{ color:#aaa; }
 .itemInfoGap{ height:8px; }
 /* ✅ POE식 아이템 이름 색상 */
@@ -4038,7 +4043,44 @@ function rarityKey(it){
 function rarityClass(it){
   return "r-" + rarityKey(it);
 }
+function fmtPct(x, digits=1){
+  // x가 0.123이면 12.3%
+  const p = x * 100;
+  const v = Math.round(p * Math.pow(10, digits)) / Math.pow(10, digits);
+  // 0.0 같은 값이면 소수 없애기
+  return (Math.abs(v - Math.round(v)) < 1e-9) ? String(Math.round(v)) : String(v);
+}
 
+function fmtNum(x, digits=2){
+  const v = Math.round(x * Math.pow(10, digits)) / Math.pow(10, digits);
+  return (Math.abs(v - Math.round(v)) < 1e-9) ? String(Math.round(v)) : String(v);
+}
+
+function formatAffixReadable(a){
+  // a: { affix:{name,group}, tier, value, kind }
+  if(!a || !a.affix) return "";
+  const g = a.affix.group;
+  const v = a.value;
+
+  // group 기준으로 POE식 문장으로 변환
+  if(g === "dmgMul")        return `평타 피해 +${fmtPct(v, 0)}%`;
+  if(g === "ultiMul")       return `궁극기 피해 +${fmtPct(v, 0)}%`;
+  if(g === "rangeMul")      return `범위 +${fmtPct(v, 0)}%`;
+  if(g === "spdMul")        return `이속 +${fmtPct(v, 0)}%`;        // (혹시 확장 대비)
+  if(g === "atkSpdMul")     return `공속 +${fmtPct(v, 0)}%`;        // (확장 대비)
+
+  if(g === "critChanceAdd") return `치명타 확률 +${fmtPct(v, 1)}%`;
+  if(g === "critMultiAdd")  return `치명타 피해 +${fmtPct(v, 0)}%`;
+
+  if(g === "maxHpAdd")      return `최대 체력 +${Math.floor(v)}`;
+  if(g === "armorAdd")      return `방어력 +${Math.floor(v)}`;
+  if(g === "hpRegen")       return `재생 +${fmtNum(v, 2)}/s`;
+
+  // fallback: 그래도 뭔가 보여주기
+  const tier = a.tier ? ` T${a.tier}` : "";
+  const raw = (Number.isInteger(v) ? String(v) : fmtNum(Number(v), 3));
+  return `${a.affix.name}${tier} : ${raw}`;
+}
 /* ✅ 아이템 정보: POE식 (이름만 컬러) */
 function prettyItemHTML(it){
   if(!it) return "";
@@ -4065,44 +4107,40 @@ function prettyItemHTML(it){
     html += `<div class="itemInfoLine itemInfoDim">베이스: ${escHtml(baseName)}</div>`;
   }
 
-  // 3) 베이스 옵션(= 베이스의 기본 효과 1줄)
-  // - it.shownDesc가 있으면 그걸 우선 사용
-  // - 없으면 baseData/totalData로 간단히 만들기(최소한으로)
-  let baseOpt = it.shownDesc || "";
+  // 3) 베이스 옵션 (통일 출력)
+html += `<div class="itemInfoGap"></div>`;
+html += `<div class="itemInfoLine itemInfoDim">베이스 옵션</div>`;
 
-  if(!baseOpt){
-    const d = it.baseData || null;
-    if(d){
-      // baseData에 들어있는 것만 1줄 요약(가장 의미있는 1~2개만)
-      const parts = [];
-      if(typeof d.maxHpAdd === "number" && d.maxHpAdd !== 0) parts.push(`최대 체력 +${Math.floor(d.maxHpAdd)}`);
-      if(typeof d.armorAdd === "number" && d.armorAdd !== 0) parts.push(`방어력 +${Math.floor(d.armorAdd)}`);
-      if(typeof d.hpRegen === "number" && d.hpRegen !== 0) parts.push(`재생 +${d.hpRegen.toFixed(2)}/s`);
-      if(typeof d.dmgMul === "number" && d.dmgMul !== 1) parts.push(`평타 피해 +${Math.round((d.dmgMul-1)*100)}%`);
-      if(typeof d.ultiMul === "number" && d.ultiMul !== 1) parts.push(`궁극기 피해 +${Math.round((d.ultiMul-1)*100)}%`);
-      if(typeof d.spdMul === "number" && d.spdMul !== 1) parts.push(`이속 +${Math.round((d.spdMul-1)*100)}%`);
-      if(typeof d.rangeMul === "number" && d.rangeMul !== 1) parts.push(`범위 +${Math.round((d.rangeMul-1)*100)}%`);
+if(it.slot === "weapon"){
+  html += `<div class="itemInfoLine">- 기본 무기 피해 +${Math.floor(it.baseDamage)}</div>`;
+}
 
-      baseOpt = parts.slice(0, 2).join(" / "); // 너무 길면 2개까지만
-    }
+if(it.baseData){
+  const d = it.baseData;
+
+  if(d.maxHpAdd){
+    html += `<div class="itemInfoLine">- 최대 체력 +${Math.floor(d.maxHpAdd)}</div>`;
   }
-
-  if(baseOpt){
-    html += `<div class="itemInfoLine">${escHtml(baseOpt)}</div>`;
+  if(d.armorAdd){
+    html += `<div class="itemInfoLine">- 방어력 +${Math.floor(d.armorAdd)}</div>`;
   }
+  if(d.hpRegen){
+    html += `<div class="itemInfoLine">- 재생 +${d.hpRegen.toFixed(2)}/s</div>`;
+  }
+}
 
   // 4) 접두 / 접미 옵션만 표시
   const aff = Array.isArray(it.affixes) ? it.affixes : [];
   const prefixes = aff.filter(a => a && a.affix && a.kind === "prefix");
   const suffixes = aff.filter(a => a && a.affix && a.kind === "suffix");
 
-  if(prefixes.length){
+    if(prefixes.length){
     html += `<div class="itemInfoGap"></div>`;
     html += `<div class="itemInfoLine itemInfoDim">접두</div>`;
     for(const a of prefixes){
-      const tier = a.tier ? ` T${a.tier}` : "";
-      const v = (Number.isInteger(a.value) ? String(a.value) : Number(a.value).toFixed(3));
-      html += `<div class="itemInfoLine">- ${escHtml(a.affix.name)}${escHtml(tier)} : ${escHtml(v)}</div>`;
+      const tier = a.tier ? ` <span class="itemInfoTier">T${a.tier}</span>` : "";
+      const line = formatAffixReadable(a);
+      html += `<div class="itemInfoLine">- ${escHtml(line)}${tier}</div>`;
     }
   }
 
@@ -4110,9 +4148,9 @@ function prettyItemHTML(it){
     html += `<div class="itemInfoGap"></div>`;
     html += `<div class="itemInfoLine itemInfoDim">접미</div>`;
     for(const a of suffixes){
-      const tier = a.tier ? ` T${a.tier}` : "";
-      const v = (Number.isInteger(a.value) ? String(a.value) : Number(a.value).toFixed(3));
-      html += `<div class="itemInfoLine">- ${escHtml(a.affix.name)}${escHtml(tier)} : ${escHtml(v)}</div>`;
+      const tier = a.tier ? ` <span class="itemInfoTier">T${a.tier}</span>` : "";
+      const line = formatAffixReadable(a);
+      html += `<div class="itemInfoLine">- ${escHtml(line)}${tier}</div>`;
     }
   }
 
