@@ -153,6 +153,22 @@
       from{ box-shadow:0 0 10px rgba(180,80,255,0.6); }
       to{ box-shadow:0 0 25px rgba(255,120,255,1); }
     }
+    /* ✅ 아이템 정보창 HTML 렌더 */
+.itemInfoWrap{
+  white-space: normal;
+  line-height: 1.25;
+}
+.itemInfoName{
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.itemInfoLine{
+  white-space: pre-line; /* 줄바꿈 유지 */
+  font-size: 13px;
+  color: #ddd;
+}
+.itemInfoDim{ color:#aaa; }
+.itemInfoGap{ height:8px; }
 /* ✅ POE식 아이템 이름 색상 */
 .rName{ font-weight:900; }
 .r-common{ color:#ffffff; }
@@ -4005,6 +4021,77 @@ function rarityKey(it){
 function rarityClass(it){
   return "r-" + rarityKey(it);
 }
+function escHtml(s){
+  return String(s ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
+}
+
+function rarityKey(it){
+  if(!it) return "common";
+  if(it.isUnique || it.rarity === "legendary") return "legendary";
+  return (it.rarity || "common");
+}
+function rarityClass(it){
+  return "r-" + rarityKey(it);
+}
+
+/* ✅ 아이템 정보: POE식 (이름만 컬러) */
+function prettyItemHTML(it){
+  if(!it) return "";
+
+  const rCls = rarityClass(it);
+  let html = `<div class="itemInfoWrap">`;
+
+  // 이름(등급 색)
+  html += `<div class="itemInfoName ${rCls}">${escHtml(it.name || "")}</div>`;
+
+  // 유니크(전설)
+  if(it.isUnique){
+    const desc = it.uniqueRef?.desc || it.desc || "";
+    if(desc){
+      html += `<div class="itemInfoLine itemInfoDim">${escHtml(desc)}</div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  // 접두/접미(affix)
+  if(Array.isArray(it.affixes) && it.affixes.length){
+    html += `<div class="itemInfoGap"></div>`;
+    for(const a of it.affixes){
+      if(!a || !a.affix) continue;
+      const kind = (a.kind === "prefix") ? "접두" : "접미";
+      const tier = a.tier ? `T${a.tier}` : "";
+      const v = (Number.isInteger(a.value) ? String(a.value) : Number(a.value).toFixed(3));
+      html += `<div class="itemInfoLine">- ${escHtml(kind)} ${escHtml(a.affix.name)} ${escHtml(tier)} : ${escHtml(v)}</div>`;
+    }
+  }
+
+  // 스탯(총합)
+  const d = it.totalData || it.data;
+  if(d){
+    html += `<div class="itemInfoGap"></div>`;
+    for(const k of Object.keys(d)){
+      const v = d[k];
+      if(typeof v !== "number") continue;
+
+      if(k.endsWith("Mul")){
+        html += `<div class="itemInfoLine">${escHtml(k)}: x${escHtml(v.toFixed(2))}</div>`;
+      }else{
+        const sign = v >= 0 ? "+" : "";
+        const vv = Number.isInteger(v) ? String(v) : v.toFixed(2);
+        html += `<div class="itemInfoLine">${escHtml(k)}: ${escHtml(sign + vv)}</div>`;
+      }
+    }
+  }
+
+  html += `</div>`;
+  return html;
+}
 function prettyItemText(it){
   if(!it) return "";
   if(it.isUnique){
@@ -4302,7 +4389,7 @@ ULT x${(g.ultiMul ?? 1).toFixed(2)}
 CRT ${(getCritChance()*100).toFixed(1)}% / x${getCritMulti().toFixed(2)}`;
 
   const it = getSelectedItem();
-  equipInfoEl.textContent = it ? prettyItemText(it) : "";
+  equipInfoEl.innerHTML = it ? prettyItemHTML(it) : "";
 }
 
 /* ===== 렌더: 가방 ===== */
@@ -4329,7 +4416,7 @@ function renderBagPanel(){
 c.style.background = "rgba(255,255,255,0.06)";
 
     cell.addEventListener("click", ()=>{
-      if(!it){ selectedItem = null; bagInfoEl.textContent=""; renderAllPanels(); return; }
+      if(!it){ selectedItem = null; bagInfoEl.innerHTML=""; renderAllPanels(); return; }
       selectedItem = {from:"bag", idx:i};
       bagInfoEl.textContent = prettyItemText(it);
       renderAllPanels();
@@ -4339,15 +4426,15 @@ c.style.background = "rgba(255,255,255,0.06)";
   }
 
   const it = getSelectedItem();
-  if(it && selectedItem?.from==="bag") bagInfoEl.textContent = prettyItemText(it);
-  else if(!bagInfoEl.textContent) bagInfoEl.textContent = "";
+  if(it && selectedItem?.from==="bag") bagInfoEl.innerHTML = prettyItemHTML(it);
+else if(!bagInfoEl.innerHTML) bagInfoEl.innerHTML = "";
 }
 
 /* ===== 렌더: 카오스 ===== */
 function renderChaosPanel(){
   chaosCountEl2.textContent = `카오스 ${chaosOrbs}`;
   const it = getSelectedItem();
-  chaosInfoEl.textContent = it ? prettyItemText(it) : "";
+  chaosInfoEl.innerHTML = it ? prettyItemHTML(it) : "";
 }
 
 function renderAllPanels(){
