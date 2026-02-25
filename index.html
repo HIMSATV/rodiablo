@@ -425,6 +425,8 @@
 
 let gamePaused = false;
 let pauseOpts = { dim: 0.60, blur: 2 };
+let resumeFade = 0;     // 0이면 없음, >0이면 페이드 중
+let resumeFadeMax = 10; // 10프레임(약 0.16초) 정도
 
 const pauseCanvas = document.createElement("canvas");
 const pauseCtx = pauseCanvas.getContext("2d");
@@ -455,11 +457,19 @@ function capturePausedFrame(opts = pauseOpts){
 
 function pauseGame(opts){
   if(gamePaused) return;
+  resumeFade = 0;
   capturePausedFrame(opts);
   gamePaused = true;
 }
 
 function resumeGame(){
+  // 이미 페이드 중이면 무시
+  if(resumeFade > 0) return;
+
+  // ✅ 페이드아웃 시작
+  resumeFade = resumeFadeMax;
+
+  // ✅ 게임은 바로 재개(뒤에서 update/draw가 돌기 시작)
   gamePaused = false;
 }
 
@@ -4479,9 +4489,19 @@ function loop(){
       ctx.globalAlpha = 1;
       ctx.filter = "none";
       ctx.drawImage(pauseCanvas, 0, 0);
-    }else{
+        }else{
       update();
       draw();
+
+      if(resumeFade > 0){
+        const a = resumeFade / resumeFadeMax;
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.globalAlpha = a;
+        ctx.filter = "none";
+        ctx.drawImage(pauseCanvas, 0, 0);
+        ctx.globalAlpha = 1;
+        resumeFade--;
+      }
     }
     lastErr = null;
   }catch(e){
