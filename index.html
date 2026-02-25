@@ -15,7 +15,7 @@
     }
 
     body{ margin:0; background:black; overflow:hidden; touch-action:none; }
-    canvas{ position:fixed; top:0; left:0; image-rendering:pixelated; }
+    #game{ position:fixed; top:0; left:0; image-rendering:pixelated; }
 
     /* ============================= */
     /* ✅ 하단 UI 바 */
@@ -346,7 +346,8 @@
     .bItem.unique{ border-color:#b89b00; }
 
   .iconCanvas{
-  display:block;               /* ✅ 중요: iOS에서 안 보이는 이슈 방지 */
+  position:static;
+  display:block;
   background:rgba(255,255,255,0.06);
   border-radius:10px;
 }
@@ -4393,7 +4394,7 @@ document.getElementById("btnChaosWnd").addEventListener("click", (e)=>{ stopEvt(
 // 장비 -> 가방
 document.getElementById("btnEquipToBag").addEventListener("click", (e)=>{
   stopEvt(e);
-  openPanel("bag");
+  renderAllPanels();
 });
 
 // 가방 -> 장비
