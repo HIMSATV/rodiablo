@@ -1040,7 +1040,6 @@ body{
     <div class="lootCards" id="lootCards"></div>
     <div class="lootHint" style="color:#aaa;font-size:12px;margin-top:10px;text-align:center;">선택하면 즉시 적용됩니다.</div>
   </div>
-</div>
 
 <!-- ✅ 장비/스펙 패널 -->
 <div class="panelOverlay" id="equipOverlay">
@@ -1159,20 +1158,46 @@ resize();
 window.addEventListener("resize", ()=>requestAnimationFrame(resize));
 requestAnimationFrame(resize);
 
-/* ===== 사운드 ===== */
-const audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+/* ===== 사운드 (iOS 대응: 사용자 입력 후 생성) ===== */
+let audioCtx = null;
 let audioUnlocked = false;
 
-function unlockAudio(){
-  if(audioUnlocked) return;
-  audioUnlocked = true;
-  audioCtx.resume().then(()=>{
-    if(!bgmOsc) bgmOsc = startBGM();
-  });
+function ensureAudioCtx(){
+  if (audioCtx) return true;
+  try{
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return true;
+  }catch(e){
+    console.log("AudioContext blocked:", e);
+    return false;
+  }
 }
+
+function unlockAudio(){
+  if (audioUnlocked) return;
+  if (!ensureAudioCtx()) return;
+
+  // iOS는 resume도 사용자 제스처에서 호출돼야 안전함
+  audioCtx.resume?.();
+
+  // 무음 버퍼 한 번 재생해서 언락(브라우저별 호환)
+  try{
+    const buffer = audioCtx.createBuffer(1, 1, 22050);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+  }catch(e){
+    // 무시
+  }
+
+  audioUnlocked = true;
+}
+
+// ✅ 첫 터치/클릭에서 오디오 언락
+window.addEventListener("pointerdown", unlockAudio, { once:true });
 window.addEventListener("touchstart", unlockAudio, { once:true });
 window.addEventListener("mousedown", unlockAudio, { once:true });
-window.addEventListener("keydown", unlockAudio, { once:true });
 
 function startBGM(){
   let isPlaying = true;
