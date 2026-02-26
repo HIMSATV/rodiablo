@@ -284,7 +284,9 @@
     .eSlot.selected{ outline:2px solid #ffd166; }
     .eSlot .label{ font-size:12px; color:#aaa; text-transform:uppercase; letter-spacing:0.06em; }
     .eSlot .item{ font-size:14px; color:#f2f2f2; line-height:1.2; word-break:break-word; }
-
+.eSlot .label{
+  display:none !important;
+}
     #specBox{
       flex:1 1 auto;
       background:#101010;
@@ -5054,11 +5056,6 @@ function renderEquipPanel(){
     c.width = 44; c.height = 44;
     d.appendChild(c);
     drawItemIcon(c, it);
-
-    const lab = document.createElement("div");
-    lab.className = "slotLabel";
-    lab.textContent = slotLabel(slot);
-    d.appendChild(lab);
 
     d.addEventListener("click", ()=>{
       // 1) 가방에서 선택한 아이템이 있으면 -> 해당 슬롯에 장착
