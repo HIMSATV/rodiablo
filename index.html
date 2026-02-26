@@ -5055,10 +5055,13 @@ function renderEquipPanel(){
     d.appendChild(c);
     drawItemIcon(c, it);
 
-    const lab = document.createElement("div");
-    lab.className = "slotLabel";
-    lab.textContent = slotLabel(slot);
-    d.appendChild(lab);
+   const c = document.createElement("canvas");
+c.width = 44; c.height = 44;
+d.appendChild(c);
+drawItemIcon(c, it);
+
+// (여기 lab 만들던 4줄이 없어져야 함)
+
 
     d.addEventListener("click", ()=>{
       // 1) 가방에서 선택한 아이템이 있으면 -> 해당 슬롯에 장착
