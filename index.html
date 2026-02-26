@@ -3410,45 +3410,98 @@ function rollRarity(){
 
 
 function pickItemsForChoice(count){
-  const mapTier = (Game && Game.mapTier) ? Game.mapTier : (window.mapTier || 1);
-  const t = clampMapTier(mapTier);
-  const out = [];
+
+  const mapTier = Math.max(1, Game.mapTier || 1);
+
+  if(!Array.isArray(ITEM_POOL) || !ITEM_POOL.length){
+    console.warn("ITEM_POOL empty");
+    return [];
+  }
+
+  const results = [];
   const usedBaseIds = new Set();
 
-  // 최소 1개는 무기 보장(플레이감)
-  const slots = [];
-  if(count > 0) slots.push("weapon");
-  while(slots.length < count){
-    slots.push(pickSlotForMapTier(t));
-  }
+  for(let i=0;i<count;i++){
 
-  for(let i=0;i<slots.length;i++){
-    const slot = slots[i];
-    let base = pickBaseForMapTier(t, slot);
+    // 슬롯 분포
+    const slot = pickSlotForMapTier(mapTier);
 
-    // 중복 방지: 같은 baseId가 이미 있으면 같은 슬롯에서 2번 재시도
-    let tries = 0;
-    while(base && usedBaseIds.has(base.id) && tries < 2){
-      base = pickBaseForMapTier(t, slot);
-      tries++;
+    let pool = ITEM_POOL.filter(b => b && b.slot === slot);
+
+    if(!pool.length){
+      pool = ITEM_POOL.slice(); // fallback
     }
-    if(!base) continue;
 
-    usedBaseIds.add(base.id);
+    // 베이스 티어 분포
+    const targetTier = pickBaseTierForMap(mapTier);
 
-    // ilvl은 맵 티어로 스케일
-    const ilvl = rollItemLevelFromMapTier(t);
-    const item = createItemInstance(base.id, null, { ilvl });
+    let filtered = pool.filter(b =>
+      (b.baseTier ?? 1) <= targetTier
+    );
 
-    if(item) out.push(item);
+    if(!filtered.length){
+      filtered = pool;
+    }
+
+    // 가중치 적용
+    const weighted = [];
+
+    for(const b of filtered){
+      if(!b) continue;
+
+      const w = Math.max(1, b.weight ?? 100);
+
+      for(let k=0;k<w;k++){
+        weighted.push(b);
+      }
+    }
+
+    if(!weighted.length){
+      console.warn("weighted empty");
+      continue;
+    }
+
+    let choice = null;
+
+    // 중복 방지 시도 5회
+    for(let t=0;t<5;t++){
+      const candidate = weighted[Math.floor(Math.random()*weighted.length)];
+      if(candidate && !usedBaseIds.has(candidate.id)){
+        choice = candidate;
+        break;
+      }
+    }
+
+    if(!choice){
+      choice = weighted[Math.floor(Math.random()*weighted.length)];
+    }
+
+    if(!choice) continue;
+
+    usedBaseIds.add(choice.id);
+
+    const ilvl = rollItemLevelFromMapTier(mapTier);
+
+    const item = createItemInstance(choice.id, null, { ilvl });
+
+    if(item){
+      results.push(item);
+    }
   }
-  return out;
+
+  return results;
 }
 
 
 function spawnLoot(x, y, source="mob"){
   if(loots.length > 25) loots.splice(0, loots.length-25);
   const choices = pickItemsForChoice(3);
+  const items = pickItemsForChoice(3);
+
+if(!items || !items.length){
+  console.warn("No items rolled");
+  return;
+}
   loots.push({ x, y, r: 14, ttl: 60*45, choices, taken: false, source });
 }
 
