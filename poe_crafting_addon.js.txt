@@ -1,0 +1,593 @@
+/* (file) poe_crafting_addon.js
+ *******************************************************
+ * PoE Crafting Add-on (standalone)
+ * - Drops-in without touching core logic.
+ * - Replaces the existing #chaosBtn click handler with
+ *   a full PoE-like currency crafting UI.
+ *
+ * How to use:
+ * 1) Save this file as: poe_crafting_addon.js
+ * 2) Include AFTER your main <script> in index.html:
+ *    <script src="poe_crafting_addon.js"></script>
+ *******************************************************/
+(function(){
+  "use strict";
+
+  // ---------- Safe helpers ----------
+  const $ = (sel)=>document.querySelector(sel);
+  const onReady = (fn)=>{
+    if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn);
+    else fn();
+  };
+  const rnd = (a,b)=>a + Math.random()*(b-a);
+  const pick = (arr)=>arr[Math.floor(Math.random()*arr.length)];
+  const isFn = (f)=>typeof f === "function";
+
+  // ---------- Currency state (global) ----------
+  function ensureCurrency(){
+    if(typeof window.chaosOrbs !== "number") window.chaosOrbs = 0;
+    window.poeCurrency = window.poeCurrency || {
+      transmute: 5,
+      augment: 8,
+      alchemy: 3,
+      chaos: window.chaosOrbs, // mirror
+      regal: 3,
+      exalt: 1,
+      annul: 2,
+      scour: 3
+    };
+  }
+
+  // Sync legacy chaosOrbs <-> poeCurrency.chaos
+  function syncChaos(){
+    ensureCurrency();
+    window.poeCurrency.chaos = window.chaosOrbs;
+  }
+  function commitChaos(){
+    ensureCurrency();
+    window.chaosOrbs = window.poeCurrency.chaos;
+  }
+
+  // ---------- Item access ----------
+  function getSelectedItemSafe(){
+    if(isFn(window.getSelectedItem)){
+      try{ return window.getSelectedItem(); }catch(_){}
+    }
+    const sel = window.selectedItem;
+    if(!sel) return null;
+    if(sel.from === "bag" && Array.isArray(window.inventory)) return window.inventory[sel.idx] || null;
+    if(sel.from === "equip" && window.equipment) return window.equipment[sel.slot] || null;
+    return null;
+  }
+
+  // ---------- Rarity rules ----------
+  function normRarity(r){
+    const x = String(r||"common").toLowerCase();
+    if(x === "normal") return "common";
+    if(x === "magic") return "magic";
+    if(x === "rare") return "rare";
+    if(x === "epic") return "epic";
+    return "common";
+  }
+  function affixCaps(r){
+    r = normRarity(r);
+    if(r === "magic") return { pre:1, suf:1 };
+    if(r === "rare" || r === "epic") return { pre:3, suf:3 };
+    return { pre:0, suf:0 };
+  }
+  function countAffixes(it){
+    const aff = Array.isArray(it.affixes)? it.affixes : [];
+    return {
+      pre: aff.filter(a=>a && a.kind==="prefix").length,
+      suf: aff.filter(a=>a && a.kind==="suffix").length
+    };
+  }
+
+  // ---------- Tag matching ----------
+  function matchesAffixTagRule(affix, itemTags){
+    const tags = Array.isArray(itemTags) ? itemTags : [];
+    const has = (t)=>tags.includes(t);
+    const all = Array.isArray(affix.requiresAll) ? affix.requiresAll : [];
+    const any = Array.isArray(affix.requiresAny) ? affix.requiresAny : [];
+    const forb = Array.isArray(affix.forbids) ? affix.forbids : [];
+    for(const f of forb){ if(has(f)) return false; }
+    for(const a of all){ if(!has(a)) return false; }
+    if(any.length){
+      let ok = false;
+      for(const a of any){ if(has(a)) { ok=true; break; } }
+      if(!ok) return false;
+    }
+    return true;
+  }
+
+  // ---------- Affix picking (single mod add) ----------
+  function pickSingleAffix(kind, usedGroups, itemTags){
+    if(!window.AFFIX_DB || !window.AFFIX_DB[kind]) return null;
+    const pool = window.AFFIX_DB[kind].filter(a=>{
+      if(!a) return false;
+      if(usedGroups.has(a.group)) return false;
+      if(!matchesAffixTagRule(a, itemTags)) return false;
+      return true;
+    });
+    if(!pool.length) return null;
+
+    let cand = null;
+    if(isFn(window.weightedPick)){
+      let guard = 0;
+      while(guard++ < 200){
+        const c = window.weightedPick(pool);
+        if(!c) break;
+        if(usedGroups.has(c.group)) continue;
+        cand = c;
+        break;
+      }
+    } else {
+      cand = pick(pool);
+    }
+    if(!cand) return null;
+    usedGroups.add(cand.group);
+
+    // Roll tier/value
+    let rr = { tier: 1, value: 0 };
+    if(isFn(window.rollTierValue)){
+      const ilvl = (itLevelGuess());
+      rr = window.rollTierValue(cand, ilvl);
+    } else {
+      const t = (cand.tiers && cand.tiers[0]) ? cand.tiers[0] : { min: 0.05, max: 0.10 };
+      rr = { tier: 1, value: rnd(t.min, t.max) };
+    }
+    return { kind, affix: cand, tier: rr.tier, value: rr.value };
+  }
+
+  function itLevelGuess(){
+    if(isFn(window.getItemLevel)){
+      try{ return window.getItemLevel(); }catch(_){}
+    }
+    return 20;
+  }
+
+  // ---------- Rebuild item stats/name after craft ----------
+  function rebuildItemDerived(it){
+    const baseId = it.baseId || it.id;
+    const tmpl = Array.isArray(window.ITEM_POOL) ? window.ITEM_POOL.find(x=>x.id===baseId) : null;
+
+    const baseData = isFn(window.buildBaseDataFromItemId) ? window.buildBaseDataFromItemId(baseId) : (it.baseData || null);
+
+    const affixData = isFn(window.makeEmptyItemData) ? window.makeEmptyItemData() : {};
+    const aff = Array.isArray(it.affixes)? it.affixes : [];
+    for(const a of aff){
+      if(a && a.affix && isFn(a.affix.apply)){
+        a.affix.apply(affixData, a.value);
+      }
+    }
+
+    const totalData = isFn(window.mergeItemData) ? window.mergeItemData(baseData, affixData) : Object.assign({}, baseData||{}, affixData||{});
+
+    const preNames = aff.filter(x=>x && x.kind==="prefix" && x.affix).map(x=>x.affix.name);
+    const sufNames = aff.filter(x=>x && x.kind==="suffix" && x.affix).map(x=>x.affix.name);
+
+    let nm = (tmpl && tmpl.name) ? tmpl.name : (it.baseName || it.name || baseId || "아이템");
+    if(preNames.length) nm = preNames.join(" ") + " " + nm;
+    if(sufNames.length) nm = nm + " " + sufNames.join(" ");
+
+    it.baseId = baseId;
+    it.baseName = (tmpl && tmpl.name) ? tmpl.name : (it.baseName || baseId);
+    it.baseData = baseData;
+    it.affixData = affixData;
+    it.totalData = totalData;
+    it.data = totalData;
+    it.name = nm;
+
+    if(tmpl && isFn(window.inferItemTagsFromTemplate)){
+      it.tags = window.inferItemTagsFromTemplate(tmpl, baseId);
+    }
+    if(isFn(window.buildItemMods)){
+      it.mods = window.buildItemMods(baseId, baseData, it.affixes || [], it.tags || []);
+    }
+
+    if(tmpl && isFn(tmpl.descGen)){
+      it.shownDesc = tmpl.descGen(totalData);
+    }
+  }
+
+  // ---------- Craft operations ----------
+  function ensureItemEditable(it){
+    if(!it) return { ok:false, msg:"아이템을 먼저 선택해줘." };
+    if(it.isUnique) return { ok:false, msg:"유니크는 제작할 수 없어." };
+    const baseId = it.baseId || it.id;
+    if(!baseId) return { ok:false, msg:"베이스 정보를 찾을 수 없어." };
+    return { ok:true, msg:"" };
+  }
+
+  function usedGroupsFromItem(it){
+    const used = new Set();
+    const aff = Array.isArray(it.affixes)? it.affixes : [];
+    for(const a of aff){
+      if(a && a.affix && a.affix.group) used.add(a.affix.group);
+    }
+    return used;
+  }
+
+  function clearAffixesToNormal(it){
+    it.rarity = "common";
+    it.affixes = [];
+    rebuildItemDerived(it);
+  }
+
+  function makeMagicFromNormal(it){
+    it.rarity = "magic";
+    it.affixes = [];
+    const tags = Array.isArray(it.tags) ? it.tags : [];
+    const used = usedGroupsFromItem(it);
+
+    const firstKind = (Math.random()<0.5) ? "prefix" : "suffix";
+    const first = pickSingleAffix(firstKind, used, tags);
+    if(first) it.affixes.push(first);
+
+    if(Math.random() < 0.35){
+      const second = pickSingleAffix(firstKind==="prefix"?"suffix":"prefix", used, tags);
+      if(second) it.affixes.push(second);
+    }
+    rebuildItemDerived(it);
+  }
+
+  function makeRareFromNormal(it){
+    it.rarity = "rare";
+    const ilvl = it.ilvl || itLevelGuess();
+    const tags = Array.isArray(it.tags) ? it.tags : [];
+    const used = new Set();
+
+    const caps = affixCaps("rare");
+    const total = 4 + Math.floor(Math.random()*3); // 4..6
+    it.affixes = [];
+    let guard = 0;
+    while(it.affixes.length < total && guard++ < 800){
+      const wantKind = (Math.random()<0.5) ? "prefix" : "suffix";
+      const counts = countAffixes(it);
+      if(wantKind==="prefix" && counts.pre >= caps.pre) continue;
+      if(wantKind==="suffix" && counts.suf >= caps.suf) continue;
+
+      const roll = pickSingleAffix(wantKind, used, tags);
+      if(!roll) break;
+
+      if(isFn(window.rollTierValue) && roll && roll.affix){
+        const rr = window.rollTierValue(roll.affix, ilvl);
+        roll.tier = rr.tier;
+        roll.value = rr.value;
+      }
+      it.affixes.push(roll);
+    }
+    rebuildItemDerived(it);
+  }
+
+  function chaosRerollRare(it){
+    const r = normRarity(it.rarity);
+    if(r !== "rare" && r !== "epic") return false;
+    makeRareFromNormal(it);
+    it.rarity = r;
+    rebuildItemDerived(it);
+    return true;
+  }
+
+  function addOneAffix(it){
+    const r = normRarity(it.rarity);
+    if(r !== "magic" && r !== "rare" && r !== "epic") return { ok:false, msg:"이 오브는 매직/레어 아이템에만 사용 가능." };
+    const caps = affixCaps(r);
+    const counts = countAffixes(it);
+    const tags = Array.isArray(it.tags) ? it.tags : [];
+    const used = usedGroupsFromItem(it);
+
+    const canPre = counts.pre < caps.pre;
+    const canSuf = counts.suf < caps.suf;
+    if(!canPre && !canSuf) return { ok:false, msg:"더 이상 옵션을 추가할 수 없어 (접두/접미 가득 참)." };
+
+    let kind = null;
+    if(canPre && canSuf) kind = (Math.random()<0.5) ? "prefix" : "suffix";
+    else kind = canPre ? "prefix" : "suffix";
+
+    const roll = pickSingleAffix(kind, used, tags);
+    if(!roll) return { ok:false, msg:"추가할 수 있는 옵션이 없어." };
+
+    it.affixes = Array.isArray(it.affixes)? it.affixes : [];
+    it.affixes.push(roll);
+    rebuildItemDerived(it);
+    return { ok:true, msg:`${kind==="prefix"?"접두":"접미"} +1 추가!` };
+  }
+
+  function removeOneAffix(it){
+    const aff = Array.isArray(it.affixes)? it.affixes : [];
+    if(!aff.length) return { ok:false, msg:"지울 옵션이 없어." };
+    const idx = Math.floor(Math.random()*aff.length);
+    const removed = aff.splice(idx,1)[0];
+    it.affixes = aff;
+    rebuildItemDerived(it);
+    return { ok:true, msg:`옵션 1개 제거됨: ${removed?.affix?.name || "?"}` };
+  }
+
+  function regalMagicToRare(it){
+    const r = normRarity(it.rarity);
+    if(r !== "magic") return { ok:false, msg:"레갈 오브는 매직 아이템에만 사용 가능." };
+    it.rarity = "rare";
+    const add = addOneAffix(it);
+    rebuildItemDerived(it);
+    return add.ok ? { ok:true, msg:"레어로 승격 + 옵션 1개 추가!" } : add;
+  }
+
+  // ---------- UI injection ----------
+  function renderCraftingUI(){
+    ensureCurrency();
+    syncChaos();
+
+    const left = $("#chaosLeft");
+    const info = $("#chaosInfo");
+    const countEl = $("#chaosCount");
+    if(!left || !info || !countEl) return;
+
+    if(!$("#poeCraftWrap")){
+      const wrap = document.createElement("div");
+      wrap.id = "poeCraftWrap";
+      wrap.style.display = "flex";
+      wrap.style.flexDirection = "column";
+      wrap.style.gap = "10px";
+      wrap.style.marginTop = "6px";
+
+      const hint = document.createElement("div");
+      hint.style.fontSize = "12px";
+      hint.style.color = "#cfcfcf";
+      hint.style.lineHeight = "1.35";
+      hint.textContent = "선택한 아이템에 오브를 사용해 제작합니다 (유니크 제외).";
+
+      const grid = document.createElement("div");
+      grid.id = "poeOrbGrid";
+      grid.style.display = "grid";
+      grid.style.gridTemplateColumns = "1fr 1fr";
+      grid.style.gap = "8px";
+
+      wrap.appendChild(hint);
+      wrap.appendChild(grid);
+      left.appendChild(wrap);
+
+      // Replace old chaosBtn to remove old handler cleanly
+      const oldBtn = $("#chaosBtn");
+      if(oldBtn){
+        const cloned = oldBtn.cloneNode(true);
+        cloned.id = "chaosBtn";
+        cloned.textContent = "카오스 오브(레어 리롤)";
+        oldBtn.parentNode.replaceChild(cloned, oldBtn);
+      }
+
+      const makeOrbBtn = (key, label)=>{
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "poeOrbBtn";
+        b.style.padding = "10px 10px";
+        b.style.borderRadius = "12px";
+        b.style.border = "1px solid #3a3a3a";
+        b.style.background = "#1b1b1b";
+        b.style.color = "#fff";
+        b.style.fontWeight = "900";
+        b.style.cursor = "pointer";
+        b.style.textAlign = "left";
+        b.dataset.orb = key;
+
+        const small = document.createElement("div");
+        small.style.fontSize = "11px";
+        small.style.fontWeight = "700";
+        small.style.opacity = "0.9";
+        small.textContent = label;
+
+        const cnt = document.createElement("div");
+        cnt.style.fontSize = "13px";
+        cnt.style.fontWeight = "900";
+        cnt.textContent = "x0";
+        cnt.className = "poeOrbCount";
+
+        b.appendChild(small);
+        b.appendChild(cnt);
+        return b;
+      };
+
+      const orbs = [
+        ["transmute","변환의 오브(노멀→매직)"],
+        ["augment","증강의 오브(+옵션 1개)"],
+        ["alchemy","연금술의 오브(노멀→레어)"],
+        ["chaos","카오스 오브(레어 리롤)"],
+        ["regal","레갈 오브(매직→레어)"],
+        ["exalt","엑잘티드 오브(+옵션 1개)"],
+        ["annul","어널 오브(옵션 1개 제거)"],
+        ["scour","스커링 오브(옵션 초기화)"]
+      ];
+
+      for(const [k,label] of orbs){
+        const b = makeOrbBtn(k,label);
+        grid.appendChild(b);
+      }
+
+      grid.addEventListener("click", (e)=>{
+        const btn = e.target.closest(".poeOrbBtn");
+        if(!btn) return;
+        const key = btn.dataset.orb;
+        if(!key) return;
+        applyOrb(key);
+      });
+
+      // Also bind chaosBtn (legacy id) to chaos orb
+      const chaosBtn = $("#chaosBtn");
+      if(chaosBtn){
+        chaosBtn.addEventListener("click", ()=>applyOrb("chaos"));
+      }
+    }
+
+    // Update counts + selected item info
+    const it = getSelectedItemSafe();
+    const selName = it ? (it.name || it.baseName || it.baseId || it.id) : "선택된 아이템 없음";
+    const r = it ? normRarity(it.rarity) : "";
+    const counts = it ? countAffixes(it) : {pre:0,suf:0};
+    const caps = it ? affixCaps(r) : {pre:0,suf:0};
+
+    countEl.textContent =
+      `제작 (PoE)  |  대상: ${selName}\n` +
+      (it ? `등급: ${r}  |  접두 ${counts.pre}/${caps.pre}, 접미 ${counts.suf}/${caps.suf}` : "가방/장비에서 아이템을 선택해줘.");
+
+    // Update orb counts
+    const wrap = $("#poeCraftWrap");
+    if(wrap){
+      wrap.querySelectorAll(".poeOrbBtn").forEach(b=>{
+        const k = b.dataset.orb;
+        const c = (k==="chaos") ? window.chaosOrbs : window.poeCurrency[k];
+        const cntEl = b.querySelector(".poeOrbCount");
+        if(cntEl) cntEl.textContent = `x${c|0}`;
+        b.style.opacity = (c>0) ? "1" : "0.45";
+      });
+    }
+
+    if(it && isFn(window.prettyItemHTML)){
+      info.innerHTML = window.prettyItemHTML(it);
+    } else {
+      info.textContent = it ? JSON.stringify(it, null, 2) : "아이템을 선택하면 옵션이 표시돼.";
+    }
+  }
+
+  function applyOrb(key){
+    ensureCurrency();
+    syncChaos();
+
+    const it = getSelectedItemSafe();
+    const chk = ensureItemEditable(it);
+    if(!chk.ok){
+      toast(chk.msg);
+      return;
+    }
+
+    const getCount = ()=>{
+      if(key==="chaos") return window.chaosOrbs|0;
+      return (window.poeCurrency[key]|0);
+    };
+    const dec = ()=>{
+      if(key==="chaos"){
+        window.chaosOrbs = (window.chaosOrbs|0) - 1;
+        if(window.chaosOrbs < 0) window.chaosOrbs = 0;
+      } else {
+        window.poeCurrency[key] = (window.poeCurrency[key]|0) - 1;
+        if(window.poeCurrency[key] < 0) window.poeCurrency[key] = 0;
+      }
+      commitChaos();
+    };
+
+    if(getCount() <= 0){
+      toast("오브가 부족해!");
+      return;
+    }
+
+    const r = normRarity(it.rarity);
+    let msg = "";
+    let ok = true;
+
+    if(key === "scour"){
+      dec();
+      clearAffixesToNormal(it);
+      msg = "스커링: 옵션 초기화!";
+    }
+    else if(key === "transmute"){
+      if(r !== "common"){ toast("변환은 노멀(흰템)에만 사용 가능."); return; }
+      dec();
+      makeMagicFromNormal(it);
+      msg = "변환: 매직으로 변환!";
+    }
+    else if(key === "alchemy"){
+      if(r !== "common"){ toast("연금술은 노멀(흰템)에만 사용 가능."); return; }
+      dec();
+      makeRareFromNormal(it);
+      msg = "연금술: 레어로 변환!";
+    }
+    else if(key === "augment"){
+      if(r !== "magic"){ toast("증강은 매직 아이템에만 사용 가능."); return; }
+      dec();
+      const res = addOneAffix(it);
+      ok = res.ok; msg = res.msg;
+    }
+    else if(key === "regal"){
+      const res = regalMagicToRare(it);
+      if(!res.ok){ toast(res.msg); return; }
+      dec();
+      msg = res.msg;
+    }
+    else if(key === "chaos"){
+      if(r !== "rare" && r !== "epic"){ toast("카오스는 레어/에픽에만 사용 가능."); return; }
+      dec();
+      chaosRerollRare(it);
+      msg = "카오스: 옵션 리롤!";
+    }
+    else if(key === "exalt"){
+      if(r !== "rare" && r !== "epic"){ toast("엑잘티드는 레어/에픽에만 사용 가능."); return; }
+      dec();
+      const res = addOneAffix(it);
+      ok = res.ok; msg = res.msg;
+    }
+    else if(key === "annul"){
+      if(r !== "magic" && r !== "rare" && r !== "epic"){ toast("어널은 매직/레어/에픽에만 사용 가능."); return; }
+      dec();
+      const res = removeOneAffix(it);
+      ok = res.ok; msg = res.msg;
+    }
+
+    if(!ok){
+      toast(msg || "실패");
+      renderCraftingUI();
+      return;
+    }
+
+    if(window.selectedItem && window.selectedItem.from === "equip" && isFn(window.rebuildGearFromEquipment)){
+      window.rebuildGearFromEquipment();
+    }
+
+    if(isFn(window.renderAllPanels)) window.renderAllPanels();
+    renderCraftingUI();
+    toast(msg || "완료!");
+  }
+
+  // Minimal toast (non-invasive)
+  let toastTimer = null;
+  function toast(text){
+    const id = "poeToast";
+    let el = $("#"+id);
+    if(!el){
+      el = document.createElement("div");
+      el.id = id;
+      el.style.position = "fixed";
+      el.style.left = "50%";
+      el.style.bottom = "160px";
+      el.style.transform = "translateX(-50%)";
+      el.style.padding = "10px 14px";
+      el.style.borderRadius = "14px";
+      el.style.background = "rgba(0,0,0,0.75)";
+      el.style.color = "#fff";
+      el.style.fontWeight = "900";
+      el.style.fontSize = "13px";
+      el.style.zIndex = "99999";
+      el.style.pointerEvents = "none";
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.opacity = "1";
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>{ if(el) el.style.opacity="0"; }, 900);
+  }
+
+  // Hook into panel renders (if core hook exists)
+  function installHook(){
+    window.GameHooks = window.GameHooks || {};
+    const prev = window.GameHooks.afterRenderPanels;
+    window.GameHooks.afterRenderPanels = function(){
+      try{ if(isFn(prev)) prev(); }catch(_){}
+      try{ if(window.panelOpen === "chaos") renderCraftingUI(); }catch(_){}
+    };
+  }
+
+  onReady(()=>{
+    ensureCurrency();
+    installHook();
+    if(window.panelOpen === "chaos") renderCraftingUI();
+  });
+
+})();
