@@ -5167,7 +5167,6 @@ function goBag(e){
 equipToBagBtn.addEventListener("pointerdown", goBag);
 equipToBagBtn.addEventListener("click", goBag);
 equipToBagBtn.style.touchAction = "manipulation";
-// ✅ 가방: 선택된 아이템을 해당 슬롯으로 장착
 document.getElementById("btnBagEquip").addEventListener("click", (e)=>{
   stopEvt(e);
 
@@ -5176,7 +5175,7 @@ document.getElementById("btnBagEquip").addEventListener("click", (e)=>{
   if(!it || it.isUnique) return;
 
   equipFromBagToSlot(selectedItem.idx, it.slot);
-  openPanel("equip"); // 결과 바로 확인
+  renderAllPanels(); // ✅ 화면만 갱신, 패널 이동 없음
 });
 
 // ✅ 장비: 선택된 슬롯 해제
@@ -5188,7 +5187,7 @@ document.getElementById("btnEquipUnequip").addEventListener("click", (e)=>{
   if(!slot || !equipment[slot]) return;
 
   unequipSlotToBag(slot);
-  openPanel("bag");
+  renderAllPanels(); // ✅ 화면만 갱신, 패널 이동 없음
 });
 // Close buttons
 document.getElementById("btnEquipClose").addEventListener("click", closePanels);
