@@ -328,8 +328,8 @@
 
 /* ✅ 아이템 설명: 위 */
 #bagInfo{
-  flex:0 0 auto;
-  max-height:38vh;         /* ✅ 너무 커지지 않게 */
+  flex:0 0 42vh;           /* ✅ 정보창 높이 고정 */
+  height:42vh;             /* ✅ 아이템에 따라 크기 변하지 않게 */
   overflow:auto;
   white-space:pre-line;
   font-size:13px;
@@ -437,8 +437,9 @@
   overflow: auto;
 }
 #bagInfo{
-  max-height: 38vh;
-  overflow: auto;
+  flex:0 0 42vh;
+  height:42vh;
+  overflow:auto;
 }
     }
     /* ============================= */
