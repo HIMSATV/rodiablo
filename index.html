@@ -431,7 +431,15 @@
       #equipPanelBody{ flex-direction:column; }
       #equipSlots{ grid-template-columns:1fr 1fr; flex:0 0 auto; }
       #bagBody{ flex-direction:column; }
-      #bagGrid{ flex:0 0 auto; }
+      #bagGrid{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+#bagInfo{
+  max-height: 38vh;
+  overflow: auto;
+}
     }
     /* ============================= */
 /* ✅ DIABLO STYLE UI SKIN (ADD) */
@@ -5051,12 +5059,14 @@ function renderBagPanel(){
     c.style.display = "block";
 c.style.background = "rgba(255,255,255,0.06)";
 
-    cell.addEventListener("click", ()=>{
-      if(!it){ selectedItem = null; bagInfoEl.innerHTML=""; renderAllPanels(); return; }
-      selectedItem = {from:"bag", idx:i};
-      bagInfoEl.textContent = prettyItemText(it);
-      renderAllPanels();
-    });
+  bindTap(cell, ()=>{
+  if(!it){
+    selectedItem = null;
+  }else{
+    selectedItem = {from:"bag", idx:i};
+  }
+  renderAllPanels();
+});
 
     bagGridEl.appendChild(cell);
   }
