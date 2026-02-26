@@ -5059,14 +5059,17 @@ function renderBagPanel(){
     c.style.display = "block";
 c.style.background = "rgba(255,255,255,0.06)";
 
-  bindTap(cell, ()=>{
+  cell.addEventListener("pointerup", (e)=>{
+  e.preventDefault();
+
   if(!it){
     selectedItem = null;
   }else{
     selectedItem = {from:"bag", idx:i};
   }
+
   renderAllPanels();
-});
+}, {passive:false});
 
     bagGridEl.appendChild(cell);
   }
@@ -5074,6 +5077,9 @@ c.style.background = "rgba(255,255,255,0.06)";
   const it = getSelectedItem();
   if(it && selectedItem?.from==="bag") bagInfoEl.innerHTML = prettyItemHTML(it);
 else if(!bagInfoEl.innerHTML) bagInfoEl.innerHTML = "";
+bagInfoEl.style.minHeight = "140px";
+bagInfoEl.style.overflowY = "auto";
+bagInfoEl.style.boxSizing = "border-box";
 }
 
 /* ===== 렌더: 카오스 ===== */
