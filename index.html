@@ -7592,6 +7592,79 @@ function resetGame(){
     }
   };
 })();
+// ===============================
+// ✅ DROP FIX: slot/tier/ilvl 기본 구현 (없으면 자동 제공)
+// ===============================
+
+function __randPickWeighted(pairs){
+  // pairs: [{v, w}]
+  let sum = 0;
+  for(const p of pairs){ sum += Math.max(0, p.w||0); }
+  if(sum <= 0) return pairs[0]?.v;
+  let r = Math.random() * sum;
+  for(const p of pairs){
+    r -= Math.max(0, p.w||0);
+    if(r <= 0) return p.v;
+  }
+  return pairs[pairs.length-1]?.v;
+}
+
+// 1) 슬롯 분포 (PoE 느낌: 초반 무기/갑옷 위주, 후반 반지/기타도 섞임)
+if(typeof pickSlotForMapTier !== "function"){
+  window.pickSlotForMapTier = function(mapTier){
+    const t = Math.max(1, mapTier||1);
+    // weapon, chest, helm, boots, ring
+    if(t <= 2){
+      return __randPickWeighted([
+        {v:"weapon", w:45},
+        {v:"chest",  w:25},
+        {v:"helm",   w:15},
+        {v:"boots",  w:10},
+        {v:"ring",   w:5},
+      ]);
+    }
+    if(t <= 6){
+      return __randPickWeighted([
+        {v:"weapon", w:35},
+        {v:"chest",  w:25},
+        {v:"helm",   w:15},
+        {v:"boots",  w:12},
+        {v:"ring",   w:13},
+      ]);
+    }
+    return __randPickWeighted([
+      {v:"weapon", w:28},
+      {v:"chest",  w:22},
+      {v:"helm",   w:15},
+      {v:"boots",  w:13},
+      {v:"ring",   w:22},
+    ]);
+  };
+}
+
+// 2) 베이스 티어 분포 (mapTier가 오를수록 상위 tier 비중 증가)
+if(typeof pickBaseTierForMap !== "function"){
+  window.pickBaseTierForMap = function(mapTier){
+    const t = Math.max(1, mapTier||1);
+    // baseTier: 1~5 기준
+    if(t <= 2)  return __randPickWeighted([{v:1,w:80},{v:2,w:20}]);
+    if(t <= 4)  return __randPickWeighted([{v:1,w:45},{v:2,w:35},{v:3,w:20}]);
+    if(t <= 6)  return __randPickWeighted([{v:1,w:20},{v:2,w:30},{v:3,w:30},{v:4,w:20}]);
+    if(t <= 8)  return __randPickWeighted([{v:2,w:20},{v:3,w:35},{v:4,w:30},{v:5,w:15}]);
+    return __randPickWeighted([{v:3,w:25},{v:4,w:35},{v:5,w:40}]);
+  };
+}
+
+// 3) ilvl 스케일 (맵티어 상승 → ilvl 상승)
+if(typeof rollItemLevelFromMapTier !== "function"){
+  window.rollItemLevelFromMapTier = function(mapTier){
+    const t = Math.max(1, mapTier||1);
+    // 예: t=1 → 1~8, t=5 → 21~28, t=10 → 46~55
+    const base = (t-1)*5 + 1;
+    const jitter = Math.floor(Math.random()*8); // 0~7
+    return base + jitter;
+  };
+}
 resetGame();
 loop();
 </script>
