@@ -3513,12 +3513,11 @@ function pickItemsForChoice(count){
 
 function spawnLoot(x, y, source="mob"){
   if(loots.length > 25) loots.splice(0, loots.length-25);
-  const choices = pickItemsForChoice(3);
-  
-  if(!choices || !choices.length){
-    console.warn("No items rolled");
-    return;
-  }
+const choices = pickItemsForChoice(3);
+if(!choices || !choices.length){
+  console.warn("No items rolled");
+  return;
+}
 loots.push({ x, y, r: 14, ttl: 60*45, choices, taken: false, source });
 }
 
@@ -7576,7 +7575,23 @@ function resetGame(){
   pendingLoot = null;
   lootOverlay.style.display = "none";
 }
+// ===============================
+// ✅ FAILSAFE: pickItemsForChoice 절대 크래시 방지 래퍼
+// ===============================
+(function(){
+  if(typeof pickItemsForChoice !== "function") return;
+  const __origPick = pickItemsForChoice;
 
+  window.pickItemsForChoice = function(count){
+    try{
+      const out = __origPick(count);
+      return Array.isArray(out) ? out.filter(Boolean) : [];
+    }catch(e){
+      console.warn("pickItemsForChoice CRASH BLOCKED:", e);
+      return [];
+    }
+  };
+})();
 resetGame();
 loop();
 </script>
