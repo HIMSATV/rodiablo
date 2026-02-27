@@ -1112,7 +1112,70 @@ body{
       width:100% !important;
       box-sizing:border-box !important;
     }
+/* =======================
+   CRAFTING PANEL FIX
+======================= */
 
+#craftingPanel{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.92);
+  z-index:9999;
+  display:none;
+  flex-direction:column;
+  color:#fff;
+}
+
+#craftingPanel.active{
+  display:flex;
+}
+
+#craftTop{
+  display:flex;
+  justify-content:space-between;
+  padding:20px;
+}
+
+#craftItemIcon{
+  width:90px;
+  height:90px;
+  border:2px solid #999;
+  border-radius:10px;
+}
+
+#craftOptions{
+  flex:1;
+  margin-left:20px;
+  max-height:120px;
+  overflow-y:auto;
+}
+
+#craftDesc{
+  padding:15px;
+  border-top:1px solid #333;
+  border-bottom:1px solid #333;
+  font-size:14px;
+}
+
+#craftOrbs{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+  padding:15px;
+}
+
+.craftOrb{
+  background:#222;
+  border:1px solid #444;
+  border-radius:8px;
+  padding:10px;
+  text-align:center;
+  cursor:pointer;
+}
+
+.craftOrb:hover{
+  border-color:gold;
+}
 </style>
 </head>
 <body>
