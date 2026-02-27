@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+Oni Samurai
+:root{ –uiScale: 1.2; –uiH: clamp(calc(84px * var(–uiScale)),
+calc(16vh * var(–uiScale)), calc(120px * var(–uiScale))); –pad:
+clamp(calc(66px * var(–uiScale)), calc(12.5vw * var(–uiScale)),
+calc(90px * var(–uiScale))); –stick:clamp(calc(28px * var(–uiScale)),
+calc(5.6vw * var(–uiScale)), calc(40px * var(–uiScale))); –btn:
+clamp(calc(70px * var(–uiScale)), calc(13vw * var(–uiScale)),
+calc(90px * var(–uiScale))); }
+
+body{ margin:0; background:black; overflow:hidden; touch-action:none; }
+#game{ position:fixed; top:0; left:0; image-rendering:pixelated; }
+
+/* ============================= / / ✅ 하단 UI 바 / /
+============================= */ #ui{
+position:fixed;bottom:0;width:100%;height:var(–uiH);
+background:#111;border-top:3px solid #550000;
+display:flex;align-items:center;justify-content:space-between; padding:0
+clamp(10px, 4vw, 25px);box-sizing:border-box; z-index:50; }
+
+#movePad{ position:relative; width:var(–pad);height:var(–pad);
+border-radius:50%; background:#222; } #stick{ position:absolute;
+width:var(–stick); height:var(–stick); border-radius:50%;
+background:#666; left: calc(50% - (var(–stick) / 2)); top: calc(50% -
+(var(–stick) / 2)); }
+
+/* 오른쪽 버튼 영역 */ #rightBtns{ position:relative; width:var(–btn);
+height:var(–btn); display:block; overflow:visible; }
+
+#attackBtn{ position:absolute; right:0; bottom:0;
+width:var(–btn);height:var(–btn); border-radius:50%;
+background:#990000;border:3px solid #ff4444;
+display:flex;align-items:center;justify-content:center;
+font-size:26px;color:white; user-select:none; -webkit-user-select:none;
+} #attackBtn.active{background:red;transform:scale(.85);}
+
+#attackIcon{ position:absolute; top:50%; left:50%;
+transform:translate(-50%,-50%); pointer-events:none; }
+
+/* ============================= / / ✅ 아이템 선택 오버레이 UI / /
+============================= */ #lootOverlay{ position:fixed; inset:0;
+display:none; align-items:center; justify-content:center;
+background:rgba(0,0,0,0.75); z-index:9999; font-family:system-ui,
+-apple-system, Segoe UI, Roboto, Arial; }
+
+#lootPanel{ width:min(92vw, 520px); background:#111; border:2px solid
+#444; border-radius:14px; padding:14px; box-shadow:0 0 30px
+rgba(0,0,0,0.6); } #lootTitle{ color:#fff; font-weight:800;
+font-size:18px; margin:4px 2px 10px; text-align:center; } .lootCards{
+display:flex; flex-direction:column; gap:10px; } .lootCard{
+background:#1a1a1a; border:2px solid #333; border-radius:12px;
+padding:12px; color:#eee; line-height:1.25; } .lootCard .name{
+font-weight:900; margin-bottom:6px; } .lootCard .desc{ color:#cfcfcf;
+font-size:14px; } .lootCard button{ margin-top:10px; width:100%;
+padding:10px 12px; border:0; border-radius:10px; background:#2d6cff;
+color:#fff; font-weight:800; font-size:15px; } .lootCard.normal{
+border-color:#3a3a3a; box-shadow:0 0 8px rgba(255,255,255,0.1); }
+.lootCard.magic{ border-color:#2f7bff; box-shadow:0 0 14px
+rgba(0,140,255,0.6); } .lootCard.rare{ border-color:#ffd166;
+box-shadow:0 0 16px rgba(255,209,102,0.55); } .lootCard.unique{
+border-color:#ffb86b; box-shadow:0 0 20px rgba(255,184,107,0.70);
+animation:uniqueGlow 1.6s infinite alternate; } @keyframes uniqueGlow{
+from{ box-shadow:0 0 14px rgba(255,184,107,0.35); } to{ box-shadow:0 0
+24px rgba(255,184,107,0.85); } } to{ box-shadow:0 0 25px
+rgba(255,120,255,1); } } /* ✅ 아이템 정보창 HTML 렌더 / .itemInfoWrap{
+white-space: normal; line-height: 1.25; } .itemInfoName{ font-weight:
+900; margin-bottom: 6px; } .itemInfoLine{ white-space: pre-line; /
+줄바꿈 유지 / font-size: 13px; color: #ddd; } .itemInfoTier{
+opacity:0.75; font-size:12px; margin-left:6px; } .itemInfoDim{
+color:#aaa; } .itemInfoGap{ height:8px; } / ✅ POE식 아이템 이름 색상 /
+.rName{ font-weight:900; } .r-normal{ color:#ffffff; } .r-magic{
+color:#2f7bff; } .r-rare{ color:#ffd166; } .r-unique{ color:#ffb86b; } /
+유니크 / / ============================= / / ✅ 장비/가방/카오스: 분리
+창 UI / / ============================= */ #hudBtns{ position:fixed;
+top:10px; left:10px; display:flex; flex-direction:column; gap:8px;
+z-index:80; } .hudBtn{ width:44px;height:44px; border-radius:14px;
+border:1px solid rgba(255,255,255,0.18); background:rgba(20,20,20,0.86);
+color:#fff; font-size:20px; box-shadow:0 0 14px rgba(0,0,0,0.45);
+user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+.hudBtn:active{ transform:scale(0.96); }
+
+/* 공통 오버레이 */ .panelOverlay{ position:fixed; inset:0;
+display:none; background:rgba(0,0,0,0.55); z-index:9999;
+font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
+align-items:center; justify-content:center; }
+
+/* 공통 패널 */ .panel{ width:min(96vw, 980px); height:min(90vh, 760px);
+background:#141414; border:2px solid #3a3a3a; border-radius:14px;
+padding:12px; box-sizing:border-box; display:flex;
+flex-direction:column; gap:10px; } .panelTop{ display:flex;
+align-items:center; justify-content:flex-end; gap:10px; } .panelClose{
+padding:8px 12px; border-radius:12px; border:1px solid #3a3a3a;
+background:#202020; color:#f0f0f0; cursor:pointer; font-size:13px; }
+.panelClose:hover{ border-color:#888; }
+
+/* ===== 장비/스펙 패널 ===== */ #equipPanelBody{ flex:1 1 auto;
+display:flex; gap:12px; min-height:0; } #equipSlots{ flex:0 0 44%;
+background:#101010; border:1px solid #2b2b2b; border-radius:12px;
+padding:12px; box-sizing:border-box; display:grid;
+grid-template-columns: 1fr 1fr; gap:10px; align-content:start; } .eSlot{
+border:1px solid #444; border-radius:12px; background:#1a1a1a;
+padding:10px; min-height:84px; cursor:pointer; display:flex;
+flex-direction:column; justify-content:center; gap:6px; } .eSlot .label,
+.eSlot .item{ display:none; }
+
+.eSlot:hover{ border-color:#888; } .eSlot.selected{ outline:2px solid
+#ffd166; } .eSlot .label{ font-size:12px; color:#aaa;
+text-transform:uppercase; letter-spacing:0.06em; } .eSlot .item{
+font-size:14px; color:#f2f2f2; line-height:1.2; word-break:break-word; }
+.eSlot .label{ display:none !important; } #specBox{ margin-top:4px; /*
+또는 4px / flex:1 1 auto; background:transparent; border:none;
+border-radius:0; padding:0; box-sizing:border-box; display:flex;
+flex-direction:column; gap:6px; min-height:0; } #specText{
+margin-top:8px; padding:12px; font-size:clamp(12px, 2.6vw, 14px); / ✅
+글씨 조금 작게 / line-height:1.35; color:#ddd; white-space:pre-line; /
+✅ 줄바꿈 그대로 / overflow-y:auto; / ✅ 내용 많으면 스크롤 /
+max-height:clamp(140px, 22vh, 190px); / ✅ 박스 안에서만 스크롤 /
+-webkit-overflow-scrolling:touch; } #equipInfo{ margin-top:4px; /
+기존값보다 줄이기 */ flex:0 0 auto; height:clamp(170px, 26vh, 260px);
+overflow:auto; overscroll-behavior:contain;
+-webkit-overflow-scrolling:touch; white-space:pre-line; font-size:13px;
+color:#ddd; background:#0f0f0f; border:1px solid #2b2b2b;
+border-radius:12px; padding:10px;
+
+width:100%; box-sizing:border-box; }
+
+/* ===== 가방 패널 ===== / #bagBody{ flex:1 1 auto; display:flex;
+flex-direction:column; / ✅ 위-아래 배치로 고정 */ gap:12px;
+min-height:0; }
+
+/* ✅ 아이템 설명: 위 / #bagInfo{ flex:0 0 42vh; / ✅ 정보창 높이 고정 /
+height:42vh; / ✅ 아이템에 따라 크기 변하지 않게 */ overflow:auto;
+white-space:pre-line; font-size:13px; color:#ddd; background:#101010;
+border:1px solid #2b2b2b; border-radius:12px; padding:12px;
+box-sizing:border-box; }
+
+/* ✅ 인벤 그리드: 아래 + 스크롤 / #bagGrid{ flex:1 1 auto;
+overflow:auto; / ✅ 스크롤 */ display:grid; grid-template-columns:
+repeat(6, 1fr); gap:8px; background:#101010; border:1px solid #2b2b2b;
+border-radius:12px; padding:10px; box-sizing:border-box;
+align-content:start; min-height:0; } .bItem{ border:1px solid #555;
+border-radius:12px; background:#171717; min-height:56px; cursor:pointer;
+display:flex; align-items:center; justify-content:center;
+position:relative; } .bItem.normal{ border-color:#666; } .bItem.magic{
+border-color:#2f7bff; box-shadow:0 0 10px rgba(0,140,255,0.35); }
+.bItem.rare{ border-color:#ffd166; box-shadow:0 0 12px
+rgba(255,209,102,0.30); } .bItem.unique{ border-color:#ffb86b;
+box-shadow:0 0 14px rgba(255,184,107,0.35); }
+
+.bItem:hover{ border-color:#888; } .bItem.selected{ outline:2px solid
+#6bf178; } .bItem.unique{ border-color:#b89b00; }
+
+.iconCanvas{ position:static; display:block;
+background:rgba(255,255,255,0.06); border-radius:10px; }
+
+/* ===== 카오스 패널 ===== */ #chaosBody{ flex:1 1 auto; display:flex;
+gap:12px; min-height:0; } #chaosLeft{ flex:1 1 auto; background:#101010;
+border:1px solid #2b2b2b; border-radius:12px; padding:12px;
+box-sizing:border-box; display:flex; flex-direction:column; gap:10px; }
+#chaosCount{ font-size:18px; font-weight:900; color:#fff; } #chaosBtn{
+padding:12px 14px; border-radius:12px; border:1px solid #3a3a3a;
+background:#2d6cff; color:#fff; font-weight:900; cursor:pointer; }
+#chaosBtn:active{ transform:scale(0.98); }
+
+#chaosInfo{ flex:1 1 auto; overflow:auto; white-space:pre-line;
+font-size:13px; color:#ddd; background:#0f0f0f; border:1px solid
+#2b2b2b; border-radius:12px; padding:12px; }
+
+/* 모바일 / @media (max-width: 600px){ #bagGrid{ grid-template-columns:
+repeat(4, 1fr); } #equipPanelBody{ flex-direction:column; } #equipSlots{
+grid-template-columns:1fr 1fr; flex:0 0 auto; } #bagBody{
+flex-direction:column; } #bagGrid{ flex: 1 1 auto; min-height: 0;
+overflow: auto; } #bagInfo{ flex:0 0 42vh; height:42vh; overflow:auto; }
+} / ============================= / / ✅ DIABLO STYLE UI SKIN (ADD) / /
+✅
+⚔️ 🎒
+
+    <div id="lootTitle">아이템 선택 (1개만)</div>
+    <div class="lootCards" id="lootCards"></div>
+
+가방 제작 해제 닫기
+
+    <div id="equipPanelBody">
+      <div id="equipSlots"></div>
+      <div id="equipInfo" class="itemInfoBox"></div>
+      <div id="specBox">
+        <div id="specText"></div>
+      </div>
+    </div>
+
+스펙 장착 닫기
+
+    <div id="bagBody">
+      <div id="bagInfo"></div>
+      <div id="bagGrid"></div>
+    </div>
+
+    <div class="panelTop">
+      <button class="panelClose" id="btnCraftClose" type="button">닫기</button>
+    </div>
+
+    <div id="craftBody">
+
+      <!-- 상단: 좌측 옵션 / 우측 아이콘 -->
+      <div id="craftTopRow">
+        <div id="craftItemText"></div>
+        <canvas id="craftItemIcon" width="110" height="110"></canvas>
+      </div>
+
+      <hr class="panelHr"/>
+
+      <!-- 오브 설명 -->
+      <div id="orbDesc">오브를 선택하면 설명이 표시됩니다.</div>
+
+      <hr class="panelHr"/>
+
+      <!-- 하단: 오브들 -->
+      <div id="orbCounts"></div>
+      <div class="orbGrid" id="craftOrbGrid">
+        <button class="orbBtn" id="orbTransmute" type="button">진화</button>
+        <button class="orbBtn" id="orbAlter" type="button">변화</button>
+        <button class="orbBtn" id="orbAug" type="button">확장</button>
+        <button class="orbBtn" id="orbRegal" type="button">제왕</button>
+
+        <button class="orbBtn" id="orbAlchemy" type="button">연금</button>
+        <button class="orbBtn" id="chaosBtn" type="button">카오스</button>
+        <button class="orbBtn" id="orbScour" type="button">정제</button>
+        <button class="orbBtn" id="orbExalt" type="button">엑잘</button>
+
+        <button class="orbBtn" id="orbAnnul" type="button">소멸</button>
+        <button class="orbBtn" id="orbDivine" type="button">신성</button>
+        <button class="orbBtn" id="orbCorrupt" type="button">타락</button>
+      </div>
+
+    </div>
+
+    <div id="attackBtn">
+      <canvas id="attackIcon" width="60" height="60"></canvas>
+    </div>
