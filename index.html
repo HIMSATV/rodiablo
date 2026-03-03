@@ -9649,8 +9649,7 @@ function drawIso(){
   // 카메라(아이소 좌표 기준) — 줌을 반영해서 플레이어가 화면 중앙에 고정
   const pIso = isoProject(player.x, player.y);
   let camX = pIso.x - (canvas.width  / (2*ZOOM));
-  let camY = pIso.y - (canvas.height / (2*ZOOM) - ISO.camYOffset);
-
+  let camY = pIso.y - (canvas.height / (2*ZOOM));
   // shake가 있으면 간단 반영
   if(typeof shake !== "undefined" && shake > 0){
     camX += (Math.random()-0.5)*shake;
