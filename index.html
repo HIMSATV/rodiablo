@@ -8438,24 +8438,39 @@ function unequipSlotToBag(slot){
 
 /* ===== 패널 열고 닫기 ===== */
 function openPanel(which){
+  // ✅ 이미 패널이 열려있는 상태에서 "전환"하는 경우:
+  // overlayPush()를 또 쌓지 않는다 (overlayCount 폭증 방지)
+  const wasOpen = !!panelOpen;
+
   document.body.classList.add("panel-open");
-  overlayPush();
-  pauseGame({ dim: 0.60, blur: 2 });
   panelOpen = which;
 
+  // 표시 전환
   equipOverlay.style.display = (which==="equip") ? "flex" : "none";
   bagOverlay.style.display   = (which==="bag")   ? "flex" : "none";
   craftOverlay.style.display = (which==="craft") ? "flex" : "none";
 
+  // 최초로 패널을 여는 순간에만 overlayPush + pause
+  if(!wasOpen){
+    overlayPush();
+    pauseGame({ dim: 0.60, blur: 2 });
+  }
+
   renderAllPanels();
 }
+
 function closePanels(){
   document.body.classList.remove("panel-open");
   panelOpen = null;
+
   equipOverlay.style.display = "none";
   bagOverlay.style.display   = "none";
   craftOverlay.style.display = "none";
-  overlayPop();
+
+  // ✅ FAILSAFE: overlayCount가 꼬여도 무조건 조작 UI 복구
+  overlayCount = 0;
+  document.body.classList.remove("overlayActive");
+
   resumeGame();
 }
 
@@ -9373,7 +9388,7 @@ if(typeof prettyItemHTML === "function"){
     }
     if(close && !close.__b){
       close.__b = true;
-      close.addEventListener("click", (e)=>{ stop(e); if(typeof closeAllPanels==="function") closeAllPanels(); });
+      close.addEventListener("click", (e)=>{ stop(e); if(typeof closePanels==="function") closePanels(); });
     }
   }
 
