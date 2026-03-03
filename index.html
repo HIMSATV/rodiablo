@@ -9649,10 +9649,14 @@ function drawIso(){
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
   // 카메라(아이소 좌표 기준)
-  const pIso = isoProject(player.x, player.y);
-  let camX = pIso.x - canvas.width/2;
-  let camY = pIso.y - (canvas.height/2 - ISO.camYOffset);
+  const ZOOM = 1.4; // 네가 쓰는 확대값이랑 동일하게
 
+const pIso = isoProject(player.x, player.y);
+let camX = pIso.x - (canvas.width  / (2*ZOOM));
+let camY = pIso.y - (canvas.height / (2*ZOOM) - ISO.camYOffset);
+  ctx.setTransform(ZOOM,0,0,ZOOM,0,0);
+ctx.translate(-camX, -camY);
+  
   // shake가 있으면 간단 반영
   if(typeof shake !== "undefined" && shake > 0){
     camX += (Math.random()-0.5)*shake;
