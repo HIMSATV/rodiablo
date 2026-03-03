@@ -4971,7 +4971,7 @@ function drawIsoLootLabels(camX, camY){
   if(!loots || loots.length === 0) return;
 
   ctx.save();
-  ctx.setTransform(1.5,0,0,1.5,0,0);
+  ctx.setTransform(1,0,0,1,0,0);
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
 
@@ -9638,7 +9638,7 @@ function drawIsoPlayerSprite(sx, sy, p){
 function drawIso(){
   if(!ISO.tileW) isoInit();
 
-  ctx.setTransform(1,0,0,1,0,0);
+  ctx.setTransform(1.4,0,0,1.4,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = "#000";
   ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -11080,7 +11080,7 @@ if(typeof prettyItemHTML === "function"){
 
 
 
-<button id="lootBtn" aria-label="Loot" title="Loot">🧤</button>
+
 
 </body>
 </html>
