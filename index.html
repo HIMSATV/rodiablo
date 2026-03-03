@@ -5836,15 +5836,15 @@ function spawnMapPacks(tier){
       const dx = px - player.x, dy = py - player.y;
       if(dx*dx + dy*dy < 260*260) continue;
 
-      let min = 25;
-      let max = 32;
+      let min = 6;
+      let max = 10;
       if(tier >= 6){
-        min = 28 + Math.floor((tier-5) * 0.4);
-        max = 36 + Math.floor((tier-5) * 0.6);
+        min = 15 + Math.floor((tier-5) * 0.4);
+        max = 20 + Math.floor((tier-5) * 0.6);
       }
       if(tier >= 12){
-        min = 30 + Math.floor((tier-10) * 0.5);
-        max = 40 + Math.floor((tier-10) * 0.7);
+        min = 25 + Math.floor((tier-10) * 0.5);
+        max = 32 + Math.floor((tier-10) * 0.7);
       }
       max = Math.min(max, 45);
 
