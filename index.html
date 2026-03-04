@@ -6700,11 +6700,17 @@ function updateMage(e){
     updateMelee(e);
   }
 
-  e.castCooldown--;
-  if(e.castCooldown <= 0 && dist < 520){
-    spawnFireZone(player.x, player.y, e.damage);
-    e.castCooldown = 140 + Math.floor(Math.random()*50);
-  }
+  if(e.castCooldown <= 0 && dist < 200){
+
+  fireZones.push({
+    x:e.x,
+    y:e.y,
+    r:32,
+    life:180
+  });
+
+  e.castCooldown = 600; // 10초
+}
 }
 
 function updateBoss(e){
