@@ -9669,12 +9669,11 @@ const handY = r*0.16;        // ← 더 위로
     ctx.restore();
 // second arm for two-hand weapons
 if(isTwoHand){
-   ang *= 1.4;
-}
+
   ctx.save();
 
-  const backHandX = -r*0.16;
-  const backHandY = r*0.10;
+  const backHandX = -r*0.16 * side;   // 또는 * flip
+const backHandY =  r*0.10;
 
   ctx.translate(backHandX, backHandY);
 
