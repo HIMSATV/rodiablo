@@ -9620,13 +9620,20 @@ function drawIsoPlayerSprite(sx, sy, p){
 
   // draw weapon very close to body, upright; swing only while attacking
   function drawWeaponAndArm(kind){
-    const t = rarityTint(weaponRarity);
+
+const isTwoHand =
+  kind === "2h_axe" ||
+  kind === "warstaff" ||
+  kind === "2h_mace" ||
+  kind === "2h_sword";
+
+const t = rarityTint(weaponRarity);
 
     // "hand/grip" anchor: close to torso but not covering armor
     const facing = (typeof attackDir !== "undefined" && attackDir) ? attackDir : dir;
     const side = (facing === "left") ? -1 : 1;
-    const handX = r*0.36*side; // 🔧 move weapon a bit outward
-    const handY = r*0.28;
+    const handX = r*0.46*side;   // ← 더 옆으로
+const handY = r*0.16;        // ← 더 위로
 
     // idle pose: upright beside body
     let ang = 0; // 0 = vertical
@@ -9660,7 +9667,26 @@ function drawIsoPlayerSprite(sx, sy, p){
     ctx.lineTo(0, 0);              // hand
     ctx.stroke();
     ctx.restore();
+// second arm for two-hand weapons
+if(isTwoHand){
 
+  ctx.save();
+
+  const backHandX = -r*0.16;
+  const backHandY = r*0.12;
+
+  ctx.translate(backHandX, backHandY);
+
+  ctx.strokeStyle = "rgba(40,40,40,0.85)";
+  ctx.lineWidth = 2.6;
+
+  ctx.beginPath();
+  ctx.moveTo(-r*0.10, -r*0.12); // shoulder
+  ctx.lineTo(0, 0);             // hand
+  ctx.stroke();
+
+  ctx.restore();
+}
     // handle (below hand)
     // 🔍 weapon size (slightly bigger)
     const WEAPON_SCALE = 1.65;
@@ -9770,6 +9796,7 @@ function drawIsoPlayerSprite(sx, sy, p){
 
   // map weaponType -> kind string for renderer
   const kind = weaponType || "2h_sword";
+  
   drawWeaponAndArm(kind);
 
 
