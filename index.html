@@ -9632,8 +9632,8 @@ const t = rarityTint(weaponRarity);
     // "hand/grip" anchor: close to torso but not covering armor
     const facing = (typeof attackDir !== "undefined" && attackDir) ? attackDir : dir;
     const side = (facing === "left") ? -1 : 1;
-    const handX = r*0.46*side;   // ← 더 옆으로
-const handY = r*0.16;        // ← 더 위로
+    const handX = r*0.16*side;   // ← 더 옆으로
+const handY = r*0.05;        // ← 더 위로
 
     // idle pose: upright beside body
     let ang = 0; // 0 = vertical
