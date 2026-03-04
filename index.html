@@ -9644,7 +9644,9 @@ const handY = r*0.16;        // ← 더 위로
       // POE-ish arc: start slightly back -> forward
       ang = (-1.10) * (1-u) + (0.35) * u;         // radians
     }
-
+if(isTwoHand){
+   ang *= 1.6;
+}
     // 🔁 swing direction: keep axe as-is, reverse others (sword/mace/staff/warstaff)
     if(kind !== "2h_axe"){
       ang = -ang;
