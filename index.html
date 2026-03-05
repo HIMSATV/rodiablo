@@ -11765,32 +11765,22 @@ if(typeof prettyItemHTML === "function"){
   }
   requestAnimationFrame(tick);
 })();
-
-</script>
-
-
-
-
-
-
-
-
-
-
-</body>
-</html>
-
-
-
-
 <script>
-
 // ===== Disable toasts (keep UI clean) =====
 window.showToast = window.showToast || function(){};
 window.toast = window.toast || function(){};
 
+// ✅ MINIMAP NAME FIX (drawMinimap ↔ drawMiniMap)
+try{
+  if(typeof window.drawMinimap !== "function" && typeof window.drawMiniMap === "function"){
+    window.drawMinimap = window.drawMiniMap;
+  }
+  if(typeof window.drawMiniMap !== "function" && typeof window.drawMinimap === "function"){
+    window.drawMiniMap = window.drawMinimap;
+  }
+}catch(e){}
 
-// ===== Loot Button binding (emoji) =====
+// ✅ (선택) lootBtn 아직 파일에 남아있으면만 유지 (없으면 지워도 됨)
 (function(){
   const b = document.getElementById('lootBtn');
   if(!b) return;
@@ -11808,28 +11798,10 @@ window.toast = window.toast || function(){};
   b.addEventListener('mousedown', (e)=>{ stop(e); doLoot(); });
   b.addEventListener('click', (e)=>{ stop(e); doLoot(); });
 })();
-
-
-// ===============================
-// ✅ MINIMAP NAME FIX (drawMinimap ↔ drawMiniMap)
-// - 기존 코드가 drawMinimap()을 호출하는데 실제 구현은 drawMiniMap()인 경우가 있어
-//   미니맵이 통째로 안 보이는 문제가 생김.
-// - 아래는 둘 중 하나만 존재해도 항상 동작하게 만드는 브리지.
-// ===============================
-if(typeof window.drawMinimap !== "function" && typeof window.drawMiniMap === "function"){
-  window.drawMinimap = window.drawMiniMap;
-}
-if(typeof window.drawMiniMap !== "function" && typeof window.drawMinimap === "function"){
-  window.drawMiniMap = window.drawMinimap;
-}
-
 </script>
+</body>
+</html>
 
 
-// ✅ minimap naming compatibility
-try{
-  if(typeof drawMinimap !== "function" && typeof drawMiniMap === "function"){
-    window.drawMinimap = drawMiniMap;
-  }
-}catch(e){}
+
 
