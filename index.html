@@ -7792,6 +7792,7 @@ function draw(){
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawPlayer(canvas.width/2, canvas.height/2);
   // town labels (screen space)
+  drawTownObjects();
   drawTownPrompts();
   drawUI();
 
@@ -7961,7 +7962,28 @@ function drawEnemy(e){
   ctx.fillRect(e.x-4,e.y-14,3,3);
   ctx.fillRect(e.x+1,e.y-14,3,3);
 }
+function drawTownObjects(){
 
+  if(!window.townStashPos) return;
+
+  const objs = [
+    {p: townStashPos, c:"#ffd060"},
+    {p: townDevicePos, c:"#ff9040"},
+    {p: lastPortal, c:"#40a0ff"}
+  ];
+
+  for(const o of objs){
+
+    if(!o.p) continue;
+
+    const iso = worldToIso(o.p.x, o.p.y);
+
+    ctx.fillStyle = o.c;
+    ctx.beginPath();
+    ctx.arc(iso.x, iso.y-10, 12, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
 /* ===== UI ===== */
 function drawUI(){
   drawTextUI();
